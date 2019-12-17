@@ -7,9 +7,9 @@ type Graph struct {
 	Root Node
 }
 
-//// Process processes the Event by routing it through all of the graph's nodes,
+//// Process processes the Envelope by routing it through all of the graph's nodes,
 //// starting with the root node.
-//func (g *Graph) Process(e *Event) error {
+//func (g *Graph) Process(e *Envelope) error {
 //
 //	node := g.Root
 //

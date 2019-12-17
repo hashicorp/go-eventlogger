@@ -4,12 +4,12 @@ import "testing"
 
 func TestFilter(t *testing.T) {
 
-	predicate := func(e *Event) (bool, error) {
+	predicate := func(e *Envelope) (bool, error) {
 		return true, nil
 	}
 	f := &Filter{Predicate: predicate}
 
-	e := &Event{}
+	e := &Envelope{}
 	err := f.Process(e)
 	if err != nil {
 		t.Fatal(err)
@@ -18,12 +18,12 @@ func TestFilter(t *testing.T) {
 
 func TestByteWriter(t *testing.T) {
 
-	marshaller := func(e *Event) ([]byte, error) {
+	marshaller := func(e *Envelope) ([]byte, error) {
 		return make([]byte, 0), nil
 	}
 	w := &ByteWriter{Marshaller: marshaller}
 
-	e := &Event{}
+	e := &Envelope{}
 	err := w.Process(e)
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +32,7 @@ func TestByteWriter(t *testing.T) {
 
 func TestFileSink(t *testing.T) {
 	fs := &FileSink{FilePath: "test.log"}
-	e := &Event{}
+	e := &Envelope{}
 	e.Marshalled = []byte("abcdef")
 	err := fs.Process(e)
 	if err != nil {

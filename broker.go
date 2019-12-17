@@ -7,9 +7,9 @@ type Future interface {
 
 // Broker
 type Broker struct {
-	Graphs map[EventType]*Graph
+	Graphs map[EventType][]*Graph
 }
 
-func (b *Broker) Process(e *Event) Future {
+func (b *Broker) Process(e *Envelope) Future {
 	return nil
 }
