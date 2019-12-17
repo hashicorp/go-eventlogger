@@ -1,12 +1,6 @@
 package eventlogger
 
-// Graph
-type Graph struct {
-	Root Node
-	// GuaranteeLevel -- future enhancement
-}
-
-// Future
+// Future.  This should probably be a channel or some such.
 type Future interface {
 	Await() error
 }

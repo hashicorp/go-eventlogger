@@ -18,16 +18,20 @@ type Event struct {
 	UserMetadata *iradix.Tree
 	Data         *iradix.Tree
 
-	Writable interface{} // A writable representation of the Event
+	// Writable is a writable representation of the Event, e.g. a []byte.
+	// Events that come in to the Broker should never have this field be
+	// populated.  Instead, it should be populated by Nodes like ByteWriter as
+	// the Event is propogated through its Graph.
+	Writable interface{}
 }
 
-func (e *Event) Clone() *Event {
-	return &Event{
-		Type:         e.Type,
-		CreatedAt:    e.CreatedAt,
-		Metadata:     e.Metadata,
-		UserMetadata: e.UserMetadata,
-		Data:         e.Data,
-		Writable:     e.Writable,
-	}
-}
+//func (e *Event) Clone() *Event {
+//	return &Event{
+//		Type:         e.Type,
+//		CreatedAt:    e.CreatedAt,
+//		Metadata:     e.Metadata,
+//		UserMetadata: e.UserMetadata,
+//		Data:         e.Data,
+//		Writable:     e.Writable,
+//	}
+//}

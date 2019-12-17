@@ -1,9 +1,41 @@
 package eventlogger
 
+import (
+	"errors"
+	"os"
+)
+
+//----------------------------------------------------------
+// Node
+
 // Node
 type Node interface {
-	Process(g *Graph, e *Event) error
+	Process(e *Event) error
 }
+
+//----------------------------------------------------------
+// Linkable
+
+type Linkable interface {
+	Next() Node
+	SetNext(Node)
+}
+
+type LinkedNode struct {
+	Link Node
+}
+
+func (ln LinkedNode) Next() Node {
+	return ln.Link
+}
+
+func (ln LinkedNode) SetNext(n Node) {
+	ln.Link = n
+}
+
+//type FanOutNode struct {
+//	Next []Node
+//}
 
 //----------------------------------------------------------
 // Filter
@@ -13,11 +45,14 @@ type Predicate func(e *Event) (bool, error)
 
 // Filter
 type Filter struct {
+	LinkedNode
+
 	Predicate Predicate
-	Next      Node
 }
 
-func (f *Filter) Process(g *Graph, e *Event) error {
+var DiscardEvent = errors.New("DiscardEvent")
+
+func (f *Filter) Process(e *Event) error {
 
 	// Use the predicate to see if we want to keep the event.
 	keep, err := f.Predicate(e)
@@ -25,14 +60,9 @@ func (f *Filter) Process(g *Graph, e *Event) error {
 		return err
 	}
 	if !keep {
-		return nil
+		return DiscardEvent
 	}
-
-	// Process the next Node
-	if f.Next == nil {
-		return nil
-	}
-	return f.Next.Process(g, e)
+	return nil
 }
 
 //----------------------------------------------------------
@@ -44,11 +74,12 @@ type ByteMarshaller func(e *Event) ([]byte, error)
 
 // ByteWriter
 type ByteWriter struct {
+	LinkedNode
+
 	Marshaller ByteMarshaller
-	Next       Node
 }
 
-func (w *ByteWriter) Process(g *Graph, e *Event) error {
+func (w *ByteWriter) Process(e *Event) error {
 
 	// Marshal
 	bytes, err := w.Marshaller(e)
@@ -56,20 +87,39 @@ func (w *ByteWriter) Process(g *Graph, e *Event) error {
 		return err
 	}
 
-	// Clone the event and add in the writable representation
-	ne := e.Clone()
-	ne.Writable = bytes
-
-	// Process the next Node
-	if w.Next == nil {
-		return nil
-	}
-	return w.Next.Process(g, ne)
+	// Add the writable representation
+	e.Writable = bytes
+	return nil
 }
 
-////----------------------------------------------------------
-////// FanOutNode creates a tree, which will be
-////// useful for e.g. fanning out to multiple Sinks.
-////struct FanOutNode {
-////	next []Nodes
-////}
+//----------------------------------------------------------
+// FileSink
+
+// FileSink writes the []byte representation of an Event to a file
+// as a string.
+type FileSink struct {
+	FilePath string
+}
+
+func (fs *FileSink) Process(e *Event) error {
+
+	bytes, ok := (e.Writable).([]byte)
+	if !ok {
+		return errors.New("Event is not writable to a FileSink")
+	}
+
+	f, err := os.OpenFile(fs.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err = f.WriteString(string(bytes)); err != nil {
+		return err
+	}
+	if _, err = f.WriteString("\n"); err != nil {
+		return err
+	}
+
+	return nil
+}
