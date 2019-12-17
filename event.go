@@ -16,7 +16,7 @@ type Envelope struct {
 	Metadata     map[string]interface{} // immutable
 	UserMetadata map[string]interface{} // immutable
 
-	Data map[string]interface{} //*iradix.Tree
+	Data map[string]interface{} //TODO: *iradix.Tree? something else?
 
 	// Marshalled is a writable representation of the Envelope, e.g. a []byte.
 	// Events that come in to the Broker should never have this field be
