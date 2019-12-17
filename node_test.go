@@ -33,7 +33,7 @@ func TestByteWriter(t *testing.T) {
 func TestFileSink(t *testing.T) {
 	fs := &FileSink{FilePath: "test.log"}
 	e := &Event{}
-	e.Writable = []byte("abcdef")
+	e.Marshalled = []byte("abcdef")
 	err := fs.Process(e)
 	if err != nil {
 		t.Fatal(err)

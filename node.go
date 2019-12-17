@@ -8,34 +8,15 @@ import (
 //----------------------------------------------------------
 // Node
 
-// Node
 type Node interface {
 	Process(e *Event) error
 }
 
-//----------------------------------------------------------
-// Linkable
-
-type Linkable interface {
-	Next() Node
-	SetNext(Node)
+type LinkableNode interface {
+	Node
+	SetNext([]Node)
+	Next() []Node
 }
-
-type LinkedNode struct {
-	Link Node
-}
-
-func (ln LinkedNode) Next() Node {
-	return ln.Link
-}
-
-func (ln LinkedNode) SetNext(n Node) {
-	ln.Link = n
-}
-
-//type FanOutNode struct {
-//	Next []Node
-//}
 
 //----------------------------------------------------------
 // Filter
@@ -45,7 +26,7 @@ type Predicate func(e *Event) (bool, error)
 
 // Filter
 type Filter struct {
-	LinkedNode
+	nodes []Node
 
 	Predicate Predicate
 }
@@ -65,6 +46,14 @@ func (f *Filter) Process(e *Event) error {
 	return nil
 }
 
+func (f *Filter) SetNext(nodes []Node) {
+	f.nodes = nodes
+}
+
+func (f *Filter) Next() []Node {
+	return f.nodes
+}
+
 //----------------------------------------------------------
 // ByteWriter
 
@@ -74,22 +63,28 @@ type ByteMarshaller func(e *Event) ([]byte, error)
 
 // ByteWriter
 type ByteWriter struct {
-	LinkedNode
+	nodes []Node
 
 	Marshaller ByteMarshaller
 }
 
 func (w *ByteWriter) Process(e *Event) error {
 
-	// Marshal
 	bytes, err := w.Marshaller(e)
 	if err != nil {
 		return err
 	}
 
-	// Add the writable representation
-	e.Writable = bytes
+	e.Marshalled = bytes
 	return nil
+}
+
+func (w *ByteWriter) SetNext(nodes []Node) {
+	w.nodes = nodes
+}
+
+func (w *ByteWriter) Next() []Node {
+	return w.nodes
 }
 
 //----------------------------------------------------------
@@ -103,7 +98,7 @@ type FileSink struct {
 
 func (fs *FileSink) Process(e *Event) error {
 
-	bytes, ok := (e.Writable).([]byte)
+	bytes, ok := (e.Marshalled).([]byte)
 	if !ok {
 		return errors.New("Event is not writable to a FileSink")
 	}

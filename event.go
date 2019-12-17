@@ -2,8 +2,7 @@ package eventlogger
 
 import (
 	"time"
-
-	iradix "github.com/hashicorp/go-immutable-radix"
+	//iradix "github.com/hashicorp/go-immutable-radix"
 )
 
 // EventType is a string that uniquely identifies the type of an Event within a
@@ -14,16 +13,24 @@ type EventType string
 type Event struct {
 	Type         EventType
 	CreatedAt    time.Time
-	Metadata     *iradix.Tree
-	UserMetadata *iradix.Tree
-	Data         *iradix.Tree
+	Metadata     map[string]interface{} // immutable
+	UserMetadata map[string]interface{} // immutable
 
-	// Writable is a writable representation of the Event, e.g. a []byte.
+	Data map[string]interface{} //*iradix.Tree
+
+	// Marshalled is a writable representation of the Event, e.g. a []byte.
 	// Events that come in to the Broker should never have this field be
 	// populated.  Instead, it should be populated by Nodes like ByteWriter as
 	// the Event is propogated through its Graph.
-	Writable interface{}
+	Marshalled interface{}
+	//Formatters map[string]Whatever
+	//sync.Map
 }
+
+//Filterer
+//Redactor
+//(JsonPointer
+//Sink
 
 //func (e *Event) Clone() *Event {
 //	return &Event{
