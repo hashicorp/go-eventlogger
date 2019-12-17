@@ -1,6 +1,10 @@
 package eventlogger
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/go-test/deep"
+)
 
 func TestFilter(t *testing.T) {
 
@@ -10,7 +14,7 @@ func TestFilter(t *testing.T) {
 	f := &Filter{Predicate: predicate}
 
 	e := &Envelope{}
-	err := f.Process(e)
+	_, err := f.Process(e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +28,7 @@ func TestByteWriter(t *testing.T) {
 	w := &ByteWriter{Marshaller: marshaller}
 
 	e := &Envelope{}
-	err := w.Process(e)
+	_, err := w.Process(e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,8 +38,33 @@ func TestFileSink(t *testing.T) {
 	fs := &FileSink{FilePath: "test.log"}
 	e := &Envelope{}
 	e.Marshalled = []byte("abcdef")
-	err := fs.Process(e)
+	_, err := fs.Process(e)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLinkNodes(t *testing.T) {
+
+	nodes, err := LinkNodes([]Node{
+		&Filter{Predicate: nil},
+		&ByteWriter{Marshaller: nil},
+		&FileSink{FilePath: "test.log"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		linked LinkableNode
+		next   []Node
+	}{
+		{nodes[0].(LinkableNode), []Node{nodes[1]}},
+		{nodes[1].(LinkableNode), []Node{nodes[2]}},
+	}
+	for i := 0; i < len(tests); i++ {
+		if diff := deep.Equal(tests[i].linked.Next(), tests[i].next); diff != nil {
+			t.Fatal(diff)
+		}
 	}
 }

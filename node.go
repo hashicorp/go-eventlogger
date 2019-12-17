@@ -9,13 +9,34 @@ import (
 // Node
 
 type Node interface {
-	Process(e *Envelope) error
+	Process(e *Envelope) (*Envelope, error)
 }
 
 type LinkableNode interface {
 	Node
 	SetNext([]Node)
 	Next() []Node
+}
+
+// LinkNodes is a convenience function that connects
+// Nodes together into a linked list. All of the nodes except the
+// last one must be LinkableNodes
+func LinkNodes(nodes []Node) ([]Node, error) {
+
+	num := len(nodes)
+	if num < 2 {
+		return nodes, nil
+	}
+
+	for i := 0; i < num-1; i++ {
+		ln, ok := nodes[i].(LinkableNode)
+		if !ok {
+			return nil, errors.New("Node is not Linkable")
+		}
+		ln.SetNext([]Node{nodes[i+1]})
+	}
+
+	return nodes, nil
 }
 
 //----------------------------------------------------------
@@ -31,19 +52,19 @@ type Filter struct {
 	Predicate Predicate
 }
 
-var DiscardEvent = errors.New("DiscardEvent")
-
-func (f *Filter) Process(e *Envelope) error {
+func (f *Filter) Process(e *Envelope) (*Envelope, error) {
 
 	// Use the predicate to see if we want to keep the event.
 	keep, err := f.Predicate(e)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !keep {
-		return DiscardEvent
+		return nil, nil
 	}
-	return nil
+
+	// return the event
+	return e, nil
 }
 
 func (f *Filter) SetNext(nodes []Node) {
@@ -68,15 +89,15 @@ type ByteWriter struct {
 	Marshaller ByteMarshaller
 }
 
-func (w *ByteWriter) Process(e *Envelope) error {
+func (w *ByteWriter) Process(e *Envelope) (*Envelope, error) {
 
 	bytes, err := w.Marshaller(e)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	e.Marshalled = bytes
-	return nil
+	return e, nil
 }
 
 func (w *ByteWriter) SetNext(nodes []Node) {
@@ -96,25 +117,26 @@ type FileSink struct {
 	FilePath string
 }
 
-func (fs *FileSink) Process(e *Envelope) error {
+func (fs *FileSink) Process(e *Envelope) (*Envelope, error) {
 
 	bytes, ok := (e.Marshalled).([]byte)
 	if !ok {
-		return errors.New("Envelope is not writable to a FileSink")
+		return nil, errors.New("Envelope is not writable to a FileSink")
 	}
 
 	f, err := os.OpenFile(fs.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 
 	if _, err = f.WriteString(string(bytes)); err != nil {
-		return err
+		return nil, err
 	}
 	if _, err = f.WriteString("\n"); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	// Do not return the event, since nothing more can happen to it downstream.
+	return nil, nil
 }
