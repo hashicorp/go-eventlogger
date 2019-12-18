@@ -5,14 +5,14 @@ type Graph struct {
 	Root Node
 }
 
-// Process the Envelope by routing it through all of the graph's nodes,
+// Process the Event by routing it through all of the graph's nodes,
 // starting with the root node.
-func (g *Graph) Process(env *Envelope) error {
+func (g *Graph) Process(env *Event) error {
 	return g.process(g.Root, env)
 }
 
 // Recursively process every node in the graph.
-func (g *Graph) process(node Node, env *Envelope) error {
+func (g *Graph) process(node Node, env *Event) error {
 
 	// Process the current Node
 	env, err := node.Process(env)
@@ -20,7 +20,7 @@ func (g *Graph) process(node Node, env *Envelope) error {
 		return err
 	}
 
-	// If the new Envelope is nil, it has been filtered out and we are done.
+	// If the new Event is nil, it has been filtered out and we are done.
 	if env == nil {
 		return nil
 	}

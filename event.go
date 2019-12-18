@@ -2,15 +2,14 @@ package eventlogger
 
 import (
 	"time"
-	//iradix "github.com/hashicorp/go-immutable-radix"
 )
 
-// EventType is a string that uniquely identifies the type of an Envelope within a
+// EventType is a string that uniquely identifies the type of an Event within a
 // given Broker.
 type EventType string
 
-// An Envelope is analogous to a log entry.
-type Envelope struct {
+// An Event is analogous to a log entry.
+type Event struct {
 	Type         EventType
 	CreatedAt    time.Time
 	Metadata     map[string]interface{} // immutable
@@ -19,22 +18,22 @@ type Envelope struct {
 	//TODO: We haven't decided what this is going to be yet.
 	// *iradix.Tree? something else?
 	// Maybe we can allow for layering
-	Data map[string]interface{}
+	Payload map[string]interface{}
 
-	// Marshalled is a writable representation of the Envelope, e.g. a []byte.
+	// Marshalled is a writable representation of the Event, e.g. a []byte.
 	// Events that come in to the Broker should never have this field be
 	// populated.  Instead, it should be populated by Nodes like ByteWriter as
-	// the Envelope is propogated through its Graph.
+	// the Event is propogated through its Graph.
 	Marshalled interface{}
 }
 
-//func (e *Envelope) Clone() *Envelope {
-//	return &Envelope{
+//func (e *Event) Clone() *Event {
+//	return &Event{
 //		Type:         e.Type,
 //		CreatedAt:    e.CreatedAt,
 //		Metadata:     e.Metadata,
 //		UserMetadata: e.UserMetadata,
-//		Data:         e.Data,
+//		Payload:         e.Payload,
 //		Writable:     e.Writable,
 //	}
 //}

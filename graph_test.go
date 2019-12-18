@@ -21,8 +21,8 @@ func TestGraph(t *testing.T) {
 	nodes, err := LinkNodes([]Node{
 		// Filter out the purple nodes
 		&Filter{
-			Predicate: func(e *Envelope) (bool, error) {
-				color, ok := e.Data["color"]
+			Predicate: func(e *Event) (bool, error) {
+				color, ok := e.Payload["color"]
 				return !ok || color != "purple", nil
 			},
 		},
@@ -43,27 +43,27 @@ func TestGraph(t *testing.T) {
 	}
 
 	// Process some Events
-	envelopes := []*Envelope{
-		&Envelope{
-			Data: map[string]interface{}{
+	envelopes := []*Event{
+		&Event{
+			Payload: map[string]interface{}{
 				"color": "red",
 				"width": 1,
 			},
 		},
-		&Envelope{
-			Data: map[string]interface{}{
+		&Event{
+			Payload: map[string]interface{}{
 				"color": "green",
 				"width": 2,
 			},
 		},
-		&Envelope{
-			Data: map[string]interface{}{
+		&Event{
+			Payload: map[string]interface{}{
 				"color": "purple",
 				"width": 3,
 			},
 		},
-		&Envelope{
-			Data: map[string]interface{}{
+		&Event{
+			Payload: map[string]interface{}{
 				"color": "blue",
 				"width": 4,
 			},

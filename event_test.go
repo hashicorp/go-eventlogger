@@ -6,6 +6,6 @@ import (
 )
 
 func TestEvent(t *testing.T) {
-	e := &Envelope{}
+	e := &Event{}
 	e.CreatedAt = time.Now()
 }

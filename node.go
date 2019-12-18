@@ -11,9 +11,9 @@ import (
 
 // A Node in a Graph
 type Node interface {
-	// Process does something with the Envelope: filter, redaction,
+	// Process does something with the Event: filter, redaction,
 	// marshalling, persisting.
-	Process(e *Envelope) (*Envelope, error)
+	Process(e *Event) (*Event, error)
 }
 
 // A LinkableNode is a Node that has downstream children.  Nodes
@@ -48,8 +48,8 @@ func LinkNodes(nodes []Node) ([]Node, error) {
 //----------------------------------------------------------
 // Filter
 
-// Predicate returns true if we want to keep the Envelope.
-type Predicate func(e *Envelope) (bool, error)
+// Predicate returns true if we want to keep the Event.
+type Predicate func(e *Event) (bool, error)
 
 // Filter
 type Filter struct {
@@ -58,7 +58,7 @@ type Filter struct {
 	Predicate Predicate
 }
 
-func (f *Filter) Process(e *Envelope) (*Envelope, error) {
+func (f *Filter) Process(e *Event) (*Event, error) {
 
 	// Use the predicate to see if we want to keep the event.
 	keep, err := f.Predicate(e)
@@ -85,14 +85,14 @@ func (f *Filter) Next() []Node {
 //----------------------------------------------------------
 // ByteWriter
 
-// ByteMarshaller turns an Envelope into a slice of bytes suitable for being
+// ByteMarshaller turns an Event into a slice of bytes suitable for being
 // persisted.
-type ByteMarshaller func(e *Envelope) ([]byte, error)
+type ByteMarshaller func(e *Event) ([]byte, error)
 
 // JSONMarshaller marshals the envelope into JSON.  For now, it just
-// does the Data field.
-var JSONMarshaller = func(e *Envelope) ([]byte, error) {
-	return json.Marshal(e.Data)
+// does the Payload field.
+var JSONMarshaller = func(e *Event) ([]byte, error) {
+	return json.Marshal(e.Payload)
 }
 
 // ByteWriter
@@ -102,7 +102,7 @@ type ByteWriter struct {
 	Marshaller ByteMarshaller
 }
 
-func (w *ByteWriter) Process(e *Envelope) (*Envelope, error) {
+func (w *ByteWriter) Process(e *Event) (*Event, error) {
 
 	bytes, err := w.Marshaller(e)
 	if err != nil {
@@ -124,17 +124,17 @@ func (w *ByteWriter) Next() []Node {
 //----------------------------------------------------------
 // FileSink
 
-// FileSink writes the []byte representation of an Envelope to a file
+// FileSink writes the []byte representation of an Event to a file
 // as a string.
 type FileSink struct {
 	FilePath string
 }
 
-func (fs *FileSink) Process(e *Envelope) (*Envelope, error) {
+func (fs *FileSink) Process(e *Event) (*Event, error) {
 
 	bytes, ok := (e.Marshalled).([]byte)
 	if !ok {
-		return nil, errors.New("Envelope is not writable to a FileSink")
+		return nil, errors.New("Event is not writable to a FileSink")
 	}
 
 	f, err := os.OpenFile(fs.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

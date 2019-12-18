@@ -8,12 +8,12 @@ import (
 
 func TestFilter(t *testing.T) {
 
-	predicate := func(e *Envelope) (bool, error) {
+	predicate := func(e *Event) (bool, error) {
 		return true, nil
 	}
 	f := &Filter{Predicate: predicate}
 
-	e := &Envelope{}
+	e := &Event{}
 	_, err := f.Process(e)
 	if err != nil {
 		t.Fatal(err)
@@ -22,12 +22,12 @@ func TestFilter(t *testing.T) {
 
 func TestByteWriter(t *testing.T) {
 
-	marshaller := func(e *Envelope) ([]byte, error) {
+	marshaller := func(e *Event) ([]byte, error) {
 		return make([]byte, 0), nil
 	}
 	w := &ByteWriter{Marshaller: marshaller}
 
-	e := &Envelope{}
+	e := &Event{}
 	_, err := w.Process(e)
 	if err != nil {
 		t.Fatal(err)
