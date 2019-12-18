@@ -6,6 +6,5 @@ import (
 
 func TestBroker(t *testing.T) {
 	b := &Broker{}
-	e := &Event{}
-	b.Process(nil, e)
+	b.Process(nil, "", nil)
 }

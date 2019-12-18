@@ -7,6 +7,6 @@ type Broker struct {
 	Graphs map[EventType][]*Graph
 }
 
-func (b *Broker) Process(ctx context.Context, e *Event) error {
+func (b *Broker) Process(ctx context.Context, t EventType, payload PayloadType) error {
 	return nil
 }
