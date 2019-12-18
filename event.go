@@ -8,17 +8,15 @@ import (
 // given Broker.
 type EventType string
 
+type MetadataType map[string]interface{}
+type PayloadType map[string]interface{}
+
 // An Event is analogous to a log entry.
 type Event struct {
-	Type         EventType
-	CreatedAt    time.Time
-	Metadata     map[string]interface{} // immutable
-	UserMetadata map[string]interface{} // immutable
-
-	//TODO: We haven't decided what this is going to be yet.
-	// *iradix.Tree? something else?
-	// Maybe we can allow for layering
-	Payload map[string]interface{}
+	Type      EventType
+	CreatedAt time.Time
+	Metadata  MetadataType
+	Payload   PayloadType
 
 	// Marshalled is a writable representation of the Event, e.g. a []byte.
 	// Events that come in to the Broker should never have this field be
@@ -33,7 +31,7 @@ type Event struct {
 //		CreatedAt:    e.CreatedAt,
 //		Metadata:     e.Metadata,
 //		UserMetadata: e.UserMetadata,
-//		Payload:         e.Payload,
+//		Payload:      e.Payload,
 //		Writable:     e.Writable,
 //	}
 //}

@@ -7,5 +7,5 @@ import (
 func TestBroker(t *testing.T) {
 	b := &Broker{}
 	e := &Event{}
-	b.Process(e)
+	b.Process(nil, e)
 }
