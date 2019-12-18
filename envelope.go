@@ -16,21 +16,17 @@ type Envelope struct {
 	Metadata     map[string]interface{} // immutable
 	UserMetadata map[string]interface{} // immutable
 
-	Data map[string]interface{} //TODO: *iradix.Tree? something else?
+	//TODO: We haven't decided what this is going to be yet.
+	// *iradix.Tree? something else?
+	// Maybe we can allow for layering
+	Data map[string]interface{}
 
 	// Marshalled is a writable representation of the Envelope, e.g. a []byte.
 	// Events that come in to the Broker should never have this field be
 	// populated.  Instead, it should be populated by Nodes like ByteWriter as
 	// the Envelope is propogated through its Graph.
 	Marshalled interface{}
-	//Formatters map[string]Whatever
-	//sync.Map
 }
-
-//Filterer
-//Redactor
-//(JsonPointer
-//Sink
 
 //func (e *Envelope) Clone() *Envelope {
 //	return &Envelope{

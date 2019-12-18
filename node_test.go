@@ -34,16 +34,6 @@ func TestByteWriter(t *testing.T) {
 	}
 }
 
-func TestFileSink(t *testing.T) {
-	fs := &FileSink{FilePath: "test.log"}
-	e := &Envelope{}
-	e.Marshalled = []byte("abcdef")
-	_, err := fs.Process(e)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestLinkNodes(t *testing.T) {
 
 	nodes, err := LinkNodes([]Node{
@@ -62,8 +52,8 @@ func TestLinkNodes(t *testing.T) {
 		{nodes[0].(LinkableNode), []Node{nodes[1]}},
 		{nodes[1].(LinkableNode), []Node{nodes[2]}},
 	}
-	for i := 0; i < len(tests); i++ {
-		if diff := deep.Equal(tests[i].linked.Next(), tests[i].next); diff != nil {
+	for _, tt := range tests {
+		if diff := deep.Equal(tt.linked.Next(), tt.next); diff != nil {
 			t.Fatal(diff)
 		}
 	}

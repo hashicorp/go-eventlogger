@@ -1,6 +1,7 @@
 package eventlogger
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 )
@@ -8,10 +9,15 @@ import (
 //----------------------------------------------------------
 // Node
 
+// A Node in a Graph
 type Node interface {
+	// Process does something with the Envelope: filter, redaction,
+	// marshalling, persisting.
 	Process(e *Envelope) (*Envelope, error)
 }
 
+// A LinkableNode is a Node that has downstream children.  Nodes
+// that are *not* LinkableNodes are Leafs.
 type LinkableNode interface {
 	Node
 	SetNext([]Node)
@@ -60,6 +66,7 @@ func (f *Filter) Process(e *Envelope) (*Envelope, error) {
 		return nil, err
 	}
 	if !keep {
+		// Return nil to signal that the event should be discarded.
 		return nil, nil
 	}
 
@@ -81,6 +88,12 @@ func (f *Filter) Next() []Node {
 // ByteMarshaller turns an Envelope into a slice of bytes suitable for being
 // persisted.
 type ByteMarshaller func(e *Envelope) ([]byte, error)
+
+// JSONMarshaller marshals the envelope into JSON.  For now, it just
+// does the Data field.
+var JSONMarshaller = func(e *Envelope) ([]byte, error) {
+	return json.Marshal(e.Data)
+}
 
 // ByteWriter
 type ByteWriter struct {
