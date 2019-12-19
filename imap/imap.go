@@ -4,7 +4,7 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix"
 )
 
-// IMap is an immutable data structure that layers changes onto a
+// IMap is an immutable data structure that layers modifications onto a
 // base map[string]interface{}.
 type IMap struct {
 	base    map[string]interface{}
@@ -12,15 +12,15 @@ type IMap struct {
 	deleted *iradix.Tree
 }
 
-//// Txn is a transaction on an IMap.
-//type Txn interface {
-//	Get(path *Path) (interface{}, bool)
-//	Set(path *Path, val interface{})
-//	Delete(path *Path)
-//}
+// Txn is a transaction on an IMap.
+type Txn struct {
+	base    map[string]interface{}
+	added   *iradix.Tree
+	deleted *iradix.Tree
+}
 
-// NewIMap creates a new IMap. Once an IMap is created, the underlying
-// map that is passed in must never be mutated.
+// NewIMap creates a new IMap. Once an IMap is created, the underlying base map
+// that is passed in must never be mutated.
 func NewIMap(base map[string]interface{}) *IMap {
 	return &IMap{
 		base:    base,
@@ -29,6 +29,8 @@ func NewIMap(base map[string]interface{}) *IMap {
 	}
 }
 
+// Get looks up the value for a specified path, along with whether
+// the value was found.
 func (m *IMap) Get(path *Path) (interface{}, bool) {
 
 	k := []byte(path.String())
@@ -37,58 +39,97 @@ func (m *IMap) Get(path *Path) (interface{}, bool) {
 	if ok {
 		return nil, false
 	}
-
 	val, ok := m.added.Get(k)
 	if ok {
 		return val, true
 	}
 
-	return m.getBase(path)
+	return getBase(m.base, path)
 }
 
-func (m *IMap) getBase(path *Path) (interface{}, bool) {
+func getBase(base map[string]interface{}, path *Path) (interface{}, bool) {
 
 	last := len(path.Keys) - 1
-	curMap := m.base
+	cur := base
 	for i := 0; i < last; i++ {
-		val, ok := curMap[path.Keys[i]]
+		val, ok := cur[path.Keys[i]]
 		if !ok {
 			return nil, false
 		}
-		curMap, ok = val.(map[string]interface{})
+		cur, ok = val.(map[string]interface{})
 		if !ok {
 			return nil, false
 		}
 	}
 
-	val, ok := curMap[path.Keys[last]]
+	val, ok := cur[path.Keys[last]]
 	return val, ok
 }
 
+// Set creates a new IMap that has a new value at the specified Path.
 func (m *IMap) Set(path *Path, val interface{}) *IMap {
+	tx := m.Txn()
+	tx.Set(path, val)
+	return tx.Commit()
+}
 
-	k := []byte(path.String())
+// Delete creates a new IMap that no longer has a value at the specified Path.
+func (m *IMap) Delete(path *Path) *IMap {
+	tx := m.Txn()
+	tx.Delete(path)
+	return tx.Commit()
+}
 
-	added, _, _ := m.added.Insert(k, val)
-	deleted, _, _ := m.deleted.Delete(k)
-
-	return &IMap{
+// Txn creates a new Transaction.
+func (m *IMap) Txn() *Txn {
+	return &Txn{
 		base:    m.base,
-		added:   added,
-		deleted: deleted,
+		added:   m.added,
+		deleted: m.deleted,
 	}
 }
 
-func (m *IMap) Delete(path *Path) *IMap {
+// Get looks up the value for a specified path, along with whether
+// the value was found.
+func (t *Txn) Get(path *Path) (interface{}, bool) {
 
 	k := []byte(path.String())
 
-	added, _, _ := m.added.Delete(k)
-	deleted, _, _ := m.deleted.Insert(k, true)
+	_, ok := t.deleted.Get(k)
+	if ok {
+		return nil, false
+	}
+	val, ok := t.added.Get(k)
+	if ok {
+		return val, true
+	}
 
+	return getBase(t.base, path)
+}
+
+// Set a value at the specified path in the transaction.
+func (t *Txn) Set(path *Path, val interface{}) {
+	k := []byte(path.String())
+	a, _, _ := t.added.Insert(k, val)
+	d, _, _ := t.deleted.Delete(k)
+	t.added = a
+	t.deleted = d
+}
+
+// Delete the path from the transaction
+func (t *Txn) Delete(path *Path) {
+	k := []byte(path.String())
+	a, _, _ := t.added.Delete(k)
+	d, _, _ := t.deleted.Insert(k, true)
+	t.added = a
+	t.deleted = d
+}
+
+// Commit commits the transaction, returning a new IMap
+func (t *Txn) Commit() *IMap {
 	return &IMap{
-		base:    m.base,
-		added:   added,
-		deleted: deleted,
+		base:    t.base,
+		added:   t.added,
+		deleted: t.deleted,
 	}
 }

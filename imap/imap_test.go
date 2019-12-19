@@ -89,6 +89,23 @@ func TestIMap(t *testing.T) {
 		{m5, NewPath("Also", "Missing"), nil, false},
 	}...)
 
+	tx := m5.Txn()
+	tx.Set(NewPath("Attributes", "Wisdom"), 1000)
+	tx.Delete(NewPath("Age"))
+	tx.Set(NewPath("Foo", "Bar"), 42)
+	m6 := tx.Commit()
+
+	tests = append(tests, []test{
+		{m6, NewPath("Name"), "Frodo", true},
+		{m6, NewPath("Age"), nil, false},
+		{m6, NewPath("Attributes", "Strength"), nil, false},
+		{m6, NewPath("Attributes", "Constitution"), 3, true},
+		{m6, NewPath("Attributes", "Wisdom"), 1000, true},
+		{m6, NewPath("Missing"), nil, false},
+		{m6, NewPath("Also", "Missing"), nil, false},
+		{m6, NewPath("Foo", "Bar"), 42, true},
+	}...)
+
 	for _, tt := range tests {
 		val, ok := tt.m.Get(tt.path)
 		testEq(t, val, tt.val)
