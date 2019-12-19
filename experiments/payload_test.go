@@ -1,7 +1,7 @@
 package experiments
 
 import (
-	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -15,7 +15,7 @@ func assert(t *testing.T, a, b interface{}) {
 
 func TestPayload(t *testing.T) {
 
-	base := map[string]interface{}{
+	p1 := NewPayload(map[string]interface{}{
 		"Name": "Frodo",
 		"Age":  50,
 		"Parents": []interface{}{
@@ -27,9 +27,7 @@ func TestPayload(t *testing.T) {
 			"Constitution": 18,
 			"Dexterity":    12,
 		},
-	}
-
-	p1 := NewPayload(base)
+	})
 
 	type test struct {
 		payload Payload
@@ -43,38 +41,50 @@ func TestPayload(t *testing.T) {
 		{p1, NewPath("Age"), 50, true},
 		{p1, NewPath("Attributes", "Strength"), 8, true},
 		{p1, NewPath("Attributes", "Constitution"), 18, true},
+		{p1, NewPath("Attributes", "Wisdom"), nil, false},
 	}
 
-	p2, err := p1.Set(NewPath("Age"), 51)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p2 := p1.Set(NewPath("Age"), 51)
 	tests = append(tests, []test{
 		{p2, NewPath("Name"), "Frodo", true},
 		{p2, NewPath("Age"), 51, true},
-		{p1, NewPath("Attributes", "Strength"), 8, true},
+		{p2, NewPath("Attributes", "Strength"), 8, true},
 		{p2, NewPath("Attributes", "Constitution"), 18, true},
+		{p2, NewPath("Attributes", "Wisdom"), nil, false},
 	}...)
 
-	p3, err := p2.Set(NewPath("Attributes", "Constitution"), 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p3 := p2.Set(NewPath("Attributes", "Constitution"), 3)
 	tests = append(tests, []test{
 		{p3, NewPath("Name"), "Frodo", true},
 		{p3, NewPath("Age"), 51, true},
-		{p1, NewPath("Attributes", "Strength"), 8, true},
+		{p3, NewPath("Attributes", "Strength"), 8, true},
 		{p3, NewPath("Attributes", "Constitution"), 3, true},
+		{p3, NewPath("Attributes", "Wisdom"), nil, false},
 	}...)
 
-	for _, tt := range tests {
+	p4 := p3.Set(NewPath("Attributes", "Wisdom"), 12)
+	tests = append(tests, []test{
+		{p4, NewPath("Name"), "Frodo", true},
+		{p4, NewPath("Age"), 51, true},
+		{p4, NewPath("Attributes", "Strength"), 8, true},
+		{p4, NewPath("Attributes", "Constitution"), 3, true},
+		{p4, NewPath("Attributes", "Wisdom"), 12, true},
+	}...)
+
+	p5 := p4.Delete(NewPath("Attributes", "Strength"))
+	tests = append(tests, []test{
+		{p5, NewPath("Name"), "Frodo", true},
+		{p5, NewPath("Age"), 51, true},
+		{p5, NewPath("Attributes", "Strength"), nil, false},
+		{p5, NewPath("Attributes", "Constitution"), 3, true},
+		{p5, NewPath("Attributes", "Wisdom"), 12, true},
+	}...)
+
+	for i, tt := range tests {
+		fmt.Printf("%d %s\n", i, tt.path)
 		val, ok := tt.payload.Get(tt.path)
 		assert(t, val, tt.val)
 		assert(t, ok, tt.ok)
 	}
 
-	_, err = p3.Set(NewPath("New", "Path"), 123)
-	if err == nil {
-		t.Fatal(errors.New("Expected error setting a value on a new path"))
-	}
 }
