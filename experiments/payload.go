@@ -46,8 +46,8 @@ type payload struct {
 	deleted *iradix.Tree
 }
 
-// NewPayload creates a new Payload. Once a Payload is created, the underlying map
-// that is passed in must never be mutated.
+// NewPayload creates a new Payload. Once a Payload is created, the underlying
+// map that is passed in must never be mutated.
 func NewPayload(m map[string]interface{}) Payload {
 	return &payload{
 		base:    m,

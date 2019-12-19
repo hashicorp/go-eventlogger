@@ -42,6 +42,8 @@ func TestPayload(t *testing.T) {
 		{p1, NewPath("Attributes", "Strength"), 8, true},
 		{p1, NewPath("Attributes", "Constitution"), 18, true},
 		{p1, NewPath("Attributes", "Wisdom"), nil, false},
+		{p1, NewPath("Missing"), nil, false},
+		{p1, NewPath("Also", "Missing"), nil, false},
 	}
 
 	p2 := p1.Set(NewPath("Age"), 51)
@@ -51,6 +53,8 @@ func TestPayload(t *testing.T) {
 		{p2, NewPath("Attributes", "Strength"), 8, true},
 		{p2, NewPath("Attributes", "Constitution"), 18, true},
 		{p2, NewPath("Attributes", "Wisdom"), nil, false},
+		{p2, NewPath("Missing"), nil, false},
+		{p2, NewPath("Also", "Missing"), nil, false},
 	}...)
 
 	p3 := p2.Set(NewPath("Attributes", "Constitution"), 3)
@@ -60,6 +64,8 @@ func TestPayload(t *testing.T) {
 		{p3, NewPath("Attributes", "Strength"), 8, true},
 		{p3, NewPath("Attributes", "Constitution"), 3, true},
 		{p3, NewPath("Attributes", "Wisdom"), nil, false},
+		{p3, NewPath("Missing"), nil, false},
+		{p3, NewPath("Also", "Missing"), nil, false},
 	}...)
 
 	p4 := p3.Set(NewPath("Attributes", "Wisdom"), 12)
@@ -69,6 +75,8 @@ func TestPayload(t *testing.T) {
 		{p4, NewPath("Attributes", "Strength"), 8, true},
 		{p4, NewPath("Attributes", "Constitution"), 3, true},
 		{p4, NewPath("Attributes", "Wisdom"), 12, true},
+		{p4, NewPath("Missing"), nil, false},
+		{p4, NewPath("Also", "Missing"), nil, false},
 	}...)
 
 	p5 := p4.Delete(NewPath("Attributes", "Strength"))
@@ -78,6 +86,8 @@ func TestPayload(t *testing.T) {
 		{p5, NewPath("Attributes", "Strength"), nil, false},
 		{p5, NewPath("Attributes", "Constitution"), 3, true},
 		{p5, NewPath("Attributes", "Wisdom"), 12, true},
+		{p5, NewPath("Missing"), nil, false},
+		{p5, NewPath("Also", "Missing"), nil, false},
 	}...)
 
 	for i, tt := range tests {
@@ -86,5 +96,4 @@ func TestPayload(t *testing.T) {
 		assert(t, val, tt.val)
 		assert(t, ok, tt.ok)
 	}
-
 }
