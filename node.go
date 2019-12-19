@@ -17,7 +17,7 @@ type Node interface {
 }
 
 // A LinkableNode is a Node that has downstream children.  Nodes
-// link Sinks that are *not* LinkableNodes are Leafs.
+// like Sinks that are *not* LinkableNodes are Leafs.
 type LinkableNode interface {
 	Node
 	SetNext([]Node)
