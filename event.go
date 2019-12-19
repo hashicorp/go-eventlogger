@@ -9,17 +9,17 @@ import (
 type EventType string
 
 // TODO needs an immutable type
-type MetadataType map[string]interface{}
+type Metadata map[string]interface{}
 
 // TODO needs an immutable type
-type PayloadType map[string]interface{}
+type Payload map[string]interface{}
 
 // An Event is analogous to a log entry.
 type Event struct {
 	Type      EventType
 	CreatedAt time.Time
-	Metadata  MetadataType
-	Payload   PayloadType
+	Metadata  Metadata
+	Payload   Payload
 }
 
 //func (e *Event) Clone() *Event {

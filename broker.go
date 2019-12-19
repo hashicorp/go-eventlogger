@@ -11,7 +11,7 @@ type Broker struct {
 	Graphs map[EventType]*Graph
 }
 
-func (b *Broker) Send(ctx context.Context, t EventType, payload PayloadType) error {
+func (b *Broker) Send(ctx context.Context, t EventType, payload Payload) error {
 
 	g, ok := b.Graphs[t]
 	if !ok {

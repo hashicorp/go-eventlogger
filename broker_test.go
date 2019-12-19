@@ -49,7 +49,7 @@ func TestBroker(t *testing.T) {
 	}
 
 	// Process some Events
-	payloads := []PayloadType{
+	payloads := []Payload{
 		map[string]interface{}{
 			"color": "red",
 			"width": 1,
