@@ -1,5 +1,7 @@
 package eventlogger
 
+import "context"
+
 // Graph
 type Graph struct {
 	Root Node
@@ -7,21 +9,21 @@ type Graph struct {
 
 // Process the Event by routing it through all of the graph's nodes,
 // starting with the root node.
-func (g *Graph) Process(env *Event) error {
-	return g.process(g.Root, env)
+func (g *Graph) Process(ctx context.Context, e *Event) error {
+	return g.process(ctx, g.Root, e)
 }
 
 // Recursively process every node in the graph.
-func (g *Graph) process(node Node, env *Event) error {
+func (g *Graph) process(ctx context.Context, node Node, e *Event) error {
 
 	// Process the current Node
-	env, err := node.Process(env)
+	e, err := node.Process(e)
 	if err != nil {
 		return err
 	}
 
 	// If the new Event is nil, it has been filtered out and we are done.
-	if env == nil {
+	if e == nil {
 		return nil
 	}
 
@@ -29,7 +31,7 @@ func (g *Graph) process(node Node, env *Event) error {
 	if ln, ok := node.(LinkableNode); ok {
 		for _, child := range ln.Next() {
 
-			err = g.process(child, env)
+			err = g.process(ctx, child, e)
 			if err != nil {
 				return err
 			}

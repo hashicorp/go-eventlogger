@@ -27,7 +27,9 @@ func TestByteWriter(t *testing.T) {
 	}
 	w := &ByteWriter{Marshaller: marshaller}
 
-	e := &Event{}
+	e := &Event{
+		Metadata: make(map[string]interface{}),
+	}
 	_, err := w.Process(e)
 	if err != nil {
 		t.Fatal(err)

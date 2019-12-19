@@ -8,7 +8,10 @@ import (
 // given Broker.
 type EventType string
 
+// TODO needs an immutable type
 type MetadataType map[string]interface{}
+
+// TODO needs an immutable type
 type PayloadType map[string]interface{}
 
 // An Event is analogous to a log entry.
@@ -17,12 +20,6 @@ type Event struct {
 	CreatedAt time.Time
 	Metadata  MetadataType
 	Payload   PayloadType
-
-	// Marshalled is a writable representation of the Event, e.g. a []byte.
-	// Events that come in to the Broker should never have this field be
-	// populated.  Instead, it should be populated by Nodes like ByteWriter as
-	// the Event is propogated through its Graph.
-	Marshalled interface{}
 }
 
 //func (e *Event) Clone() *Event {

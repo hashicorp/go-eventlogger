@@ -1,7 +1,6 @@
 package experiments
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -90,8 +89,7 @@ func TestPayload(t *testing.T) {
 		{p5, NewPath("Also", "Missing"), nil, false},
 	}...)
 
-	for i, tt := range tests {
-		fmt.Printf("%d %s\n", i, tt.path)
+	for _, tt := range tests {
 		val, ok := tt.payload.Get(tt.path)
 		assert(t, val, tt.val)
 		assert(t, ok, tt.ok)

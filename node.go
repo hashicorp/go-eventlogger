@@ -17,7 +17,7 @@ type Node interface {
 }
 
 // A LinkableNode is a Node that has downstream children.  Nodes
-// that are *not* LinkableNodes are Leafs.
+// link Sinks that are *not* LinkableNodes are Leafs.
 type LinkableNode interface {
 	Node
 	SetNext([]Node)
@@ -109,7 +109,9 @@ func (w *ByteWriter) Process(e *Event) (*Event, error) {
 		return nil, err
 	}
 
-	e.Marshalled = bytes
+	// TODO this isn't kosher since it modifies Metadata. Fix this once
+	// we have an immutable type for Metadata.
+	e.Metadata["marshalled"] = bytes
 	return e, nil
 }
 
@@ -132,7 +134,13 @@ type FileSink struct {
 
 func (fs *FileSink) Process(e *Event) (*Event, error) {
 
-	bytes, ok := (e.Marshalled).([]byte)
+	// TODO we need an immutable type for Metadata.
+	val, ok := e.Metadata["marshalled"]
+	if !ok {
+		return nil, errors.New("Event is not marshallable")
+	}
+
+	bytes, ok := val.([]byte)
 	if !ok {
 		return nil, errors.New("Event is not writable to a FileSink")
 	}
@@ -150,6 +158,7 @@ func (fs *FileSink) Process(e *Event) (*Event, error) {
 		return nil, err
 	}
 
-	// Do not return the event, since nothing more can happen to it downstream.
+	// Sinks are leafs, so do not return the event, since nothing more can
+	// happen to it downstream.
 	return nil, nil
 }
