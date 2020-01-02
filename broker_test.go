@@ -1,9 +1,11 @@
 package eventlogger
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/go-test/deep"
 )
@@ -22,7 +24,7 @@ func TestBroker(t *testing.T) {
 		// Filter out the purple nodes
 		&Filter{
 			Predicate: func(e *Event) (bool, error) {
-				color, ok := e.Payload["color"]
+				color, ok := e.Payload.(map[string]interface{})["color"]
 				return !ok || color != "purple", nil
 			},
 		},
@@ -32,7 +34,7 @@ func TestBroker(t *testing.T) {
 		},
 		// Send to FileSink
 		&FileSink{
-			FilePath: path,
+			Path: path,
 		},
 	})
 	if err != nil {
@@ -42,14 +44,16 @@ func TestBroker(t *testing.T) {
 		Root: nodes[0],
 	}
 	et := EventType("Foo")
+	now := time.Now()
 	broker := &Broker{
 		Graphs: map[EventType]*Graph{
 			et: graph,
 		},
+		clock: &clock{now},
 	}
 
 	// Process some Events
-	payloads := []Payload{
+	payloads := []interface{}{
 		map[string]interface{}{
 			"color": "red",
 			"width": 1,
@@ -80,10 +84,12 @@ func TestBroker(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expect := `{"color":"red","width":1}
-{"color":"green","width":2}
-{"color":"blue","width":4}
-`
+	prefix := fmt.Sprintf(`{"CreatedAt":"%s","EventType":"Foo","Payload":`, now.Format(time.RFC3339Nano))
+	suffix := "}\n"
+	var expect string
+	for _, s := range []string{`{"color":"red","width":1}`, `{"color":"green","width":2}`, `{"color":"blue","width":4}`} {
+		expect += fmt.Sprintf("%s%s%s", prefix, s, suffix)
+	}
 	if diff := deep.Equal(string(dat), expect); diff != nil {
 		t.Fatal(diff)
 	}

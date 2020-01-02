@@ -28,7 +28,7 @@ func TestByteWriter(t *testing.T) {
 	w := &ByteWriter{Marshaller: marshaller}
 
 	e := &Event{
-		Metadata: make(map[string]interface{}),
+		Formatted: make(map[string][]byte),
 	}
 	_, err := w.Process(e)
 	if err != nil {
@@ -41,7 +41,7 @@ func TestLinkNodes(t *testing.T) {
 	nodes, err := LinkNodes([]Node{
 		&Filter{Predicate: nil},
 		&ByteWriter{Marshaller: nil},
-		&FileSink{FilePath: "test.log"},
+		&FileSink{Path: "test.log"},
 	})
 	if err != nil {
 		t.Fatal(err)
