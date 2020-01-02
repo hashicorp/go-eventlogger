@@ -7,7 +7,6 @@ import (
 )
 
 func TestFilter(t *testing.T) {
-
 	predicate := func(e *Event) (bool, error) {
 		return true, nil
 	}
@@ -21,12 +20,7 @@ func TestFilter(t *testing.T) {
 }
 
 func TestByteWriter(t *testing.T) {
-
-	marshaller := func(e *Event) ([]byte, error) {
-		return make([]byte, 0), nil
-	}
-	w := &ByteWriter{Marshaller: marshaller}
-
+	w := &JSONFormatter{}
 	e := &Event{
 		Formatted: make(map[string][]byte),
 	}
@@ -37,10 +31,9 @@ func TestByteWriter(t *testing.T) {
 }
 
 func TestLinkNodes(t *testing.T) {
-
 	nodes, err := LinkNodes([]Node{
 		&Filter{Predicate: nil},
-		&ByteWriter{Marshaller: nil},
+		&JSONFormatter{},
 		&FileSink{Path: "test.log"},
 	})
 	if err != nil {

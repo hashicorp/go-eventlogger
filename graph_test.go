@@ -2,6 +2,8 @@ package eventlogger
 
 import (
 	"context"
+	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -31,6 +33,10 @@ func (r *reloadNode) Reload() error {
 
 func (r *reloadNode) Type() NodeType {
 	return 0
+}
+
+func (r *reloadNode) Name() string {
+	return "reloadNode"
 }
 
 func TestReload(t *testing.T) {
@@ -64,9 +70,7 @@ func TestValidate(t *testing.T) {
 		{
 			"childless inner node",
 			[]Node{
-				&ByteWriter{
-					Marshaller: JSONMarshaller,
-				},
+				&JSONFormatter{},
 			},
 			false,
 		},
@@ -94,9 +98,7 @@ func TestValidate(t *testing.T) {
 		{
 			"good graph",
 			[]Node{
-				&ByteWriter{
-					Marshaller: JSONMarshaller,
-				},
+				&JSONFormatter{},
 				&FileSink{
 					Path: "/path/to/file",
 				},
@@ -120,6 +122,89 @@ func TestValidate(t *testing.T) {
 				t.Fatalf("valid=%v, expected=%v, err=%v", valid, tc.valid, err)
 			}
 
+		})
+	}
+}
+
+func TestStatus(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "file.sink.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmp.Name())
+	goodpath := tmp.Name()
+	badpath := "/path/to/file"
+
+	testcases := []struct {
+		name     string
+		sinks    []Node
+		warnings int
+		sent     int
+	}{
+		{
+			"one bad",
+			[]Node{
+				&FileSink{
+					Path: badpath,
+				},
+			},
+			1,
+			0,
+		},
+		{
+			"one good",
+			[]Node{
+				&FileSink{
+					Path: goodpath,
+				},
+			},
+			0,
+			1,
+		},
+		{
+			"one good one bad",
+			[]Node{
+				&FileSink{
+					Path: badpath,
+				},
+				&FileSink{
+					Path: goodpath,
+				},
+			},
+			1,
+			1,
+		},
+	}
+
+	for i := range testcases {
+		tc := testcases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			nodes := []Node{&JSONFormatter{}}
+			_, err := LinkNodesAndSinks(nodes, tc.sinks)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			g := Graph{Root: nodes[0]}
+			err = g.Validate()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			e := &Event{
+				Formatted: make(map[string][]byte),
+			}
+			status, err := g.Process(context.Background(), e)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(status.SentToSinks) != tc.sent {
+				t.Fatalf("got=%d, expected=%d", len(status.SentToSinks), tc.sent)
+			}
+
+			if len(status.Warnings) != tc.warnings {
+				t.Fatalf("got=%d, expected=%d", len(status.Warnings), tc.warnings)
+			}
 		})
 	}
 

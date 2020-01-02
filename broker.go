@@ -37,10 +37,15 @@ func (b *Broker) Validate() error {
 	return nil
 }
 
-func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) error {
+type Status struct {
+	SentToSinks []string
+	Warnings    []error
+}
+
+func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (Status, error) {
 	g, ok := b.Graphs[t]
 	if !ok {
-		return fmt.Errorf("No Graph for EventType %s", t)
+		return Status{}, fmt.Errorf("No Graph for EventType %s", t)
 	}
 
 	e := &Event{

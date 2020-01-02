@@ -29,9 +29,7 @@ func TestBroker(t *testing.T) {
 			},
 		},
 		// Marshal to JSON
-		&ByteWriter{
-			Marshaller: JSONMarshaller,
-		},
+		&JSONFormatter{},
 		// Send to FileSink
 		&FileSink{
 			Path: path,
@@ -72,7 +70,7 @@ func TestBroker(t *testing.T) {
 		},
 	}
 	for _, p := range payloads {
-		err = broker.Send(nil, et, p)
+		_, err = broker.Send(nil, et, p)
 		if err != nil {
 			t.Fatal(err)
 		}

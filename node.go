@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,6 +32,7 @@ type Node interface {
 	// Reload is used to re-read any config stored externally
 	// and to close and reopen files, e.g. for log rotation.
 	Reload() error
+	Name() string
 	Type() NodeType
 }
 
@@ -46,7 +48,6 @@ type LinkableNode interface {
 // Nodes together into a linked list. All of the nodes except the
 // last one must be LinkableNodes
 func LinkNodes(nodes []Node) ([]Node, error) {
-
 	num := len(nodes)
 	if num < 2 {
 		return nodes, nil
@@ -63,6 +64,22 @@ func LinkNodes(nodes []Node) ([]Node, error) {
 	return nodes, nil
 }
 
+func LinkNodesAndSinks(inner, sinks []Node) ([]Node, error) {
+	_, err := LinkNodes(inner)
+	if err != nil {
+		return nil, err
+	}
+
+	ln, ok := inner[len(inner)-1].(LinkableNode)
+	if !ok {
+		return nil, fmt.Errorf("last inner node not linkable")
+	}
+
+	ln.SetNext(sinks)
+
+	return inner, nil
+}
+
 //----------------------------------------------------------
 // Filter
 
@@ -71,9 +88,9 @@ type Predicate func(e *Event) (bool, error)
 
 // Filter
 type Filter struct {
-	nodes []Node
-
+	nodes     []Node
 	Predicate Predicate
+	name      string
 }
 
 var _ LinkableNode = &Filter{}
@@ -110,18 +127,21 @@ func (f *Filter) Type() NodeType {
 	return NodeTypeFilter
 }
 
+func (f *Filter) Name() string {
+	return f.name
+}
+
 //----------------------------------------------------------
 // ByteWriter
+type JSONFormatter struct {
+	nodes []Node
+}
 
-// ByteMarshaller turns an Event into a slice of bytes suitable for being
-// persisted.
-type ByteMarshaller func(e *Event) ([]byte, error)
+var _ LinkableNode = &JSONFormatter{}
 
-// JSONMarshaller marshals the envelope into JSON.  For now, it just
-// does the Payload field.
-var JSONMarshaller = func(e *Event) ([]byte, error) {
-	w := &bytes.Buffer{}
-	enc := json.NewEncoder(w)
+func (w *JSONFormatter) Process(e *Event) (*Event, error) {
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
 	err := enc.Encode(struct {
 		CreatedAt time.Time
 		EventType
@@ -135,44 +155,30 @@ var JSONMarshaller = func(e *Event) ([]byte, error) {
 		return nil, err
 	}
 
-	return w.Bytes(), nil
-}
-
-// ByteWriter
-type ByteWriter struct {
-	nodes []Node
-
-	Marshaller ByteMarshaller
-}
-
-var _ LinkableNode = &ByteWriter{}
-
-func (w *ByteWriter) Process(e *Event) (*Event, error) {
-	bytes, err := w.Marshaller(e)
-	if err != nil {
-		return nil, err
-	}
-
 	e.l.Lock()
-	e.Formatted["json"] = bytes
+	e.Formatted["json"] = buf.Bytes()
 	e.l.Unlock()
 	return e, nil
 }
 
-func (w *ByteWriter) SetNext(nodes []Node) {
+func (w *JSONFormatter) SetNext(nodes []Node) {
 	w.nodes = nodes
 }
 
-func (w *ByteWriter) Next() []Node {
+func (w *JSONFormatter) Next() []Node {
 	return w.nodes
 }
 
-func (w *ByteWriter) Reload() error {
+func (w *JSONFormatter) Reload() error {
 	return nil
 }
 
-func (w *ByteWriter) Type() NodeType {
+func (w *JSONFormatter) Type() NodeType {
 	return NodeTypeFormatter
+}
+
+func (w *JSONFormatter) Name() string {
+	return "JSONFormatter"
 }
 
 //----------------------------------------------------------
@@ -290,4 +296,8 @@ func (fs *FileSink) Reload() error {
 	}
 
 	return fs.open()
+}
+
+func (fs *FileSink) Name() string {
+	return fmt.Sprintf("sink:%s", fs.Path)
 }
