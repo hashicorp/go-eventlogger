@@ -1,6 +1,7 @@
 package eventlogger
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -70,7 +71,7 @@ func TestBroker(t *testing.T) {
 		},
 	}
 	for _, p := range payloads {
-		_, err = broker.Send(nil, et, p)
+		_, err = broker.Send(context.Background(), et, p)
 		if err != nil {
 			t.Fatal(err)
 		}

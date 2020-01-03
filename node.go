@@ -262,7 +262,7 @@ func (fs *FileSink) Process(e *Event) (*Event, error) {
 	// If writing to stdout there's no real reason to think anything would have
 	// changed so return above. Otherwise, opportunistically try to re-open the
 	// FD, once per call.
-	fs.f.Close()
+	_ = fs.f.Close()
 	fs.f = nil
 
 	if err := fs.open(); err != nil {

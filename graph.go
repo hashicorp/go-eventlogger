@@ -3,6 +3,7 @@ package eventlogger
 import (
 	"context"
 	"fmt"
+	"sync"
 )
 
 // Graph
@@ -13,42 +14,71 @@ type Graph struct {
 	SuccessThreshold int
 }
 
+func (s Status) GetError(threshold int) error {
+	if len(s.SentToSinks) < threshold {
+		return fmt.Errorf("event not written to enough sinks")
+	}
+	return nil
+}
+
 // Process the Event by routing it through all of the graph's nodes,
 // starting with the root node.
 func (g *Graph) Process(ctx context.Context, e *Event) (Status, error) {
-	return g.process(ctx, g.Root, e)
+	statusChan := make(chan Status)
+	var wg sync.WaitGroup
+	go func() {
+		wg.Add(1)
+		g.process(ctx, g.Root, e, statusChan, &wg)
+		wg.Wait()
+		close(statusChan)
+	}()
+	var status Status
+	var done bool
+	for !done {
+		select {
+		case <-ctx.Done():
+			done = true
+		case s, ok := <-statusChan:
+			if ok {
+				status.Warnings = append(status.Warnings, s.Warnings...)
+				status.SentToSinks = append(status.SentToSinks, s.SentToSinks...)
+			} else {
+				done = true
+			}
+		}
+	}
+	return status, status.GetError(g.SuccessThreshold)
 }
 
 // Recursively process every node in the graph.
-func (g *Graph) process(ctx context.Context, node Node, e *Event) (Status, error) {
+func (g *Graph) process(ctx context.Context, node Node, e *Event, statusChan chan Status, wg *sync.WaitGroup) {
+	defer wg.Done()
 
 	// Process the current Node
 	e, err := node.Process(e)
+	if ctx.Err() != nil {
+		return
+	}
 	if err != nil {
-		return Status{Warnings: []error{err}}, err
+		statusChan <- Status{Warnings: []error{err}}
+		return
 	}
 
-	var s Status
 	// Process any child nodes.  This is depth-first.
 	if ln, ok := node.(LinkableNode); ok {
 		// If the new Event is nil, it has been filtered out and we are done.
 		if e == nil {
-			return Status{}, nil
+			statusChan <- Status{}
+			return
 		}
 
 		for _, child := range ln.Next() {
-			status, _ := g.process(ctx, child, e)
-			s.Warnings = append(s.Warnings, status.Warnings...)
-			s.SentToSinks = append(s.SentToSinks, status.SentToSinks...)
+			wg.Add(1)
+			go g.process(ctx, child, e, statusChan, wg)
 		}
 	} else {
-		return Status{SentToSinks: []string{node.Name()}}, nil
+		statusChan <- Status{SentToSinks: []string{node.Name()}}
 	}
-
-	if len(s.SentToSinks) < g.SuccessThreshold {
-		return s, fmt.Errorf("event not written to enough sinks")
-	}
-	return s, nil
 }
 
 func (g *Graph) Reload(ctx context.Context) error {
