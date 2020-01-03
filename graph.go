@@ -8,6 +8,9 @@ import (
 // Graph
 type Graph struct {
 	Root Node
+	// SuccessThreshold specifies how many sinks must store an event for Process
+	// to not return an error.
+	SuccessThreshold int
 }
 
 // Process the Event by routing it through all of the graph's nodes,
@@ -42,19 +45,8 @@ func (g *Graph) process(ctx context.Context, node Node, e *Event) (Status, error
 		return Status{SentToSinks: []string{node.Name()}}, nil
 	}
 
-	if len(s.Warnings) > 0 && len(s.SentToSinks) == 0 {
-		// TODO: the following would make sense:
-		//  return s, fmt.Errorf("event not written to any sinks successfully")
-
-		// For now we're not doing the above: instead, even when we failed to
-		// log the event, we're returning a nil error.  Rationale: we don't yet
-		// have support for configurable delivery policies, and if the user has
-		// defined only a single bogus sink, and modifying the sink config fails
-		// due to failure to log the reconfiguration event because of that bogus
-		// sink, the user will never be able to repair the configuration.
-
-		// We'll have delivery policies soon enough, and in the meantime callers
-		// can log the warnings to inform their users of any problems logging.
+	if len(s.SentToSinks) < g.SuccessThreshold {
+		return s, fmt.Errorf("event not written to enough sinks")
 	}
 	return s, nil
 }

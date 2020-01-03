@@ -126,53 +126,58 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestStatus(t *testing.T) {
+func TestSendResult(t *testing.T) {
 	tmp, err := ioutil.TempFile("", "file.sink.")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmp.Name())
-	goodpath := tmp.Name()
-	badpath := "/path/to/file"
+	goodsink := &FileSink{Path: tmp.Name()}
+	badsink := &FileSink{Path: "/path/to/file"}
 
 	testcases := []struct {
-		name     string
-		sinks    []Node
-		warnings int
-		sent     int
+		name      string
+		sinks     []Node
+		threshold int
+		warnings  int
+		sent      int
+		failure   bool
 	}{
 		{
-			"one bad",
-			[]Node{
-				&FileSink{
-					Path: badpath,
-				},
-			},
-			1,
-			0,
+			"one bad no threshold",
+			[]Node{badsink}, 0, 1, 0, false,
 		},
 		{
-			"one good",
-			[]Node{
-				&FileSink{
-					Path: goodpath,
-				},
-			},
-			0,
-			1,
+			"one good no threshold",
+			[]Node{goodsink}, 0, 0, 1, false,
 		},
 		{
-			"one good one bad",
-			[]Node{
-				&FileSink{
-					Path: badpath,
-				},
-				&FileSink{
-					Path: goodpath,
-				},
-			},
-			1,
-			1,
+			"one good one bad no threshold",
+			[]Node{goodsink, badsink}, 0, 1, 1, false,
+		},
+		{
+			"one bad threshold=1",
+			[]Node{badsink}, 1, 1, 0, true,
+		},
+		{
+			"one good threshold=1",
+			[]Node{goodsink}, 1, 0, 1, false,
+		},
+		{
+			"one good one bad threshold=1",
+			[]Node{goodsink, badsink}, 1, 1, 1, false,
+		},
+		{
+			"two bad threshold=2",
+			[]Node{badsink, badsink}, 2, 2, 0, true,
+		},
+		{
+			"two good threshold=2",
+			[]Node{goodsink, goodsink}, 2, 0, 2, false,
+		},
+		{
+			"one good one bad threshold=2",
+			[]Node{goodsink, badsink}, 2, 1, 1, true,
 		},
 	}
 
@@ -185,7 +190,7 @@ func TestStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := Graph{Root: nodes[0]}
+			g := Graph{Root: nodes[0], SuccessThreshold: tc.threshold}
 			err = g.Validate()
 			if err != nil {
 				t.Fatal(err)
@@ -195,9 +200,11 @@ func TestStatus(t *testing.T) {
 				Formatted: make(map[string][]byte),
 			}
 			status, err := g.Process(context.Background(), e)
-			if err != nil {
-				t.Fatal(err)
+			failure := err != nil
+			if failure != tc.failure {
+				t.Fatalf("got=%v, expected=%v, error=%v", failure, tc.failure, err)
 			}
+
 			if len(status.SentToSinks) != tc.sent {
 				t.Fatalf("got=%d, expected=%d", len(status.SentToSinks), tc.sent)
 			}
