@@ -134,7 +134,7 @@ func TestSendResult(t *testing.T) {
 	}
 	defer os.Remove(tmp.Name())
 	goodsink := &FileSink{Path: tmp.Name()}
-	badsink := &FileSink{Path: "/path/to/file"}
+	badsink := &FileSink{Path: "/"}
 
 	testcases := []struct {
 		name      string
