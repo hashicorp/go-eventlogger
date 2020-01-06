@@ -133,7 +133,7 @@ func TestStatus(t *testing.T) {
 	}
 	defer os.Remove(tmp.Name())
 	goodpath := tmp.Name()
-	badpath := "/path/to/file"
+	badpath := "/"
 
 	testcases := []struct {
 		name     string
