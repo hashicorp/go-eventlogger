@@ -6,30 +6,6 @@ import (
 	"github.com/go-test/deep"
 )
 
-func TestFilter(t *testing.T) {
-	predicate := func(e *Event) (bool, error) {
-		return true, nil
-	}
-	f := &Filter{Predicate: predicate}
-
-	e := &Event{}
-	_, err := f.Process(e)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestByteWriter(t *testing.T) {
-	w := &JSONFormatter{}
-	e := &Event{
-		Formatted: make(map[string][]byte),
-	}
-	_, err := w.Process(e)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestLinkNodes(t *testing.T) {
 	nodes, err := LinkNodes([]Node{
 		&Filter{Predicate: nil},
