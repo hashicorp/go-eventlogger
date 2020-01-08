@@ -58,9 +58,9 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 	return g.Process(ctx, e)
 }
 
-func (b *Broker) Reload(ctx context.Context) error {
+func (b *Broker) Reopen(ctx context.Context) error {
 	for _, g := range b.Graphs {
-		if err := g.Reload(ctx); err != nil {
+		if err := g.Reopen(ctx); err != nil {
 			return err
 		}
 	}

@@ -8,56 +8,56 @@ import (
 	"time"
 )
 
-type reloadNode struct {
+type reopenNode struct {
 	nodes    []Node
-	reloaded int
+	reopened int
 }
 
-var _ LinkableNode = &reloadNode{}
+var _ LinkableNode = &reopenNode{}
 
-func (r *reloadNode) Process(e *Event) (*Event, error) {
+func (r *reopenNode) Process(e *Event) (*Event, error) {
 	return e, nil
 }
 
-func (r *reloadNode) SetNext(nodes []Node) {
+func (r *reopenNode) SetNext(nodes []Node) {
 	r.nodes = nodes
 }
 
-func (r *reloadNode) Next() []Node {
+func (r *reopenNode) Next() []Node {
 	return r.nodes
 }
 
-func (r *reloadNode) Reload() error {
-	r.reloaded++
+func (r *reopenNode) Reopen() error {
+	r.reopened++
 	return nil
 }
 
-func (r *reloadNode) Type() NodeType {
+func (r *reopenNode) Type() NodeType {
 	return 0
 }
 
-func (r *reloadNode) Name() string {
-	return "reloadNode"
+func (r *reopenNode) Name() string {
+	return "reopenNode"
 }
 
-func TestReload(t *testing.T) {
+func TestReopen(t *testing.T) {
 	nodes, err := LinkNodes([]Node{
-		&reloadNode{},
-		&reloadNode{},
+		&reopenNode{},
+		&reopenNode{},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	g := Graph{Root: nodes[0]}
-	err = g.Reload(context.Background())
+	err = g.Reopen(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, node := range nodes {
-		if node.(*reloadNode).reloaded == 0 {
-			t.Fatal("expected node to be reloaded")
+		if node.(*reopenNode).reopened == 0 {
+			t.Fatal("expected node to be reopened")
 		}
 	}
 }

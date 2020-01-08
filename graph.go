@@ -81,15 +81,15 @@ func (g *Graph) process(ctx context.Context, node Node, e *Event, statusChan cha
 	}
 }
 
-func (g *Graph) Reload(ctx context.Context) error {
-	return g.reload(ctx, g.Root)
+func (g *Graph) Reopen(ctx context.Context) error {
+	return g.reopen(ctx, g.Root)
 }
 
 // Recursively process every node in the graph.
-func (g *Graph) reload(ctx context.Context, node Node) error {
+func (g *Graph) reopen(ctx context.Context, node Node) error {
 
 	// Process the current Node
-	err := node.Reload()
+	err := node.Reopen()
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func (g *Graph) reload(ctx context.Context, node Node) error {
 	if ln, ok := node.(LinkableNode); ok {
 		for _, child := range ln.Next() {
 
-			err = g.reload(ctx, child)
+			err = g.reopen(ctx, child)
 			if err != nil {
 				return err
 			}

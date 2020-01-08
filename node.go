@@ -29,9 +29,9 @@ type Node interface {
 	// Process does something with the Event: filter, redaction,
 	// marshalling, persisting.
 	Process(e *Event) (*Event, error)
-	// Reload is used to re-read any config stored externally
+	// Reopen is used to re-read any config stored externally
 	// and to close and reopen files, e.g. for log rotation.
-	Reload() error
+	Reopen() error
 	Name() string
 	Type() NodeType
 }
@@ -119,7 +119,7 @@ func (f *Filter) Next() []Node {
 	return f.nodes
 }
 
-func (f *Filter) Reload() error {
+func (f *Filter) Reopen() error {
 	return nil
 }
 
@@ -169,7 +169,7 @@ func (w *JSONFormatter) Next() []Node {
 	return w.nodes
 }
 
-func (w *JSONFormatter) Reload() error {
+func (w *JSONFormatter) Reopen() error {
 	return nil
 }
 
@@ -274,7 +274,7 @@ func (fs *FileSink) Process(e *Event) (*Event, error) {
 	return nil, err
 }
 
-func (fs *FileSink) Reload() error {
+func (fs *FileSink) Reopen() error {
 	switch fs.Path {
 	case "stdout", "discard":
 		return nil
