@@ -49,8 +49,12 @@ func TestReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g := Graph{Root: nodes[0]}
-	err = g.Reopen(context.Background())
+	g := graph{
+		roots: map[PipelineID]Node{
+			"id": nodes[0],
+		},
+	}
+	err = g.reopen(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,8 +120,12 @@ func TestValidate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := Graph{Root: nodes[0]}
-			err = g.Validate()
+			g := graph{
+				roots: map[PipelineID]Node{
+					"id": nodes[0],
+				},
+			}
+			err = g.validate()
 			valid := err == nil
 			if valid != tc.valid {
 				t.Fatalf("valid=%v, expected=%v, err=%v", valid, tc.valid, err)
@@ -191,8 +199,14 @@ func TestSendResult(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := Graph{Root: nodes[0], SuccessThreshold: tc.threshold}
-			err = g.Validate()
+			g := graph{
+				roots: map[PipelineID]Node{
+					"id": nodes[0],
+				},
+				successThreshold: tc.threshold,
+			}
+
+			err = g.validate()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -200,7 +214,7 @@ func TestSendResult(t *testing.T) {
 			e := &Event{
 				Formatted: make(map[string][]byte),
 			}
-			status, err := g.Process(context.Background(), e)
+			status, err := g.process(context.Background(), e)
 			failure := err != nil
 			if failure != tc.failure {
 				t.Fatalf("got=%v, expected=%v, error=%v", failure, tc.failure, err)
@@ -296,8 +310,14 @@ func TestSendBlocking(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := Graph{Root: nodes[0], SuccessThreshold: tc.threshold}
-			err = g.Validate()
+			g := graph{
+				roots: map[PipelineID]Node{
+					"id": nodes[0],
+				},
+				successThreshold: tc.threshold,
+			}
+
+			err = g.validate()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -306,7 +326,7 @@ func TestSendBlocking(t *testing.T) {
 				Formatted: make(map[string][]byte),
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-			status, err := g.Process(ctx, e)
+			status, err := g.process(ctx, e)
 			cancel()
 			failure := err != nil
 			if failure != tc.failure {

@@ -20,7 +20,7 @@ func TestBroker(t *testing.T) {
 	defer os.Remove(tmp.Name())
 	path := tmp.Name()
 
-	// Construct a Graph
+	// Construct a graph
 	nodes, err := LinkNodes([]Node{
 		// Filter out the purple nodes
 		&Filter{
@@ -39,16 +39,17 @@ func TestBroker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	graph := &Graph{
-		Root: nodes[0],
-	}
-	et := EventType("Foo")
+
+	// Create a broker
+	broker := NewBroker()
 	now := time.Now()
-	broker := &Broker{
-		Graphs: map[EventType]*Graph{
-			et: graph,
-		},
-		clock: &clock{now},
+	broker.clock = &clock{now}
+
+	// Register the graph with the broker
+	et := EventType("Foo")
+	err = broker.RegisterPipeline(et, "id", nodes[0])
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Process some Events
@@ -90,6 +91,59 @@ func TestBroker(t *testing.T) {
 		expect += fmt.Sprintf("%s%s%s", prefix, s, suffix)
 	}
 	if diff := deep.Equal(string(dat), expect); diff != nil {
+		t.Fatal(diff)
+	}
+}
+
+func TestPipeline(t *testing.T) {
+	broker := NewBroker()
+
+	// invalid pipeline
+	root := &Filter{Predicate: nil}
+	err := broker.RegisterPipeline("t", "id", root)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if diff := deep.Equal("non-sink node has no children", err.Error()); diff != nil {
+		t.Fatal(diff)
+	}
+
+	// Construct a graph
+	nodes, err := LinkNodes([]Node{
+		&JSONFormatter{},
+		&FileSink{Path: "path"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// register
+	err = broker.RegisterPipeline("t", "id", nodes[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// register again
+	err = broker.RegisterPipeline("t", "id", nodes[0])
+	if err == nil {
+		t.Fatal(err)
+	}
+	if diff := deep.Equal("pipeline for PipelineID id already exists", err.Error()); diff != nil {
+		t.Fatal(diff)
+	}
+
+	// remove
+	err = broker.RemovePipeline("t", "id")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// remove again
+	err = broker.RemovePipeline("t", "id")
+	if err == nil {
+		t.Fatal(err)
+	}
+	if diff := deep.Equal("No pipeline for PipelineID id", err.Error()); diff != nil {
 		t.Fatal(diff)
 	}
 }

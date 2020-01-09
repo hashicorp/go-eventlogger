@@ -14,7 +14,7 @@ const (
 	NodeTypeSink
 )
 
-// A Node in a Graph
+// A Node in a graph
 type Node interface {
 	// Process does something with the Event: filter, redaction,
 	// marshalling, persisting.
