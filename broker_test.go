@@ -109,35 +109,116 @@ func TestPipeline(t *testing.T) {
 	}
 
 	// Construct a graph
-	nodes, err := LinkNodes([]Node{
+	s1 := &testSink{}
+	p1, err := LinkNodes([]Node{
 		&JSONFormatter{},
-		&FileSink{Path: "path"},
+		s1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// register
-	err = broker.RegisterPipeline("t", "id", nodes[0])
+	err = broker.RegisterPipeline("t", "s1", p1[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// register again
-	err = broker.RegisterPipeline("t", "id", nodes[0])
+	err = broker.RegisterPipeline("t", "s1", p1[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// send a payload
+	payload := map[string]interface{}{
+		"color": "red",
+		"width": 1,
+	}
+	_, err = broker.Send(context.Background(), "t", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := deep.Equal(s1.count, 1); diff != nil {
+		t.Fatal(diff)
+	}
+
+	// Construct another graph
+	s2 := &testSink{}
+	p2, err := LinkNodes([]Node{
+		&JSONFormatter{},
+		s2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = broker.RegisterPipeline("t", "s2", p2[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// send a payload
+	_, err = broker.Send(context.Background(), "t", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := deep.Equal(s1.count, 2); diff != nil {
+		t.Fatal(diff)
+	}
+	if diff := deep.Equal(s2.count, 1); diff != nil {
+		t.Fatal(diff)
+	}
+
+	// remove second graph
+	err = broker.RemovePipeline("t", "s2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// send a payload
+	_, err = broker.Send(context.Background(), "t", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := deep.Equal(s1.count, 3); diff != nil {
+		t.Fatal(diff)
+	}
+	if diff := deep.Equal(s2.count, 1); diff != nil {
+		t.Fatal(diff)
+	}
+
 	// remove
-	err = broker.RemovePipeline("t", "id")
+	err = broker.RemovePipeline("t", "s1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// remove again
-	err = broker.RemovePipeline("t", "id")
+	err = broker.RemovePipeline("t", "s1")
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+type testSink struct {
+	count int
+}
+
+var _ Node = &testSink{}
+
+func (ts *testSink) Type() NodeType {
+	return NodeTypeSink
+}
+
+func (ts *testSink) Process(e *Event) (*Event, error) {
+	ts.count++
+	return nil, nil
+}
+
+func (ts *testSink) Reopen() error {
+	return nil
+}
+
+func (ts *testSink) Name() string {
+	return "testSink"
 }
