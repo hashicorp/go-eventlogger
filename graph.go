@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/hashicorp/go-multierror"
 )
 
 // graph
@@ -80,14 +82,16 @@ func (g *graph) doProcess(ctx context.Context, node Node, e *Event, statusChan c
 }
 
 func (g *graph) reopen(ctx context.Context) error {
+	var errors *multierror.Error
+
 	for _, root := range g.roots {
-		// TODO should these be collated as a multi-error?
 		err := g.doReopen(ctx, root)
 		if err != nil {
-			return err
+			errors = multierror.Append(errors, err)
 		}
 	}
-	return nil
+
+	return errors.ErrorOrNil()
 }
 
 // Recursively reopen every node in the graph.
@@ -114,14 +118,16 @@ func (g *graph) doReopen(ctx context.Context, node Node) error {
 }
 
 func (g *graph) validate() error {
+	var errors *multierror.Error
+
 	for _, root := range g.roots {
-		// TODO should these be collated as a multi-error?
 		err := g.doValidate(nil, root)
 		if err != nil {
-			return err
+			errors = multierror.Append(errors, err)
 		}
 	}
-	return nil
+
+	return errors.ErrorOrNil()
 }
 
 func (g *graph) doValidate(parent, node Node) error {
