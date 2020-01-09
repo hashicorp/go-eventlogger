@@ -94,11 +94,6 @@ func (b *Broker) RegisterPipeline(t EventType, id PipelineID, root Node) error {
 		b.graphs[t] = g
 	}
 
-	_, ok = g.roots[id]
-	if ok {
-		return fmt.Errorf("pipeline for PipelineID %s already exists", id)
-	}
-
 	err := g.doValidate(nil, root)
 	if err != nil {
 		return err

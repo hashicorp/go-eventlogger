@@ -125,11 +125,8 @@ func TestPipeline(t *testing.T) {
 
 	// register again
 	err = broker.RegisterPipeline("t", "id", nodes[0])
-	if err == nil {
+	if err != nil {
 		t.Fatal(err)
-	}
-	if diff := deep.Equal("pipeline for PipelineID id already exists", err.Error()); diff != nil {
-		t.Fatal(diff)
 	}
 
 	// remove
