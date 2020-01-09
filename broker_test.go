@@ -140,10 +140,7 @@ func TestPipeline(t *testing.T) {
 
 	// remove again
 	err = broker.RemovePipeline("t", "id")
-	if err == nil {
+	if err != nil {
 		t.Fatal(err)
-	}
-	if diff := deep.Equal("No pipeline for PipelineID id", err.Error()); diff != nil {
-		t.Fatal(diff)
 	}
 }

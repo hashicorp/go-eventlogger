@@ -116,11 +116,6 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 		return fmt.Errorf("No graph for EventType %s", t)
 	}
 
-	_, ok = g.roots[id]
-	if !ok {
-		return fmt.Errorf("No pipeline for PipelineID %s", id)
-	}
-
 	delete(g.roots, id)
 	return nil
 }
