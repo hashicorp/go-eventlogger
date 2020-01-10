@@ -114,3 +114,20 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 	delete(g.roots, id)
 	return nil
 }
+
+// SetSuccessThreshold
+func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
+
+	if successThreshold < 0 {
+		return fmt.Errorf("successThreshold must be 0 or greater")
+	}
+
+	g, ok := b.graphs[t]
+	if !ok {
+		g = &graph{roots: make(map[PipelineID]Node)}
+		b.graphs[t] = g
+	}
+
+	g.successThreshold = successThreshold
+	return nil
+}
