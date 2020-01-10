@@ -139,8 +139,8 @@ func TestPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if diff := deep.Equal(s1.count, 1); diff != nil {
-		t.Fatal(diff)
+	if s1.count != 1 {
+		t.Fatalf("expected count %d, not %d", s1.count, 1)
 	}
 
 	// Construct another graph
@@ -162,11 +162,11 @@ func TestPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if diff := deep.Equal(s1.count, 2); diff != nil {
-		t.Fatal(diff)
+	if s1.count != 2 {
+		t.Fatalf("expected count %d, not %d", s1.count, 2)
 	}
-	if diff := deep.Equal(s2.count, 1); diff != nil {
-		t.Fatal(diff)
+	if s2.count != 1 {
+		t.Fatalf("expected count %d, not %d", s2.count, 1)
 	}
 
 	// remove second graph
@@ -180,11 +180,11 @@ func TestPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if diff := deep.Equal(s1.count, 3); diff != nil {
-		t.Fatal(diff)
+	if s1.count != 3 {
+		t.Fatalf("expected count %d, not %d", s1.count, 3)
 	}
-	if diff := deep.Equal(s2.count, 1); diff != nil {
-		t.Fatal(diff)
+	if s2.count != 1 {
+		t.Fatalf("expected count %d, not %d", s2.count, 1)
 	}
 
 	// remove
