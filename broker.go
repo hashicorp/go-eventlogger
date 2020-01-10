@@ -115,9 +115,9 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 	return nil
 }
 
-// SetSuccessThreshold sets the succes threshold per eventType.  At least that
-// many sinks must successfully process the event for the overall processing of
-// the event to be considered a success.
+// SetSuccessThreshold sets the succes threshold per eventType.  For the
+// overall processing of a given event to be considered a success, at least as
+// many sinks as the threshold value must successfully process the event.
 func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 
 	if successThreshold < 0 {
