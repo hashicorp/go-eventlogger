@@ -4,31 +4,31 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/hashicorp/go-multierror"
 )
 
-// Graph
-type Graph struct {
-	Root Node
-	// SuccessThreshold specifies how many sinks must store an event for Process
-	// to not return an error.
-	SuccessThreshold int
-}
+// graph
+type graph struct {
 
-func (s Status) GetError(threshold int) error {
-	if len(s.SentToSinks) < threshold {
-		return fmt.Errorf("event not written to enough sinks")
-	}
-	return nil
+	// roots maps PipelineIDs to root Nodes
+	roots map[PipelineID]Node
+
+	// successThreshold specifies how many sinks must store an event for Process
+	// to not return an error.
+	successThreshold int
 }
 
 // Process the Event by routing it through all of the graph's nodes,
 // starting with the root node.
-func (g *Graph) Process(ctx context.Context, e *Event) (Status, error) {
+func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 	statusChan := make(chan Status)
 	var wg sync.WaitGroup
 	go func() {
-		wg.Add(1)
-		g.process(ctx, g.Root, e, statusChan, &wg)
+		for _, root := range g.roots {
+			wg.Add(1)
+			g.doProcess(ctx, root, e, statusChan, &wg)
+		}
 		wg.Wait()
 		close(statusChan)
 	}()
@@ -47,11 +47,11 @@ func (g *Graph) Process(ctx context.Context, e *Event) (Status, error) {
 			}
 		}
 	}
-	return status, status.GetError(g.SuccessThreshold)
+	return status, status.GetError(g.successThreshold)
 }
 
 // Recursively process every node in the graph.
-func (g *Graph) process(ctx context.Context, node Node, e *Event, statusChan chan Status, wg *sync.WaitGroup) {
+func (g *graph) doProcess(ctx context.Context, node Node, e *Event, statusChan chan Status, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Process the current Node
@@ -74,19 +74,28 @@ func (g *Graph) process(ctx context.Context, node Node, e *Event, statusChan cha
 
 		for _, child := range ln.Next() {
 			wg.Add(1)
-			go g.process(ctx, child, e, statusChan, wg)
+			go g.doProcess(ctx, child, e, statusChan, wg)
 		}
 	} else {
 		statusChan <- Status{SentToSinks: []string{node.Name()}}
 	}
 }
 
-func (g *Graph) Reopen(ctx context.Context) error {
-	return g.reopen(ctx, g.Root)
+func (g *graph) reopen(ctx context.Context) error {
+	var errors *multierror.Error
+
+	for _, root := range g.roots {
+		err := g.doReopen(ctx, root)
+		if err != nil {
+			errors = multierror.Append(errors, err)
+		}
+	}
+
+	return errors.ErrorOrNil()
 }
 
-// Recursively process every node in the graph.
-func (g *Graph) reopen(ctx context.Context, node Node) error {
+// Recursively reopen every node in the graph.
+func (g *graph) doReopen(ctx context.Context, node Node) error {
 
 	// Process the current Node
 	err := node.Reopen()
@@ -98,7 +107,7 @@ func (g *Graph) reopen(ctx context.Context, node Node) error {
 	if ln, ok := node.(LinkableNode); ok {
 		for _, child := range ln.Next() {
 
-			err = g.reopen(ctx, child)
+			err = g.doReopen(ctx, child)
 			if err != nil {
 				return err
 			}
@@ -108,11 +117,20 @@ func (g *Graph) reopen(ctx context.Context, node Node) error {
 	return nil
 }
 
-func (g *Graph) Validate() error {
-	return g.validate(nil, g.Root)
+func (g *graph) validate() error {
+	var errors *multierror.Error
+
+	for _, root := range g.roots {
+		err := g.doValidate(nil, root)
+		if err != nil {
+			errors = multierror.Append(errors, err)
+		}
+	}
+
+	return errors.ErrorOrNil()
 }
 
-func (g *Graph) validate(parent, node Node) error {
+func (g *graph) doValidate(parent, node Node) error {
 	innerNode, isInner := node.(LinkableNode)
 
 	switch {
@@ -128,7 +146,7 @@ func (g *Graph) validate(parent, node Node) error {
 
 	// Process any child nodes.  This is depth-first.
 	for _, child := range innerNode.Next() {
-		err := g.validate(node, child)
+		err := g.doValidate(node, child)
 		if err != nil {
 			return err
 		}
