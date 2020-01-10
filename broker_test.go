@@ -222,3 +222,25 @@ func (ts *testSink) Reopen() error {
 func (ts *testSink) Name() string {
 	return "testSink"
 }
+
+func TestSuccessThreshold(t *testing.T) {
+
+	b := NewBroker()
+
+	err := b.SetSuccessThreshold("t", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, ok := b.graphs["t"]
+	if !ok {
+		t.Fatalf("expected graph for eventType")
+	}
+	if g.successThreshold != 2 {
+		t.Fatalf("expected successThreshold %d, not %d", g.successThreshold, 2)
+	}
+
+	err = b.SetSuccessThreshold("t", -1)
+	if err == nil || err.Error() != "successThreshold must be 0 or greater" {
+		t.Fatalf("expected successThreshold error")
+	}
+}
