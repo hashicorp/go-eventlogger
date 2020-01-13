@@ -250,7 +250,7 @@ func TestSendBlocking(t *testing.T) {
 	}
 	defer os.Remove(tmp.Name())
 	goodsink := &FileSink{Path: tmp.Name()}
-	badsink := &fileSinkDelayed{goodsink, time.Second}
+	slowsink := &fileSinkDelayed{goodsink, time.Second}
 
 	// TODO right now we don't flag failure to deliver due to timeout with a
 	// warning.  We probably should, in which case maybe we could
@@ -265,7 +265,7 @@ func TestSendBlocking(t *testing.T) {
 	}{
 		{
 			"one bad no threshold",
-			[]Node{badsink}, 0, 0, 0, false,
+			[]Node{slowsink}, 0, 0, 0, false,
 		},
 		{
 			"one good no threshold",
@@ -273,11 +273,11 @@ func TestSendBlocking(t *testing.T) {
 		},
 		{
 			"one good one bad no threshold",
-			[]Node{goodsink, badsink}, 0, 0, 1, false,
+			[]Node{goodsink, slowsink}, 0, 0, 1, false,
 		},
 		{
 			"one bad threshold=1",
-			[]Node{badsink}, 1, 0, 0, true,
+			[]Node{slowsink}, 1, 0, 0, true,
 		},
 		{
 			"one good threshold=1",
@@ -285,11 +285,11 @@ func TestSendBlocking(t *testing.T) {
 		},
 		{
 			"one good one bad threshold=1",
-			[]Node{goodsink, badsink}, 1, 0, 1, false,
+			[]Node{goodsink, slowsink}, 1, 0, 1, false,
 		},
 		{
 			"two bad threshold=2",
-			[]Node{badsink, badsink}, 2, 0, 0, true,
+			[]Node{slowsink, slowsink}, 2, 0, 0, true,
 		},
 		{
 			"two good threshold=2",
@@ -297,7 +297,7 @@ func TestSendBlocking(t *testing.T) {
 		},
 		{
 			"one good one bad threshold=2",
-			[]Node{goodsink, badsink}, 2, 0, 1, true,
+			[]Node{goodsink, slowsink}, 2, 0, 1, true,
 		},
 	}
 
@@ -342,4 +342,8 @@ func TestSendBlocking(t *testing.T) {
 			}
 		})
 	}
+
+	// Sleep long enough that the 1s sleep in fileSinkDelayed completes, to
+	// satisfy the go leak detector in TestMain.
+	time.Sleep(700 * time.Millisecond)
 }
