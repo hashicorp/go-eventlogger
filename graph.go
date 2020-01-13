@@ -56,11 +56,11 @@ func (g *graph) doProcess(ctx context.Context, node Node, e *Event, statusChan c
 
 	// Process the current Node
 	e, err := node.Process(e)
-	if ctx.Err() != nil {
-		return
-	}
 	if err != nil {
-		statusChan <- Status{Warnings: []error{err}}
+		select {
+		case <-ctx.Done():
+		case statusChan <- Status{Warnings: []error{err}}:
+		}
 		return
 	}
 
@@ -77,7 +77,10 @@ func (g *graph) doProcess(ctx context.Context, node Node, e *Event, statusChan c
 			go g.doProcess(ctx, child, e, statusChan, wg)
 		}
 	} else {
-		statusChan <- Status{SentToSinks: []string{node.Name()}}
+		select {
+		case <-ctx.Done():
+		case statusChan <- Status{SentToSinks: []string{node.Name()}}:
+		}
 	}
 }
 
