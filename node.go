@@ -22,7 +22,11 @@ type Node interface {
 	// Reopen is used to re-read any config stored externally
 	// and to close and reopen files, e.g. for log rotation.
 	Reopen() error
+	// Name returns the node's name.  Nothing enforces uniqueness,
+	// but it's usually a good idea.
 	Name() string
+	// Type describes the type of the node.  This is mostly just used to
+	// validate that pipelines are sensibly arranged, e.g. ending with a sink.
 	Type() NodeType
 }
 
@@ -54,6 +58,9 @@ func LinkNodes(nodes []Node) ([]Node, error) {
 	return nodes, nil
 }
 
+// LinkNodesAndSinks is a convenience function that connects
+// the inner Nodes together into a linked list.  Then it appends the sinks
+// to the end as a set of fan-out leaves.
 func LinkNodesAndSinks(inner, sinks []Node) ([]Node, error) {
 	_, err := LinkNodes(inner)
 	if err != nil {

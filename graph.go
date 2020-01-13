@@ -41,13 +41,13 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 		case s, ok := <-statusChan:
 			if ok {
 				status.Warnings = append(status.Warnings, s.Warnings...)
-				status.SentToSinks = append(status.SentToSinks, s.SentToSinks...)
+				status.Complete = append(status.Complete, s.Complete...)
 			} else {
 				done = true
 			}
 		}
 	}
-	return status, status.GetError(g.successThreshold)
+	return status, status.getError(g.successThreshold)
 }
 
 // Recursively process every node in the graph.
@@ -79,7 +79,7 @@ func (g *graph) doProcess(ctx context.Context, node Node, e *Event, statusChan c
 	} else {
 		select {
 		case <-ctx.Done():
-		case statusChan <- Status{SentToSinks: []string{node.Name()}}:
+		case statusChan <- Status{Complete: []string{node.Name()}}:
 		}
 	}
 }
