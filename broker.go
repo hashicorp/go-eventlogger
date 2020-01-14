@@ -94,6 +94,7 @@ func (b *Broker) Reopen(ctx context.Context) error {
 // NodeID is a string that uniquely identifies a Node.
 type NodeID string
 
+// RegisterNode assigns a node ID to a node.  Node IDs should be unique.
 func (b *Broker) RegisterNode(id NodeID, node Node) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -105,19 +106,27 @@ func (b *Broker) RegisterNode(id NodeID, node Node) error {
 // PipelineID is a string that uniquely identifies a Pipeline within a given EventType.
 type PipelineID string
 
+// PipelineDefinition defines a pipe: its ID, the EventType it's for, and the nodes
+// that it contains.
+type PipelineDefinition struct {
+	PipelineID PipelineID
+	EventType  EventType
+	NodeIDs    []NodeID
+}
+
 // RegisterPipeline adds a pipeline to the broker.
-func (b *Broker) RegisterPipeline(t EventType, id PipelineID, nodeIDs []NodeID) error {
+func (b *Broker) RegisterPipeline(def PipelineDefinition) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	g, ok := b.graphs[t]
+	g, ok := b.graphs[def.EventType]
 	if !ok {
 		g = &graph{roots: make(map[PipelineID]*linkedNode)}
-		b.graphs[t] = g
+		b.graphs[def.EventType] = g
 	}
 
-	nodes := make([]Node, len(nodeIDs))
-	for i, n := range nodeIDs {
+	nodes := make([]Node, len(def.NodeIDs))
+	for i, n := range def.NodeIDs {
 		node, ok := b.nodes[n]
 		if !ok {
 			return fmt.Errorf("nodeID %q not registered", n)
@@ -134,7 +143,7 @@ func (b *Broker) RegisterPipeline(t EventType, id PipelineID, nodeIDs []NodeID) 
 		return err
 	}
 
-	g.roots[id] = root
+	g.roots[def.PipelineID] = root
 
 	return nil
 }
