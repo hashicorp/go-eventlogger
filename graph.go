@@ -79,7 +79,7 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 	} else {
 		select {
 		case <-ctx.Done():
-		case statusChan <- Status{Complete: []string{node.node.Name()}}:
+		case statusChan <- Status{Complete: []NodeID{node.nodeID}}:
 		}
 	}
 }
