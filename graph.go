@@ -55,7 +55,7 @@ func (g *graph) doProcess(ctx context.Context, node Node, e *Event, statusChan c
 	defer wg.Done()
 
 	// Process the current Node
-	e, err := node.Process(e)
+	e, err := node.Process(ctx, e)
 	if err != nil {
 		select {
 		case <-ctx.Done():

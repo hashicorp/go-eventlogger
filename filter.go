@@ -1,5 +1,9 @@
 package eventlogger
 
+import (
+	"context"
+)
+
 // Predicate returns true if we want to keep the Event.
 type Predicate func(e *Event) (bool, error)
 
@@ -12,7 +16,7 @@ type Filter struct {
 
 var _ LinkableNode = &Filter{}
 
-func (f *Filter) Process(e *Event) (*Event, error) {
+func (f *Filter) Process(ctx context.Context, e *Event) (*Event, error) {
 
 	// Use the predicate to see if we want to keep the event.
 	keep, err := f.Predicate(e)

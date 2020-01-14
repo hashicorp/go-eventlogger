@@ -2,6 +2,7 @@ package eventlogger
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"time"
 )
@@ -12,7 +13,7 @@ type JSONFormatter struct {
 
 var _ LinkableNode = &JSONFormatter{}
 
-func (w *JSONFormatter) Process(e *Event) (*Event, error) {
+func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	err := enc.Encode(struct {

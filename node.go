@@ -1,6 +1,7 @@
 package eventlogger
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -18,7 +19,7 @@ const (
 type Node interface {
 	// Process does something with the Event: filter, redaction,
 	// marshalling, persisting.
-	Process(e *Event) (*Event, error)
+	Process(ctx context.Context, e *Event) (*Event, error)
 	// Reopen is used to re-read any config stored externally
 	// and to close and reopen files, e.g. for log rotation.
 	Reopen() error
