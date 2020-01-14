@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-// Broker
+// Broker is the top-level entity used in the library for configuring the system
+// and for sending events.
 type Broker struct {
 	graphs     map[EventType]*graph
 	graphMutex sync.RWMutex
@@ -15,6 +16,7 @@ type Broker struct {
 	*clock
 }
 
+// NewBroker creates a new Broker.
 func NewBroker() *Broker {
 	return &Broker{
 		graphs: make(map[EventType]*graph),
@@ -33,35 +35,24 @@ func (c *clock) Now() time.Time {
 	return c.now
 }
 
-func (b *Broker) Validate() error {
-	b.graphMutex.RLock()
-	defer b.graphMutex.RUnlock()
-
-	if len(b.graphs) == 0 {
-		return fmt.Errorf("no graphs in broker")
-	}
-
-	for _, g := range b.graphs {
-		if err := g.validate(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
+// Status describes the result of a Send.
 type Status struct {
-	SentToSinks []string
-	Warnings    []error
+	// Complete lists the names of all sinks that successfully wrote the Event.
+	Complete []string
+	// Warnings lists any non-fatal errors that occurred while sending an Event.
+	Warnings []error
 }
 
-func (s Status) GetError(threshold int) error {
-	if len(s.SentToSinks) < threshold {
+func (s Status) getError(threshold int) error {
+	if len(s.Complete) < threshold {
 		return fmt.Errorf("event not written to enough sinks")
 	}
 	return nil
 }
 
+// Send writes an event of type t to all configured pipelines and reports on the
+// result.  An error will only be returned if configured delivery policies could
+// not be satisfied.
 func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (Status, error) {
 
 	b.graphMutex.RLock()
@@ -82,6 +73,9 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 	return g.process(ctx, e)
 }
 
+// Reopen asks all nodes to reopen any files they have open.  This is typically
+// used as part of log rotation: after rotating, the rotator sends a signal to
+// the application, which then would invoke this method.
 func (b *Broker) Reopen(ctx context.Context) error {
 	b.graphMutex.RLock()
 	defer b.graphMutex.RUnlock()
