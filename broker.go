@@ -93,13 +93,13 @@ func (b *Broker) Reopen(ctx context.Context) error {
 type PipelineID string
 
 // RegisterPipeline adds a pipeline to the broker.
-func (b *Broker) RegisterPipeline(t EventType, id PipelineID, root Node) error {
+func (b *Broker) RegisterPipeline(t EventType, id PipelineID, root *linkedNode) error {
 	b.graphMutex.Lock()
 	defer b.graphMutex.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
-		g = &graph{roots: make(map[PipelineID]Node)}
+		g = &graph{roots: make(map[PipelineID]*linkedNode)}
 		b.graphs[t] = g
 	}
 
@@ -140,7 +140,7 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 
 	g, ok := b.graphs[t]
 	if !ok {
-		g = &graph{roots: make(map[PipelineID]Node)}
+		g = &graph{roots: make(map[PipelineID]*linkedNode)}
 		b.graphs[t] = g
 	}
 

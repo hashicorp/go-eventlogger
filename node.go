@@ -2,7 +2,6 @@ package eventlogger
 
 import (
 	"context"
-	"errors"
 	"fmt"
 )
 
@@ -31,49 +30,49 @@ type Node interface {
 	Type() NodeType
 }
 
-// A LinkableNode is a Node that has downstream children.  Nodes
-// that are *not* LinkableNodes are Leafs.
-type LinkableNode interface {
-	Node
-	SetNext([]Node)
-	Next() []Node
+type linkedNode struct {
+	node Node
+	next []*linkedNode
 }
 
-// LinkNodes is a convenience function that connects
+// linkNodes is a convenience function that connects
 // Nodes together into a linked list. All of the nodes except the
 // last one must be LinkableNodes
-func LinkNodes(nodes []Node) ([]Node, error) {
-	num := len(nodes)
-	if num < 2 {
-		return nodes, nil
+func linkNodes(nodes []Node) (*linkedNode, error) {
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("no nodes given")
 	}
 
-	for i := 0; i < num-1; i++ {
-		ln, ok := nodes[i].(LinkableNode)
-		if !ok {
-			return nil, errors.New("Node is not Linkable")
-		}
-		ln.SetNext([]Node{nodes[i+1]})
+	root := &linkedNode{node: nodes[0]}
+	cur := root
+
+	for _, n := range nodes[1:] {
+		next := &linkedNode{node: n}
+		cur.next = []*linkedNode{next}
+		cur = next
 	}
 
-	return nodes, nil
+	return root, nil
 }
 
-// LinkNodesAndSinks is a convenience function that connects
+// linkNodesAndSinks is a convenience function that connects
 // the inner Nodes together into a linked list.  Then it appends the sinks
 // to the end as a set of fan-out leaves.
-func LinkNodesAndSinks(inner, sinks []Node) ([]Node, error) {
-	_, err := LinkNodes(inner)
+func linkNodesAndSinks(inner, sinks []Node) (*linkedNode, error) {
+	root, err := linkNodes(inner)
 	if err != nil {
 		return nil, err
 	}
 
-	ln, ok := inner[len(inner)-1].(LinkableNode)
-	if !ok {
-		return nil, fmt.Errorf("last inner node not linkable")
+	// This is inefficient but since it's only used in setup we don't care:
+	cur := root
+	for cur.next != nil {
+		cur = cur.next[0]
 	}
 
-	ln.SetNext(sinks)
+	for _, s := range sinks {
+		cur.next = append(cur.next, &linkedNode{node: s})
+	}
 
-	return inner, nil
+	return root, nil
 }

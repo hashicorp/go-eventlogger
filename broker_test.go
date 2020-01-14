@@ -21,7 +21,7 @@ func TestBroker(t *testing.T) {
 	path := tmp.Name()
 
 	// Construct a graph
-	nodes, err := LinkNodes([]Node{
+	root, err := linkNodes([]Node{
 		// Filter out the purple nodes
 		&Filter{
 			Predicate: func(e *Event) (bool, error) {
@@ -47,7 +47,7 @@ func TestBroker(t *testing.T) {
 
 	// Register the graph with the broker
 	et := EventType("Foo")
-	err = broker.RegisterPipeline(et, "id", nodes[0])
+	err = broker.RegisterPipeline(et, "id", root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestPipeline(t *testing.T) {
 	broker := NewBroker()
 
 	// invalid pipeline
-	root := &Filter{Predicate: nil}
+	root := &linkedNode{node: &Filter{Predicate: nil}}
 	err := broker.RegisterPipeline("t", "id", root)
 	if err == nil {
 		t.Fatal(err)
@@ -110,7 +110,7 @@ func TestPipeline(t *testing.T) {
 
 	// Construct a graph
 	s1 := &testSink{}
-	p1, err := LinkNodes([]Node{
+	p1, err := linkNodes([]Node{
 		&JSONFormatter{},
 		s1,
 	})
@@ -119,13 +119,13 @@ func TestPipeline(t *testing.T) {
 	}
 
 	// register
-	err = broker.RegisterPipeline("t", "s1", p1[0])
+	err = broker.RegisterPipeline("t", "s1", p1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// register again
-	err = broker.RegisterPipeline("t", "s1", p1[0])
+	err = broker.RegisterPipeline("t", "s1", p1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,14 +145,14 @@ func TestPipeline(t *testing.T) {
 
 	// Construct another graph
 	s2 := &testSink{}
-	p2, err := LinkNodes([]Node{
+	p2, err := linkNodes([]Node{
 		&JSONFormatter{},
 		s2,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = broker.RegisterPipeline("t", "s2", p2[0])
+	err = broker.RegisterPipeline("t", "s2", p2)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,22 +9,13 @@ import (
 )
 
 type reopenNode struct {
-	nodes    []Node
 	reopened int
 }
 
-var _ LinkableNode = &reopenNode{}
+var _ Node = &reopenNode{}
 
 func (r *reopenNode) Process(ctx context.Context, e *Event) (*Event, error) {
 	return e, nil
-}
-
-func (r *reopenNode) SetNext(nodes []Node) {
-	r.nodes = nodes
-}
-
-func (r *reopenNode) Next() []Node {
-	return r.nodes
 }
 
 func (r *reopenNode) Reopen() error {
@@ -41,17 +32,15 @@ func (r *reopenNode) Name() string {
 }
 
 func TestReopen(t *testing.T) {
-	nodes, err := LinkNodes([]Node{
-		&reopenNode{},
-		&reopenNode{},
-	})
+	nodes := []Node{&reopenNode{}, &reopenNode{}}
+	root, err := linkNodes(nodes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	g := graph{
-		roots: map[PipelineID]Node{
-			"id": nodes[0],
+		roots: map[PipelineID]*linkedNode{
+			"id": root,
 		},
 	}
 	err = g.reopen(context.Background())
@@ -115,14 +104,14 @@ func TestValidate(t *testing.T) {
 	for i := range testcases {
 		tc := testcases[i]
 		t.Run(tc.name, func(t *testing.T) {
-			nodes, err := LinkNodes(tc.nodes)
+			root, err := linkNodes(tc.nodes)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			g := graph{
-				roots: map[PipelineID]Node{
-					"id": nodes[0],
+				roots: map[PipelineID]*linkedNode{
+					"id": root,
 				},
 			}
 			err = g.validate()
@@ -194,14 +183,14 @@ func TestSendResult(t *testing.T) {
 		tc := testcases[i]
 		t.Run(tc.name, func(t *testing.T) {
 			nodes := []Node{&JSONFormatter{}}
-			_, err := LinkNodesAndSinks(nodes, tc.sinks)
+			root, err := linkNodesAndSinks(nodes, tc.sinks)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			g := graph{
-				roots: map[PipelineID]Node{
-					"id": nodes[0],
+				roots: map[PipelineID]*linkedNode{
+					"id": root,
 				},
 				successThreshold: tc.threshold,
 			}
@@ -305,14 +294,14 @@ func TestSendBlocking(t *testing.T) {
 		tc := testcases[i]
 		t.Run(tc.name, func(t *testing.T) {
 			nodes := []Node{&JSONFormatter{}}
-			_, err := LinkNodesAndSinks(nodes, tc.sinks)
+			root, err := linkNodesAndSinks(nodes, tc.sinks)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			g := graph{
-				roots: map[PipelineID]Node{
-					"id": nodes[0],
+				roots: map[PipelineID]*linkedNode{
+					"id": root,
 				},
 				successThreshold: tc.threshold,
 			}
