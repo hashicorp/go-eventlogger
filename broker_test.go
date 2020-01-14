@@ -210,7 +210,7 @@ func (ts *testSink) Type() NodeType {
 	return NodeTypeSink
 }
 
-func (ts *testSink) Process(e *Event) (*Event, error) {
+func (ts *testSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	ts.count++
 	return nil, nil
 }

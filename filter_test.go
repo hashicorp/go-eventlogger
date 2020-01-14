@@ -1,6 +1,7 @@
 package eventlogger
 
 import (
+	"context"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ func TestFilter(t *testing.T) {
 	f := &Filter{Predicate: predicate}
 
 	e := &Event{}
-	_, err := f.Process(e)
+	_, err := f.Process(context.Background(), e)
 	if err != nil {
 		t.Fatal(err)
 	}

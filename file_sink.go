@@ -2,6 +2,7 @@ package eventlogger
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -58,7 +59,7 @@ func (fs *FileSink) open() error {
 	return nil
 }
 
-func (fs *FileSink) Process(e *Event) (*Event, error) {
+func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	e.l.RLock()
 	val, ok := e.Formatted["json"]
 	e.l.RUnlock()

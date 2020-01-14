@@ -15,7 +15,7 @@ type reopenNode struct {
 
 var _ LinkableNode = &reopenNode{}
 
-func (r *reopenNode) Process(e *Event) (*Event, error) {
+func (r *reopenNode) Process(ctx context.Context, e *Event) (*Event, error) {
 	return e, nil
 }
 
@@ -238,9 +238,9 @@ type fileSinkDelayed struct {
 
 var _ Node = &fileSinkDelayed{}
 
-func (fsd *fileSinkDelayed) Process(e *Event) (*Event, error) {
+func (fsd *fileSinkDelayed) Process(ctx context.Context, e *Event) (*Event, error) {
 	time.Sleep(fsd.delay)
-	return fsd.FileSink.Process(e)
+	return fsd.FileSink.Process(ctx, e)
 }
 
 func TestSendBlocking(t *testing.T) {
