@@ -10,8 +10,9 @@ import (
 // Broker is the top-level entity used in the library for configuring the system
 // and for sending events.
 type Broker struct {
-	graphs     map[EventType]*graph
-	graphMutex sync.RWMutex
+	nodes  map[NodeID]Node
+	graphs map[EventType]*graph
+	lock   sync.RWMutex
 
 	*clock
 }
@@ -19,6 +20,7 @@ type Broker struct {
 // NewBroker creates a new Broker.
 func NewBroker() *Broker {
 	return &Broker{
+		nodes:  make(map[NodeID]Node),
 		graphs: make(map[EventType]*graph),
 	}
 }
@@ -55,9 +57,9 @@ func (s Status) getError(threshold int) error {
 // not be satisfied.
 func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (Status, error) {
 
-	b.graphMutex.RLock()
+	b.lock.RLock()
 	g, ok := b.graphs[t]
-	b.graphMutex.RUnlock()
+	b.lock.RUnlock()
 
 	if !ok {
 		return Status{}, fmt.Errorf("No graph for EventType %s", t)
@@ -77,8 +79,8 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 // used as part of log rotation: after rotating, the rotator sends a signal to
 // the application, which then would invoke this method.
 func (b *Broker) Reopen(ctx context.Context) error {
-	b.graphMutex.RLock()
-	defer b.graphMutex.RUnlock()
+	b.lock.RLock()
+	defer b.lock.RUnlock()
 
 	for _, g := range b.graphs {
 		if err := g.reopen(ctx); err != nil {
@@ -89,13 +91,24 @@ func (b *Broker) Reopen(ctx context.Context) error {
 	return nil
 }
 
+// NodeID is a string that uniquely identifies a Node.
+type NodeID string
+
+func (b *Broker) RegisterNode(id NodeID, node Node) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	b.nodes[id] = node
+	return nil
+}
+
 // PipelineID is a string that uniquely identifies a Pipeline within a given EventType.
 type PipelineID string
 
 // RegisterPipeline adds a pipeline to the broker.
-func (b *Broker) RegisterPipeline(t EventType, id PipelineID, root *linkedNode) error {
-	b.graphMutex.Lock()
-	defer b.graphMutex.Unlock()
+func (b *Broker) RegisterPipeline(t EventType, id PipelineID, nodeIDs []NodeID) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
@@ -103,7 +116,20 @@ func (b *Broker) RegisterPipeline(t EventType, id PipelineID, root *linkedNode) 
 		b.graphs[t] = g
 	}
 
-	err := g.doValidate(nil, root)
+	nodes := make([]Node, len(nodeIDs))
+	for i, n := range nodeIDs {
+		node, ok := b.nodes[n]
+		if !ok {
+			return fmt.Errorf("nodeID %q not registered", n)
+		}
+		nodes[i] = node
+	}
+	root, err := linkNodes(nodes)
+	if err != nil {
+		return err
+	}
+
+	err = g.doValidate(nil, root)
 	if err != nil {
 		return err
 	}
@@ -115,8 +141,8 @@ func (b *Broker) RegisterPipeline(t EventType, id PipelineID, root *linkedNode) 
 
 // RemovePipeline removes a pipeline from the broker.
 func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
-	b.graphMutex.Lock()
-	defer b.graphMutex.Unlock()
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
@@ -131,8 +157,8 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 // overall processing of a given event to be considered a success, at least as
 // many sinks as the threshold value must successfully process the event.
 func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
-	b.graphMutex.Lock()
-	defer b.graphMutex.Unlock()
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	if successThreshold < 0 {
 		return fmt.Errorf("successThreshold must be 0 or greater")

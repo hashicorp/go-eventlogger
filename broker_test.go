@@ -11,8 +11,21 @@ import (
 	"github.com/go-test/deep"
 )
 
-func TestBroker(t *testing.T) {
+func nodesToNodeIDs(t *testing.T, broker *Broker, nodes ...Node) []NodeID {
+	t.Helper()
+	nodeIDs := make([]NodeID, len(nodes))
+	for i, node := range nodes {
+		id := NodeID(fmt.Sprintf("node-%d", i))
+		err := broker.RegisterNode(id, node)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nodeIDs[i] = id
+	}
+	return nodeIDs
+}
 
+func TestBroker(t *testing.T) {
 	tmp, err := ioutil.TempFile("", "file.sink.")
 	if err != nil {
 		t.Fatal(err)
@@ -20,25 +33,17 @@ func TestBroker(t *testing.T) {
 	defer os.Remove(tmp.Name())
 	path := tmp.Name()
 
-	// Construct a graph
-	root, err := linkNodes([]Node{
-		// Filter out the purple nodes
-		&Filter{
-			Predicate: func(e *Event) (bool, error) {
-				color, ok := e.Payload.(map[string]interface{})["color"]
-				return !ok || color != "purple", nil
-			},
+	// Filter out the purple nodes
+	n1 := &Filter{
+		Predicate: func(e *Event) (bool, error) {
+			color, ok := e.Payload.(map[string]interface{})["color"]
+			return !ok || color != "purple", nil
 		},
-		// Marshal to JSON
-		&JSONFormatter{},
-		// Send to FileSink
-		&FileSink{
-			Path: path,
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
+	// Marshal to JSON
+	n2 := &JSONFormatter{}
+	// Send to FileSink
+	n3 := &FileSink{Path: path}
 
 	// Create a broker
 	broker := NewBroker()
@@ -47,7 +52,8 @@ func TestBroker(t *testing.T) {
 
 	// Register the graph with the broker
 	et := EventType("Foo")
-	err = broker.RegisterPipeline(et, "id", root)
+	nodeIDs := nodesToNodeIDs(t, broker, n1, n2, n3)
+	err = broker.RegisterPipeline(et, "id", nodeIDs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,8 +105,8 @@ func TestPipeline(t *testing.T) {
 	broker := NewBroker()
 
 	// invalid pipeline
-	root := &linkedNode{node: &Filter{Predicate: nil}}
-	err := broker.RegisterPipeline("t", "id", root)
+	nodeIDs := nodesToNodeIDs(t, broker, &Filter{Predicate: nil})
+	err := broker.RegisterPipeline("t", "id", nodeIDs)
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -109,16 +115,9 @@ func TestPipeline(t *testing.T) {
 	}
 
 	// Construct a graph
+	f1 := &JSONFormatter{}
 	s1 := &testSink{}
-	p1, err := linkNodes([]Node{
-		&JSONFormatter{},
-		s1,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// register
+	p1 := nodesToNodeIDs(t, broker, f1, s1)
 	err = broker.RegisterPipeline("t", "s1", p1)
 	if err != nil {
 		t.Fatal(err)
@@ -145,13 +144,7 @@ func TestPipeline(t *testing.T) {
 
 	// Construct another graph
 	s2 := &testSink{}
-	p2, err := linkNodes([]Node{
-		&JSONFormatter{},
-		s2,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	p2 := nodesToNodeIDs(t, broker, f1, s2)
 	err = broker.RegisterPipeline("t", "s2", p2)
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +217,6 @@ func (ts *testSink) Name() string {
 }
 
 func TestSuccessThreshold(t *testing.T) {
-
 	b := NewBroker()
 
 	err := b.SetSuccessThreshold("t", 2)
