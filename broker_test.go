@@ -53,7 +53,7 @@ func TestBroker(t *testing.T) {
 	// Register the graph with the broker
 	et := EventType("Foo")
 	nodeIDs := nodesToNodeIDs(t, broker, n1, n2, n3)
-	err = broker.RegisterPipeline(PipelineDefinition{
+	err = broker.RegisterPipeline(Pipeline{
 		EventType:  et,
 		PipelineID: "id",
 		NodeIDs:    nodeIDs,
@@ -110,7 +110,7 @@ func TestPipeline(t *testing.T) {
 
 	// invalid pipeline
 	nodeIDs := nodesToNodeIDs(t, broker, &Filter{Predicate: nil})
-	err := broker.RegisterPipeline(PipelineDefinition{
+	err := broker.RegisterPipeline(Pipeline{
 		EventType:  "t",
 		PipelineID: "id",
 		NodeIDs:    nodeIDs,
@@ -126,7 +126,7 @@ func TestPipeline(t *testing.T) {
 	f1 := &JSONFormatter{}
 	s1 := &testSink{}
 	p1 := nodesToNodeIDs(t, broker, f1, s1)
-	err = broker.RegisterPipeline(PipelineDefinition{
+	err = broker.RegisterPipeline(Pipeline{
 		EventType:  "t",
 		PipelineID: "s1",
 		NodeIDs:    p1,
@@ -136,7 +136,7 @@ func TestPipeline(t *testing.T) {
 	}
 
 	// register again
-	err = broker.RegisterPipeline(PipelineDefinition{
+	err = broker.RegisterPipeline(Pipeline{
 		EventType:  "t",
 		PipelineID: "s1",
 		NodeIDs:    p1,
@@ -161,7 +161,7 @@ func TestPipeline(t *testing.T) {
 	// Construct another graph
 	s2 := &testSink{}
 	p2 := nodesToNodeIDs(t, broker, f1, s2)
-	err = broker.RegisterPipeline(PipelineDefinition{
+	err = broker.RegisterPipeline(Pipeline{
 		EventType:  "t",
 		PipelineID: "s2",
 		NodeIDs:    p2,

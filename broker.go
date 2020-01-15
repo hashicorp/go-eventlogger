@@ -106,16 +106,16 @@ func (b *Broker) RegisterNode(id NodeID, node Node) error {
 // PipelineID is a string that uniquely identifies a Pipeline within a given EventType.
 type PipelineID string
 
-// PipelineDefinition defines a pipe: its ID, the EventType it's for, and the nodes
+// Pipeline defines a pipe: its ID, the EventType it's for, and the nodes
 // that it contains.
-type PipelineDefinition struct {
+type Pipeline struct {
 	PipelineID PipelineID
 	EventType  EventType
 	NodeIDs    []NodeID
 }
 
 // RegisterPipeline adds a pipeline to the broker.
-func (b *Broker) RegisterPipeline(def PipelineDefinition) error {
+func (b *Broker) RegisterPipeline(def Pipeline) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
