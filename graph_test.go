@@ -220,8 +220,8 @@ func TestSendResult(t *testing.T) {
 				t.Fatalf("got=%v, expected=%v, error=%v", failure, tc.failure, err)
 			}
 
-			if len(status.Complete) != tc.sent {
-				t.Fatalf("got=%d, expected=%d", len(status.Complete), tc.sent)
+			if len(status.complete) != tc.sent {
+				t.Fatalf("got=%d, expected=%d", len(status.complete), tc.sent)
 			}
 
 			if len(status.Warnings) != tc.warnings {
@@ -333,8 +333,8 @@ func TestSendBlocking(t *testing.T) {
 				t.Fatalf("got=%v, expected=%v, error=%v", failure, tc.failure, err)
 			}
 
-			if len(status.Complete) != tc.sent {
-				t.Fatalf("got=%d, expected=%d", len(status.Complete), tc.sent)
+			if len(status.complete) != tc.sent {
+				t.Fatalf("got=%d, expected=%d", len(status.complete), tc.sent)
 			}
 
 			if len(status.Warnings) != tc.warnings {
