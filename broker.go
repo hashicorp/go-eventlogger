@@ -40,7 +40,7 @@ func (c *clock) Now() time.Time {
 // Status describes the result of a Send.
 type Status struct {
 	// complete lists the IDs of sinks that successfully wrote the Event.
-	Complete []NodeID
+	complete []NodeID
 	// Warnings lists any non-fatal errors that occurred while sending an Event.
 	Warnings []error
 }
