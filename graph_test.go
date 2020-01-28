@@ -9,22 +9,13 @@ import (
 )
 
 type reopenNode struct {
-	nodes    []Node
 	reopened int
 }
 
-var _ LinkableNode = &reopenNode{}
+var _ Node = &reopenNode{}
 
 func (r *reopenNode) Process(ctx context.Context, e *Event) (*Event, error) {
 	return e, nil
-}
-
-func (r *reopenNode) SetNext(nodes []Node) {
-	r.nodes = nodes
-}
-
-func (r *reopenNode) Next() []Node {
-	return r.nodes
 }
 
 func (r *reopenNode) Reopen() error {
@@ -41,17 +32,15 @@ func (r *reopenNode) Name() string {
 }
 
 func TestReopen(t *testing.T) {
-	nodes, err := LinkNodes([]Node{
-		&reopenNode{},
-		&reopenNode{},
-	})
+	nodes := []Node{&reopenNode{}, &reopenNode{}}
+	root, err := linkNodes(nodes, []NodeID{"1", "2"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	g := graph{
-		roots: map[PipelineID]Node{
-			"id": nodes[0],
+		roots: map[PipelineID]*linkedNode{
+			"id": root,
 		},
 	}
 	err = g.reopen(context.Background())
@@ -115,14 +104,15 @@ func TestValidate(t *testing.T) {
 	for i := range testcases {
 		tc := testcases[i]
 		t.Run(tc.name, func(t *testing.T) {
-			nodes, err := LinkNodes(tc.nodes)
+			ids := make([]NodeID, len(tc.nodes))
+			root, err := linkNodes(tc.nodes, ids)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			g := graph{
-				roots: map[PipelineID]Node{
-					"id": nodes[0],
+				roots: map[PipelineID]*linkedNode{
+					"id": root,
 				},
 			}
 			err = g.validate()
@@ -141,12 +131,16 @@ func TestSendResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmp.Name())
-	goodsink := &FileSink{Path: tmp.Name()}
-	badsink := &FileSink{Path: "/"}
+	goodsink := NodeID("good")
+	badsink := NodeID("bad")
+	sinksByID := map[NodeID]Node{
+		goodsink: &FileSink{Path: tmp.Name()},
+		badsink:  &FileSink{Path: "/"},
+	}
 
 	testcases := []struct {
 		name      string
-		sinks     []Node
+		sinkIDs   []NodeID
 		threshold int
 		warnings  int
 		sent      int
@@ -154,39 +148,39 @@ func TestSendResult(t *testing.T) {
 	}{
 		{
 			"one bad no threshold",
-			[]Node{badsink}, 0, 1, 0, false,
+			[]NodeID{badsink}, 0, 1, 0, false,
 		},
 		{
 			"one good no threshold",
-			[]Node{goodsink}, 0, 0, 1, false,
+			[]NodeID{goodsink}, 0, 0, 1, false,
 		},
 		{
 			"one good one bad no threshold",
-			[]Node{goodsink, badsink}, 0, 1, 1, false,
+			[]NodeID{goodsink, badsink}, 0, 1, 1, false,
 		},
 		{
 			"one bad threshold=1",
-			[]Node{badsink}, 1, 1, 0, true,
+			[]NodeID{badsink}, 1, 1, 0, true,
 		},
 		{
 			"one good threshold=1",
-			[]Node{goodsink}, 1, 0, 1, false,
+			[]NodeID{goodsink}, 1, 0, 1, false,
 		},
 		{
 			"one good one bad threshold=1",
-			[]Node{goodsink, badsink}, 1, 1, 1, false,
+			[]NodeID{goodsink, badsink}, 1, 1, 1, false,
 		},
 		{
 			"two bad threshold=2",
-			[]Node{badsink, badsink}, 2, 2, 0, true,
+			[]NodeID{badsink, badsink}, 2, 2, 0, true,
 		},
 		{
 			"two good threshold=2",
-			[]Node{goodsink, goodsink}, 2, 0, 2, false,
+			[]NodeID{goodsink, goodsink}, 2, 0, 2, false,
 		},
 		{
 			"one good one bad threshold=2",
-			[]Node{goodsink, badsink}, 2, 1, 1, true,
+			[]NodeID{goodsink, badsink}, 2, 1, 1, true,
 		},
 	}
 
@@ -194,14 +188,18 @@ func TestSendResult(t *testing.T) {
 		tc := testcases[i]
 		t.Run(tc.name, func(t *testing.T) {
 			nodes := []Node{&JSONFormatter{}}
-			_, err := LinkNodesAndSinks(nodes, tc.sinks)
+			sinks := make([]Node, len(tc.sinkIDs))
+			for i, id := range tc.sinkIDs {
+				sinks[i] = sinksByID[id]
+			}
+			root, err := linkNodesAndSinks(nodes, sinks, []NodeID{"f1"}, tc.sinkIDs)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			g := graph{
-				roots: map[PipelineID]Node{
-					"id": nodes[0],
+				roots: map[PipelineID]*linkedNode{
+					"id": root,
 				},
 				successThreshold: tc.threshold,
 			}
@@ -249,15 +247,20 @@ func TestSendBlocking(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmp.Name())
-	goodsink := &FileSink{Path: tmp.Name()}
-	slowsink := &fileSinkDelayed{goodsink, time.Second}
+	fs := &FileSink{Path: tmp.Name()}
+	goodsink := NodeID("good")
+	slowsink := NodeID("bad")
+	sinksByID := map[NodeID]Node{
+		goodsink: fs,
+		slowsink: &fileSinkDelayed{fs, time.Second},
+	}
 
 	// TODO right now we don't flag failure to deliver due to timeout with a
 	// warning.  We probably should, in which case maybe we could
 	// fold this test into the preceding one.
 	testcases := []struct {
 		name      string
-		sinks     []Node
+		sinkIDs   []NodeID
 		threshold int
 		warnings  int
 		sent      int
@@ -265,39 +268,39 @@ func TestSendBlocking(t *testing.T) {
 	}{
 		{
 			"one bad no threshold",
-			[]Node{slowsink}, 0, 0, 0, false,
+			[]NodeID{slowsink}, 0, 0, 0, false,
 		},
 		{
 			"one good no threshold",
-			[]Node{goodsink}, 0, 0, 1, false,
+			[]NodeID{goodsink}, 0, 0, 1, false,
 		},
 		{
 			"one good one bad no threshold",
-			[]Node{goodsink, slowsink}, 0, 0, 1, false,
+			[]NodeID{goodsink, slowsink}, 0, 0, 1, false,
 		},
 		{
 			"one bad threshold=1",
-			[]Node{slowsink}, 1, 0, 0, true,
+			[]NodeID{slowsink}, 1, 0, 0, true,
 		},
 		{
 			"one good threshold=1",
-			[]Node{goodsink}, 1, 0, 1, false,
+			[]NodeID{goodsink}, 1, 0, 1, false,
 		},
 		{
 			"one good one bad threshold=1",
-			[]Node{goodsink, slowsink}, 1, 0, 1, false,
+			[]NodeID{goodsink, slowsink}, 1, 0, 1, false,
 		},
 		{
 			"two bad threshold=2",
-			[]Node{slowsink, slowsink}, 2, 0, 0, true,
+			[]NodeID{slowsink, slowsink}, 2, 0, 0, true,
 		},
 		{
 			"two good threshold=2",
-			[]Node{goodsink, goodsink}, 2, 0, 2, false,
+			[]NodeID{goodsink, goodsink}, 2, 0, 2, false,
 		},
 		{
 			"one good one bad threshold=2",
-			[]Node{goodsink, slowsink}, 2, 0, 1, true,
+			[]NodeID{goodsink, slowsink}, 2, 0, 1, true,
 		},
 	}
 
@@ -305,14 +308,18 @@ func TestSendBlocking(t *testing.T) {
 		tc := testcases[i]
 		t.Run(tc.name, func(t *testing.T) {
 			nodes := []Node{&JSONFormatter{}}
-			_, err := LinkNodesAndSinks(nodes, tc.sinks)
+			sinks := make([]Node, len(tc.sinkIDs))
+			for i, id := range tc.sinkIDs {
+				sinks[i] = sinksByID[id]
+			}
+			root, err := linkNodesAndSinks(nodes, sinks, []NodeID{"f1"}, tc.sinkIDs)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			g := graph{
-				roots: map[PipelineID]Node{
-					"id": nodes[0],
+				roots: map[PipelineID]*linkedNode{
+					"id": root,
 				},
 				successThreshold: tc.threshold,
 			}

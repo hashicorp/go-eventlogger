@@ -14,10 +14,11 @@ import (
 // FileSink writes the []byte representation of an Event to a file
 // as a string.
 type FileSink struct {
-	Path string
-	Mode os.FileMode
-	f    *os.File
-	l    sync.Mutex
+	Path   string
+	Mode   os.FileMode
+	Format string
+	f      *os.File
+	l      sync.Mutex
 }
 
 var _ Node = &FileSink{}
@@ -60,8 +61,12 @@ func (fs *FileSink) open() error {
 }
 
 func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
+	format := fs.Format
+	if format == "" {
+		format = "json"
+	}
 	e.l.RLock()
-	val, ok := e.Formatted["json"]
+	val, ok := e.Formatted[format]
 	e.l.RUnlock()
 	if !ok {
 		return nil, errors.New("event was not marshaled")

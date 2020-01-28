@@ -9,12 +9,11 @@ type Predicate func(e *Event) (bool, error)
 
 // Filter
 type Filter struct {
-	nodes     []Node
 	Predicate Predicate
 	name      string
 }
 
-var _ LinkableNode = &Filter{}
+var _ Node = &Filter{}
 
 func (f *Filter) Process(ctx context.Context, e *Event) (*Event, error) {
 
@@ -30,14 +29,6 @@ func (f *Filter) Process(ctx context.Context, e *Event) (*Event, error) {
 
 	// return the event
 	return e, nil
-}
-
-func (f *Filter) SetNext(nodes []Node) {
-	f.nodes = nodes
-}
-
-func (f *Filter) Next() []Node {
-	return f.nodes
 }
 
 func (f *Filter) Reopen() error {

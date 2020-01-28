@@ -7,11 +7,9 @@ import (
 	"time"
 )
 
-type JSONFormatter struct {
-	nodes []Node
-}
+type JSONFormatter struct{}
 
-var _ LinkableNode = &JSONFormatter{}
+var _ Node = &JSONFormatter{}
 
 func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	buf := &bytes.Buffer{}
@@ -33,14 +31,6 @@ func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	e.Formatted["json"] = buf.Bytes()
 	e.l.Unlock()
 	return e, nil
-}
-
-func (w *JSONFormatter) SetNext(nodes []Node) {
-	w.nodes = nodes
-}
-
-func (w *JSONFormatter) Next() []Node {
-	return w.nodes
 }
 
 func (w *JSONFormatter) Reopen() error {
