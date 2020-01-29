@@ -39,14 +39,14 @@ func (c *clock) Now() time.Time {
 
 // Status describes the result of a Send.
 type Status struct {
-	// Complete lists the IDs of sinks that successfully wrote the Event.
-	Complete []NodeID
+	// complete lists the IDs of sinks that successfully wrote the Event.
+	complete []NodeID
 	// Warnings lists any non-fatal errors that occurred while sending an Event.
 	Warnings []error
 }
 
 func (s Status) getError(threshold int) error {
-	if len(s.Complete) < threshold {
+	if len(s.complete) < threshold {
 		return fmt.Errorf("event not written to enough sinks")
 	}
 	return nil

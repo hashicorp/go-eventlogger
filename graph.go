@@ -41,7 +41,7 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 		case s, ok := <-statusChan:
 			if ok {
 				status.Warnings = append(status.Warnings, s.Warnings...)
-				status.Complete = append(status.Complete, s.Complete...)
+				status.complete = append(status.complete, s.complete...)
 			} else {
 				done = true
 			}
@@ -79,7 +79,7 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 	} else {
 		select {
 		case <-ctx.Done():
-		case statusChan <- Status{Complete: []NodeID{node.nodeID}}:
+		case statusChan <- Status{complete: []NodeID{node.nodeID}}:
 		}
 	}
 }
