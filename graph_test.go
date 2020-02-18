@@ -126,15 +126,15 @@ func TestValidate(t *testing.T) {
 }
 
 func TestSendResult(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "file.sink.")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmp.Name())
+	defer os.RemoveAll(tmpDir)
 	goodsink := NodeID("good")
 	badsink := NodeID("bad")
 	sinksByID := map[NodeID]Node{
-		goodsink: &FileSink{Path: tmp.Name()},
+		goodsink: &FileSink{Path: tmpDir, FileName: "sink"},
 		badsink:  &FileSink{Path: "/"},
 	}
 
@@ -242,12 +242,12 @@ func (fsd *fileSinkDelayed) Process(ctx context.Context, e *Event) (*Event, erro
 }
 
 func TestSendBlocking(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "file.sink.")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmp.Name())
-	fs := &FileSink{Path: tmp.Name()}
+	defer os.RemoveAll(tmpDir)
+	fs := &FileSink{Path: tmpDir, FileName: "sink"}
 	goodsink := NodeID("good")
 	slowsink := NodeID("bad")
 	sinksByID := map[NodeID]Node{

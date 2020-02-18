@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -26,12 +27,11 @@ func nodesToNodeIDs(t *testing.T, broker *Broker, nodes ...Node) []NodeID {
 }
 
 func TestBroker(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "file.sink.")
+	tmpDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmp.Name())
-	path := tmp.Name()
+	defer os.RemoveAll(tmpDir)
 
 	// Filter out the purple nodes
 	n1 := &Filter{
@@ -43,7 +43,7 @@ func TestBroker(t *testing.T) {
 	// Marshal to JSON
 	n2 := &JSONFormatter{}
 	// Send to FileSink
-	n3 := &FileSink{Path: path}
+	n3 := &FileSink{Path: tmpDir, FileName: "file.log"}
 
 	// Create a broker
 	broker := NewBroker()
@@ -89,7 +89,15 @@ func TestBroker(t *testing.T) {
 	}
 
 	// Check the contents of the log
-	dat, err := ioutil.ReadFile(path)
+	files, err := ioutil.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) > 1 {
+		t.Errorf("Expected 1 log file, got %d", len(files))
+	}
+
+	dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
