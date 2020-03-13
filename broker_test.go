@@ -102,7 +102,7 @@ func TestBroker(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prefix := fmt.Sprintf(`{"CreatedAt":"%s","EventType":"Foo","Payload":`, now.Format(time.RFC3339Nano))
+	prefix := fmt.Sprintf(`{"created_at":"%s","event_type":"Foo","payload":`, now.Format(time.RFC3339Nano))
 	suffix := "}\n"
 	var expect string
 	for _, s := range []string{`{"color":"red","width":1}`, `{"color":"green","width":2}`, `{"color":"blue","width":4}`} {
