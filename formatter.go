@@ -15,9 +15,9 @@ func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	err := enc.Encode(struct {
-		CreatedAt time.Time
-		EventType
-		Payload interface{}
+		CreatedAt time.Time `json:"created_at"`
+		EventType `json:"event_type"`
+		Payload   interface{} `json:"payload"`
 	}{
 		e.CreatedAt,
 		e.Type,
