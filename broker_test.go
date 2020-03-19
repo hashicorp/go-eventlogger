@@ -62,6 +62,12 @@ func TestBroker(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set success threshold to 1
+	err = broker.SetSuccessThreshold(et, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Process some Events
 	payloads := []interface{}{
 		map[string]interface{}{

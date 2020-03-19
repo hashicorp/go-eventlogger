@@ -63,6 +63,14 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 		}
 		return
 	}
+	// If the Event is nil, it has been filtered out and we are done.
+	if e == nil {
+		select {
+		case <-ctx.Done():
+		case statusChan <- Status{complete: []NodeID{node.nodeID}}:
+		}
+		return
+	}
 
 	// Process any child nodes.  This is depth-first.
 	if len(node.next) != 0 {
