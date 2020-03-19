@@ -68,9 +68,6 @@ func TestBroker(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Allow filtering of events to count towards completion of graph
-	broker.SetAllowFilterCompletion(et, true)
-
 	// Process some Events
 	payloads := []interface{}{
 		map[string]interface{}{

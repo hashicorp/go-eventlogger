@@ -17,10 +17,6 @@ type graph struct {
 	// successThreshold specifies how many sinks must store an event for Process
 	// to not return an error.
 	successThreshold int
-
-	// allowFilterCompletion specifies if a filter node filtering an event
-	// can count as a status completion
-	allowFilterCompletion bool
 }
 
 // Process the Event by routing it through all of the graph's nodes,
@@ -68,11 +64,12 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 		return
 	}
 	// If the Event is nil, it has been filtered out and we are done.
-	if g.allowFilterCompletion && e == nil {
+	if e == nil {
 		select {
 		case <-ctx.Done():
 		case statusChan <- Status{complete: []NodeID{node.nodeID}}:
 		}
+		return
 	}
 
 	// Process any child nodes.  This is depth-first.
