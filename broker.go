@@ -182,3 +182,18 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 	g.successThreshold = successThreshold
 	return nil
 }
+
+// SetAllowFilterCompletion sets whether or not a node filtering an event
+// counts towards the completion status of that node.
+func (b *Broker) SetAllowFilterCompletion(t EventType, allow bool) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	g, ok := b.graphs[t]
+	if !ok {
+		g = &graph{roots: make(map[PipelineID]*linkedNode)}
+		b.graphs[t] = g
+	}
+
+	g.allowFilterCompletion = allow
+}
