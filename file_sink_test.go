@@ -4,9 +4,65 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestFileSink_FileDeleted(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fs := FileSink{
+		Path:     tmpDir,
+		FileName: "audit.log",
+	}
+	event := &Event{
+		Formatted: map[string][]byte{"json": []byte("first")},
+		Payload:   "First entry",
+	}
+	_, err = fs.Process(context.Background(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// delete file
+	err = os.Remove(filepath.Join(tmpDir, "audit.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	event = &Event{
+		Formatted: map[string][]byte{"json": []byte("second")},
+		Payload:   "Second entry",
+	}
+	_, err = fs.Process(context.Background(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure process re-created the file
+	dat, err := ioutil.ReadFile(filepath.Join(tmpDir, "audit.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(dat)
+	want := "second"
+	if got != "second" {
+		t.Errorf("Expected file content to be %s, got %s", want, got)
+	}
+
+	files := 1
+	if got, _ := ioutil.ReadDir(tmpDir); len(got) != files {
+		t.Errorf("Expected %d files, got %v file(s)", files, len(got))
+	}
+}
 
 func TestFileSink_TimeRotate(t *testing.T) {
 	t.Parallel()

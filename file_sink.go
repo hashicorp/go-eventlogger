@@ -81,6 +81,12 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 		}
 	}
 
+	// Ensure our file still exists
+	_, err := os.Stat(fs.f.Name())
+	if os.IsNotExist(err) {
+		fs.f = nil
+	}
+
 	// Check for last contact, rotate if necessary and able
 	if err := fs.rotate(); err != nil {
 		return nil, err
@@ -106,7 +112,7 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	}
 
 	_, _ = reader.Seek(0, io.SeekStart)
-	_, err := reader.WriteTo(fs.f)
+	_, err = reader.WriteTo(fs.f)
 	return nil, err
 }
 
