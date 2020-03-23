@@ -119,6 +119,14 @@ func (fs *FileSink) Reopen() error {
 	fs.l.Lock()
 	defer fs.l.Unlock()
 
+	if fs.f != nil {
+		// Ensure file still exists
+		_, err := os.Stat(fs.f.Name())
+		if os.IsNotExist(err) {
+			fs.f = nil
+		}
+	}
+
 	if fs.f == nil {
 		return fs.open()
 	}
