@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -34,9 +35,14 @@ func TestFileSink_NewDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	files := 1
-	if got, _ := ioutil.ReadDir(sinkDir); len(got) != files {
-		t.Errorf("Expected %d files, got %v file(s)", files, len(got))
+	want := []string{"audit.log"}
+	files, _ := ioutil.ReadDir(sinkDir)
+	got := []string{}
+	for _, f := range files {
+		got = append(got, f.Name())
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Expected %v files, got %v file(s)", want, got)
 	}
 }
 
