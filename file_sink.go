@@ -52,7 +52,10 @@ type FileSink struct {
 
 var _ Node = &FileSink{}
 
-const defaultMode = 0600
+const (
+	defaultMode = 0600
+	dirMode     = 0700
+)
 
 func (fs *FileSink) Type() NodeType {
 	return NodeTypeSink
@@ -152,7 +155,7 @@ func (fs *FileSink) open() error {
 		mode = defaultMode
 	}
 
-	if err := os.MkdirAll(filepath.Dir(fs.Path), mode); err != nil {
+	if err := os.MkdirAll(fs.Path, dirMode); err != nil {
 		return err
 	}
 
