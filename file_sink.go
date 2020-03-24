@@ -18,7 +18,7 @@ import (
 // FileSink writes the []byte representation of an Event to a file
 // as a string.
 type FileSink struct {
-	// Path is the complete path of the log file
+	// Path is the complete path of the log file directory, excluding FileName
 	Path string
 
 	// FileName is the name of the log file
