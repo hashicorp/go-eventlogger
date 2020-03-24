@@ -18,7 +18,7 @@ import (
 // FileSink writes the []byte representation of an Event to a file
 // as a string.
 type FileSink struct {
-	// Path is the complete path of the log file
+	// Path is the complete path of the log file directory, excluding FileName
 	Path string
 
 	// FileName is the name of the log file
@@ -52,7 +52,10 @@ type FileSink struct {
 
 var _ Node = &FileSink{}
 
-const defaultMode = 0600
+const (
+	defaultMode = 0600
+	dirMode     = 0700
+)
 
 func (fs *FileSink) Type() NodeType {
 	return NodeTypeSink
@@ -152,7 +155,7 @@ func (fs *FileSink) open() error {
 		mode = defaultMode
 	}
 
-	if err := os.MkdirAll(filepath.Dir(fs.Path), mode); err != nil {
+	if err := os.MkdirAll(fs.Path, dirMode); err != nil {
 		return err
 	}
 

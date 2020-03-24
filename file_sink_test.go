@@ -5,9 +5,46 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
+
+func TestFileSink_NewDir(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	sinkDir := filepath.Join(tmpDir, "file_sink")
+
+	fs := FileSink{
+		Path:     sinkDir,
+		FileName: "audit.log",
+	}
+
+	event := &Event{
+		Formatted: map[string][]byte{"json": []byte("first")},
+		Payload:   "First entry",
+	}
+	_, err = fs.Process(context.Background(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"audit.log"}
+	files, _ := ioutil.ReadDir(sinkDir)
+	got := []string{}
+	for _, f := range files {
+		got = append(got, f.Name())
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Expected %v files, got %v file(s)", want, got)
+	}
+}
 
 func TestFileSink_Reopen(t *testing.T) {
 	t.Parallel()
