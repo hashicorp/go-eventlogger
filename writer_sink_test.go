@@ -13,7 +13,7 @@ func TestWriterSink_Process(t *testing.T) {
 	ctx := context.Background()
 
 	event := &Event{
-		Formatted: map[string][]byte{"json": []byte("first")},
+		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
 

@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	JSONFormat = "json"
+)
+
 // JSONFormatter is a Formatter Node which formats the Event as JSON.
 type JSONFormatter struct{}
 
@@ -31,7 +35,7 @@ func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	}
 
 	e.l.Lock()
-	e.Formatted["json"] = buf.Bytes()
+	e.Formatted[JSONFormat] = buf.Bytes()
 	e.l.Unlock()
 	return e, nil
 }
