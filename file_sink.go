@@ -43,7 +43,7 @@ type FileSink struct {
 	MaxDuration time.Duration
 
 	// Format specifies the format the []byte representation is formatted in
-	// Defaults to "json"
+	// Defaults to JSONFormat
 	Format string
 
 	f *os.File
@@ -64,7 +64,7 @@ func (fs *FileSink) Type() NodeType {
 func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	format := fs.Format
 	if format == "" {
-		format = "json"
+		format = JSONFormat
 	}
 	e.l.RLock()
 	val, ok := e.Formatted[format]

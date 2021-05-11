@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	JSONFormat = "json"
+)
+
 type JSONFormatter struct{}
 
 var _ Node = &JSONFormatter{}
@@ -28,7 +32,7 @@ func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	}
 
 	e.l.Lock()
-	e.Formatted["json"] = buf.Bytes()
+	e.Formatted[JSONFormat] = buf.Bytes()
 	e.l.Unlock()
 	return e, nil
 }
