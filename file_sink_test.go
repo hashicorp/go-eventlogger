@@ -27,7 +27,7 @@ func TestFileSink_NewDir(t *testing.T) {
 	}
 
 	event := &Event{
-		Formatted: map[string][]byte{"json": []byte("first")},
+		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
 	_, err = fs.Process(context.Background(), event)
@@ -60,7 +60,7 @@ func TestFileSink_Reopen(t *testing.T) {
 		FileName: "audit.log",
 	}
 	event := &Event{
-		Formatted: map[string][]byte{"json": []byte("first")},
+		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
 	_, err = fs.Process(context.Background(), event)
@@ -81,7 +81,7 @@ func TestFileSink_Reopen(t *testing.T) {
 	}
 
 	event = &Event{
-		Formatted: map[string][]byte{"json": []byte("second")},
+		Formatted: map[string][]byte{JSONFormat: []byte("second")},
 		Payload:   "Second entry",
 	}
 	_, err = fs.Process(context.Background(), event)
@@ -122,7 +122,7 @@ func TestFileSink_TimeRotate(t *testing.T) {
 		MaxDuration: 2 * time.Second,
 	}
 	event := &Event{
-		Formatted: map[string][]byte{"json": []byte("first")},
+		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
 	_, err = fs.Process(context.Background(), event)
@@ -133,7 +133,7 @@ func TestFileSink_TimeRotate(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	event = &Event{
-		Formatted: map[string][]byte{"json": []byte("first")},
+		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
 	_, err = fs.Process(context.Background(), event)
@@ -163,7 +163,7 @@ func TestFileSink_ByteRotate(t *testing.T) {
 		MaxDuration: 24 * time.Hour,
 	}
 	event := &Event{
-		Formatted: map[string][]byte{"json": []byte("entry")},
+		Formatted: map[string][]byte{JSONFormat: []byte("entry")},
 		Payload:   "entry",
 	}
 	_, err = fs.Process(context.Background(), event)
@@ -174,7 +174,7 @@ func TestFileSink_ByteRotate(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	event = &Event{
-		Formatted: map[string][]byte{"json": []byte("entry")},
+		Formatted: map[string][]byte{JSONFormat: []byte("entry")},
 		Payload:   "entry",
 	}
 	_, err = fs.Process(context.Background(), event)
@@ -231,7 +231,7 @@ func TestFileSink_pruneFiles(t *testing.T) {
 	}
 
 	event := &Event{
-		Formatted: map[string][]byte{"json": []byte("first entry")},
+		Formatted: map[string][]byte{JSONFormat: []byte("first entry")},
 	}
 	_, err = fs.Process(context.Background(), event)
 	if err != nil {
@@ -239,7 +239,7 @@ func TestFileSink_pruneFiles(t *testing.T) {
 	}
 
 	event = &Event{
-		Formatted: map[string][]byte{"json": []byte("second entry")},
+		Formatted: map[string][]byte{JSONFormat: []byte("second entry")},
 	}
 	_, err = fs.Process(context.Background(), event)
 	if err != nil {
@@ -247,7 +247,7 @@ func TestFileSink_pruneFiles(t *testing.T) {
 	}
 
 	event = &Event{
-		Formatted: map[string][]byte{"json": []byte("third entry")},
+		Formatted: map[string][]byte{JSONFormat: []byte("third entry")},
 	}
 	_, err = fs.Process(context.Background(), event)
 	if err != nil {
