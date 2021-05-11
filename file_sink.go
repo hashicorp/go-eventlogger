@@ -43,7 +43,7 @@ type FileSink struct {
 	MaxDuration time.Duration
 
 	// Format specifies the format the []byte representation is formatted in
-	// Defaults to "json"
+	// Defaults to JSONFormat
 	Format string
 
 	f *os.File
@@ -57,14 +57,17 @@ const (
 	dirMode     = 0700
 )
 
+// Type describes the type of the node as a Sink.
 func (fs *FileSink) Type() NodeType {
 	return NodeTypeSink
 }
 
+// Process writes the []byte representation of an Event to a file
+// as a string.
 func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	format := fs.Format
 	if format == "" {
-		format = "json"
+		format = JSONFormat
 	}
 	e.l.RLock()
 	val, ok := e.Formatted[format]
@@ -94,13 +97,9 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 		// happen to it downstream.
 		fs.BytesWritten += int64(n)
 		return nil, nil
-	} else if fs.Path == "stdout" {
-		return nil, err
 	}
 
-	// If writing to stdout there's no real reason to think anything would have
-	// changed so return above. Otherwise, opportunistically try to re-open the
-	// FD, once per call.
+	// Opportunistically try to re-open the FD, once per call.
 	_ = fs.f.Close()
 	fs.f = nil
 
@@ -113,9 +112,10 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	return nil, err
 }
 
+// Reopen will close, rotate and reopen the Sink's file.
 func (fs *FileSink) Reopen() error {
 	switch fs.Path {
-	case "stdout", "discard":
+	case "discard":
 		return nil
 	}
 
@@ -145,6 +145,7 @@ func (fs *FileSink) Reopen() error {
 	return fs.open()
 }
 
+// Name returns a representation of the Sink's name
 func (fs *FileSink) Name() string {
 	return fmt.Sprintf("sink:%s", fs.Path)
 }

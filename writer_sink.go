@@ -12,14 +12,14 @@ import (
 // includes os.Stdout and os.Stderr
 type WriterSink struct {
 	// Format specifies the format the []byte representation is formatted in
-	// Defaults to "json"
+	// Defaults to JSONFormat
 	Format string
 
 	// Writer is the io.Writer used when writing Events
 	Writer io.Writer
 }
 
-// Reopen does nothing for WriterSinks.  The can not be rotated.
+// Reopen does nothing for WriterSinks.  They cannot be rotated.
 func (fs *WriterSink) Reopen() error { return nil }
 
 // Type defines a WriterSink as a NodeTypeSink
@@ -38,7 +38,7 @@ func (fs *WriterSink) Process(ctx context.Context, e *Event) (*Event, error) {
 
 	format := fs.Format
 	if fs.Format == "" {
-		format = "json"
+		format = JSONFormat
 	}
 	e.l.RLock()
 	val, ok := e.Formatted[format]
