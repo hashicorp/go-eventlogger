@@ -16,10 +16,10 @@ func TestLinkNodes(t *testing.T) {
 	expected := &linkedNode{
 		node:   n1,
 		nodeID: "1",
-		next: []*linkedNode{&linkedNode{
+		next: []*linkedNode{{
 			node:   n2,
 			nodeID: "2",
-			next: []*linkedNode{&linkedNode{
+			next: []*linkedNode{{
 				node:   n3,
 				nodeID: "3",
 			}},
