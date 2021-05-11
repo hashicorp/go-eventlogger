@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// NodeType defines the possible Node type's in the system.
 type NodeType int
 
 const (

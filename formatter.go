@@ -7,10 +7,13 @@ import (
 	"time"
 )
 
+// JSONFormatter is a Formatter Node which formats the Event as JSON.
 type JSONFormatter struct{}
 
 var _ Node = &JSONFormatter{}
 
+// Process formats the Event as JSON and stores that formatted data in
+// Event.Formatted with a key of "json"
 func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
@@ -33,14 +36,17 @@ func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 	return e, nil
 }
 
+// Reopen is a no op
 func (w *JSONFormatter) Reopen() error {
 	return nil
 }
 
+// Type describes the type of the node as a Formatter.
 func (w *JSONFormatter) Type() NodeType {
 	return NodeTypeFormatter
 }
 
+// Name returns a representation of the Formatter's name
 func (w *JSONFormatter) Name() string {
 	return "JSONFormatter"
 }

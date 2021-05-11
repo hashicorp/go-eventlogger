@@ -57,10 +57,13 @@ const (
 	dirMode     = 0700
 )
 
+// Type describes the type of the node as a Sink.
 func (fs *FileSink) Type() NodeType {
 	return NodeTypeSink
 }
 
+// Process writes the []byte representation of an Event to a file
+// as a string.
 func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	format := fs.Format
 	if format == "" {
@@ -113,6 +116,7 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	return nil, err
 }
 
+// Reopen will close, rotate and reopen the Sink's file.
 func (fs *FileSink) Reopen() error {
 	switch fs.Path {
 	case "stdout", "discard":
@@ -145,6 +149,7 @@ func (fs *FileSink) Reopen() error {
 	return fs.open()
 }
 
+// Name returns a representation of the Sink's name
 func (fs *FileSink) Name() string {
 	return fmt.Sprintf("sink:%s", fs.Path)
 }
