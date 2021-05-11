@@ -9,6 +9,23 @@ import (
 
 // Broker is the top-level entity used in the library for configuring the system
 // and for sending events.
+//
+// Brokers have registered Nodes which may be composed into registered Pipelines
+// for EventTypes.
+//
+// A Node may be a filter, formatter or sink (see NodeType).
+//
+// A Broker may have multiple Pipelines.
+//
+// EventTypes may have multiple Pipelines.
+//
+// A Pipeline for an EventType may contain multiple filters, one formatter and
+// one sink.
+//
+// If a Pipeline does not have a formatter, then the event will not be written
+// to the Sink.
+//
+// A Node can be shared across multiple pipelines.
 type Broker struct {
 	nodes  map[NodeID]Node
 	graphs map[EventType]*graph
@@ -30,6 +47,7 @@ type clock struct {
 	now time.Time
 }
 
+// Now returns the current time
 func (c *clock) Now() time.Time {
 	if c == nil {
 		return time.Now()
@@ -52,9 +70,9 @@ func (s Status) getError(threshold int) error {
 	return nil
 }
 
-// Send writes an event of type t to all configured pipelines and reports on the
-// result.  An error will only be returned if configured delivery policies could
-// not be satisfied.
+// Send writes an event of type t to all registered pipelines concurrently and
+// reports on the result.  An error will only be returned if a pipeline's delivery
+// policies could not be satisfied.
 func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (Status, error) {
 
 	b.lock.RLock()
@@ -75,9 +93,11 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 	return g.process(ctx, e)
 }
 
-// Reopen asks all nodes to reopen any files they have open.  This is typically
-// used as part of log rotation: after rotating, the rotator sends a signal to
-// the application, which then would invoke this method.
+// Reopen calls every registered Node's Reopen() function.  The intention is to
+// ask all nodes to reopen any files they have open.  This is typically used as
+// part of log rotation: after rotating, the rotator sends a signal to the
+// application, which then would invoke this method.  Another typically use-case
+// is to have all Nodes reevaluated any external configuration they might have.
 func (b *Broker) Reopen(ctx context.Context) error {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
@@ -94,7 +114,9 @@ func (b *Broker) Reopen(ctx context.Context) error {
 // NodeID is a string that uniquely identifies a Node.
 type NodeID string
 
-// RegisterNode assigns a node ID to a node.  Node IDs should be unique.
+// RegisterNode assigns a node ID to a node.  Node IDs should be unique. A Node
+// may be a filter, formatter or sink (see NodeType). Nodes can be shared across
+// multiple pipelines.
 func (b *Broker) RegisterNode(id NodeID, node Node) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -107,11 +129,16 @@ func (b *Broker) RegisterNode(id NodeID, node Node) error {
 type PipelineID string
 
 // Pipeline defines a pipe: its ID, the EventType it's for, and the nodes
-// that it contains.
+// that it contains. Nodes can be shared across multiple pipelines.
 type Pipeline struct {
+	// PipelineID uniquely identifies the Pipeline
 	PipelineID PipelineID
-	EventType  EventType
-	NodeIDs    []NodeID
+
+	// EventType defines the type of event the Pipeline processes
+	EventType EventType
+
+	// NodeIDs defines Pipeline's the list of nodes
+	NodeIDs []NodeID
 }
 
 // RegisterPipeline adds a pipeline to the broker.
@@ -162,7 +189,7 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 	return nil
 }
 
-// SetSuccessThreshold sets the succes threshold per eventType.  For the
+// SetSuccessThreshold sets the success threshold per eventType.  For the
 // overall processing of a given event to be considered a success, at least as
 // many sinks as the threshold value must successfully process the event.
 func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
