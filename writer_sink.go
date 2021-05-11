@@ -19,7 +19,7 @@ type WriterSink struct {
 	Writer io.Writer
 }
 
-// Reopen does nothing for WriterSinks.  The can not be rotated.
+// Reopen does nothing for WriterSinks.  They cannot be rotated.
 func (fs *WriterSink) Reopen() error { return nil }
 
 // Type defines a WriterSink as a NodeTypeSink
