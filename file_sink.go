@@ -97,13 +97,9 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 		// happen to it downstream.
 		fs.BytesWritten += int64(n)
 		return nil, nil
-	} else if fs.Path == "stdout" {
-		return nil, err
 	}
 
-	// If writing to stdout there's no real reason to think anything would have
-	// changed so return above. Otherwise, opportunistically try to re-open the
-	// FD, once per call.
+	// Opportunistically try to re-open the FD, once per call.
 	_ = fs.f.Close()
 	fs.f = nil
 
@@ -119,7 +115,7 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 // Reopen will close, rotate and reopen the Sink's file.
 func (fs *FileSink) Reopen() error {
 	switch fs.Path {
-	case "stdout", "discard":
+	case "discard":
 		return nil
 	}
 
