@@ -34,8 +34,11 @@ type GatedFilter struct {
 	// Broker used to send along expired gated events
 	Broker *Broker
 
-	// Expiration for gated events.  Expired events will be sent along if
-	// there's a Broker or deleted if there's no Broker.
+	// Expiration for gated events.  It's important because without an
+	// expiration gated events that aren't flushed/processed could consume all
+	// available memory.  Expired events will be sent along if there's a Broker
+	// or deleted if there's no Broker. If no expiration is set the
+	// DefaultGatedEventTimeout will be used.
 	Expiration time.Duration
 
 	l            sync.RWMutex
@@ -54,6 +57,9 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	const op = "eventlogger.(GatedWriter).Process"
 	if e == nil {
 		return nil, fmt.Errorf("%s: missing event", op)
+	}
+	if w.Expiration == 0 {
+		w.Expiration = DefaultGatedEventTimeout
 	}
 	g, ok := e.Payload.(Gateable)
 	if !ok {
