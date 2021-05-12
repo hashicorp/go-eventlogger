@@ -74,7 +74,6 @@ func (s Status) getError(threshold int) error {
 // reports on the result.  An error will only be returned if a pipeline's delivery
 // policies could not be satisfied.
 func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (Status, error) {
-
 	b.lock.RLock()
 	g, ok := b.graphs[t]
 	b.lock.RUnlock()

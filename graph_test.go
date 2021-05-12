@@ -120,7 +120,6 @@ func TestValidate(t *testing.T) {
 			if valid != tc.valid {
 				t.Fatalf("valid=%v, expected=%v, err=%v", valid, tc.valid, err)
 			}
-
 		})
 	}
 }
@@ -148,39 +147,48 @@ func TestSendResult(t *testing.T) {
 	}{
 		{
 			"one bad no threshold",
-			[]NodeID{badsink}, 0, 1, 0, false,
+			[]NodeID{badsink},
+			0, 1, 0, false,
 		},
 		{
 			"one good no threshold",
-			[]NodeID{goodsink}, 0, 0, 1, false,
+			[]NodeID{goodsink},
+			0, 0, 1, false,
 		},
 		{
 			"one good one bad no threshold",
-			[]NodeID{goodsink, badsink}, 0, 1, 1, false,
+			[]NodeID{goodsink, badsink},
+			0, 1, 1, false,
 		},
 		{
 			"one bad threshold=1",
-			[]NodeID{badsink}, 1, 1, 0, true,
+			[]NodeID{badsink},
+			1, 1, 0, true,
 		},
 		{
 			"one good threshold=1",
-			[]NodeID{goodsink}, 1, 0, 1, false,
+			[]NodeID{goodsink},
+			1, 0, 1, false,
 		},
 		{
 			"one good one bad threshold=1",
-			[]NodeID{goodsink, badsink}, 1, 1, 1, false,
+			[]NodeID{goodsink, badsink},
+			1, 1, 1, false,
 		},
 		{
 			"two bad threshold=2",
-			[]NodeID{badsink, badsink}, 2, 2, 0, true,
+			[]NodeID{badsink, badsink},
+			2, 2, 0, true,
 		},
 		{
 			"two good threshold=2",
-			[]NodeID{goodsink, goodsink}, 2, 0, 2, false,
+			[]NodeID{goodsink, goodsink},
+			2, 0, 2, false,
 		},
 		{
 			"one good one bad threshold=2",
-			[]NodeID{goodsink, badsink}, 2, 1, 1, true,
+			[]NodeID{goodsink, badsink},
+			2, 1, 1, true,
 		},
 	}
 
@@ -268,39 +276,48 @@ func TestSendBlocking(t *testing.T) {
 	}{
 		{
 			"one bad no threshold",
-			[]NodeID{slowsink}, 0, 0, 0, false,
+			[]NodeID{slowsink},
+			0, 0, 0, false,
 		},
 		{
 			"one good no threshold",
-			[]NodeID{goodsink}, 0, 0, 1, false,
+			[]NodeID{goodsink},
+			0, 0, 1, false,
 		},
 		{
 			"one good one bad no threshold",
-			[]NodeID{goodsink, slowsink}, 0, 0, 1, false,
+			[]NodeID{goodsink, slowsink},
+			0, 0, 1, false,
 		},
 		{
 			"one bad threshold=1",
-			[]NodeID{slowsink}, 1, 0, 0, true,
+			[]NodeID{slowsink},
+			1, 0, 0, true,
 		},
 		{
 			"one good threshold=1",
-			[]NodeID{goodsink}, 1, 0, 1, false,
+			[]NodeID{goodsink},
+			1, 0, 1, false,
 		},
 		{
 			"one good one bad threshold=1",
-			[]NodeID{goodsink, slowsink}, 1, 0, 1, false,
+			[]NodeID{goodsink, slowsink},
+			1, 0, 1, false,
 		},
 		{
 			"two bad threshold=2",
-			[]NodeID{slowsink, slowsink}, 2, 0, 0, true,
+			[]NodeID{slowsink, slowsink},
+			2, 0, 0, true,
 		},
 		{
 			"two good threshold=2",
-			[]NodeID{goodsink, goodsink}, 2, 0, 2, false,
+			[]NodeID{goodsink, goodsink},
+			2, 0, 2, false,
 		},
 		{
 			"one good one bad threshold=2",
-			[]NodeID{goodsink, slowsink}, 2, 0, 1, true,
+			[]NodeID{goodsink, slowsink},
+			2, 0, 1, true,
 		},
 	}
 
