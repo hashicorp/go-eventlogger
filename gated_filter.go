@@ -36,8 +36,18 @@ type gatedEvent struct {
 const DefaultGatedEventTimeout = time.Second * 10
 
 // GatedFilter provides the ability to buffer events identified by
-// Gateable.ID() until an event is processed that returns true for
-// Gateable.Flush()
+// Gateable.GetID() until an event is processed that returns true for
+// Gateable.FlushEvents().
+//
+// When a Gateable Event returns true for FlushEvents(), the filter will call
+// Gateable.ComposedOf(...) with the list of gated events with the
+// Gateable.GetID() up to that point in time and return the resulting composed
+// event.
+
+// If GatedFilter.Broker is nill, expired gated events will simply be being
+// deleted.  If the Broker is NOT nil, then the expiring gated events will be
+// flushed using Gateable.ComposedOf(...) and the resulting composed event sent
+// using the Broker.
 type GatedFilter struct {
 	// Broker used to send along expired gated events
 	Broker *Broker
