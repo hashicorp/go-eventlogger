@@ -58,9 +58,6 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	if e == nil {
 		return nil, fmt.Errorf("%s: missing event", op)
 	}
-	if w.Expiration == 0 {
-		w.Expiration = DefaultGatedEventTimeout
-	}
 	g, ok := e.Payload.(Gateable)
 	if !ok {
 		return e, nil
@@ -85,6 +82,9 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		w.orderedGated = list.New()
 	}
 
+	if w.Expiration == 0 {
+		w.Expiration = DefaultGatedEventTimeout
+	}
 	// first time we've seen this gated event ID
 	if _, ok := w.gated[g.GetID()]; !ok {
 		ge := &gatedEvent{
@@ -127,16 +127,16 @@ func (w *GatedFilter) ProcessExpiredEvents(ctx context.Context) error {
 			// need to remove this, even if there's an error
 			defer w.orderedGated.Remove(ge.element)
 			defer delete(w.gated, ge.element.Value.(*gatedEvent).id)
+			tmp := &SimpleGatedPayload{}
+			e, err := tmp.ComposedFrom(ge.events)
+			if err != nil {
+				return err
+			}
 			switch {
 			case w.Broker == nil:
 				// no op... perhaps we should log this somehow in the future if
 				// the GatedFilter adds a logger.
 			default:
-				tmp := &SimpleGatedPayload{}
-				e, err := tmp.ComposedFrom(ge.events)
-				if err != nil {
-					return err
-				}
 				if _, err := w.Broker.SendEvent(ctx, e); err != nil {
 					return err
 				}
