@@ -21,7 +21,7 @@ type Gateable interface {
 
 	// ComposedFrom creates one event which is a composition of the list events
 	// parameter.  The Event returned must not have a Gateable payload.
-	ComposedFrom([]*Event) (*Event, error)
+	ComposedFrom(now time.Time, events []*Event) (*Event, error)
 }
 
 type gatedEvent struct {
@@ -58,6 +58,10 @@ type GatedFilter struct {
 	// or deleted if there's no Broker. If no expiration is set the
 	// DefaultGatedEventTimeout will be used.
 	Expiration time.Duration
+
+	// NowFunc is a time func that returns the current time and the GatedFilter
+	// will default to time.Now() if it's unset.
+	NowFunc func() time.Time
 
 	l sync.RWMutex
 
@@ -118,7 +122,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		ge := &gatedEvent{
 			id:     g.GetID(),
 			events: []*Event{},
-			exp:    time.Now().Add(w.Expiration),
+			exp:    w.Now().Add(w.Expiration),
 		}
 		ge.element = w.orderedGated.PushBack(ge)
 		w.gated[g.GetID()] = ge
@@ -132,7 +136,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		defer w.orderedGated.Remove(w.gated[g.GetID()].element)
 		defer delete(w.gated, g.GetID())
 
-		return g.ComposedFrom(w.gated[g.GetID()].events)
+		return g.ComposedFrom(w.Now(), w.gated[g.GetID()].events)
 	}
 
 	return nil, nil
@@ -152,14 +156,14 @@ func (w *GatedFilter) ProcessExpiredEvents(ctx context.Context) error {
 	// Iterate through list, starting with the oldest gated event at the front.
 	for e := w.orderedGated.Front(); e != nil; e = e.Next() {
 		ge := e.Value.(*gatedEvent)
-		if time.Now().After(ge.exp) {
+		if w.Now().After(ge.exp) {
 			// need to remove this, even if there's an error during composition
 			defer w.orderedGated.Remove(ge.element)
 			defer delete(w.gated, ge.element.Value.(*gatedEvent).id)
 
 			// well, it's one way to have a static method in Go...
 			tmp := &SimpleGatedPayload{}
-			e, err := tmp.ComposedFrom(ge.events)
+			e, err := tmp.ComposedFrom(w.Now(), ge.events)
 			if err != nil {
 				return err
 			}
@@ -190,6 +194,15 @@ func (w *GatedFilter) Reopen() error {
 // Type describes the type of the node as a Filter.
 func (w *GatedFilter) Type() NodeType {
 	return NodeTypeFilter
+}
+
+// Now returns the current time.  If GatedFilter.NowFunc is unset, then
+// time.Now() is used as a default.
+func (w *GatedFilter) Now() time.Time {
+	if w.NowFunc != nil {
+		return w.NowFunc()
+	}
+	return time.Now()
 }
 
 // SimpleGatedPayload defines a Gateable payload implementation.
@@ -223,12 +236,16 @@ func (s *SimpleGatedPayload) FlushEvents() bool {
 // ComposedFrom will build a single event which will be Flushed/Processed from a
 // collection of gated events.  The event returned does not contain a Gateable
 // payload intentionally.
-func (s *SimpleGatedPayload) ComposedFrom(events []*Event) (*Event, error) {
+func (s *SimpleGatedPayload) ComposedFrom(now time.Time, events []*Event) (*Event, error) {
 	const op = "eventlogger.(SimpleGatedPayload).ComposedFrom"
+	if now.IsZero() {
+		return nil, fmt.Errorf("%s: missing now", op)
+	}
 	if len(events) == 0 {
 		return nil, fmt.Errorf("%s: missing events", op)
 	}
 	payload := struct {
+		ID      string
 		Header  map[string]interface{}
 		Details []*Event
 	}{}
@@ -237,6 +254,7 @@ func (s *SimpleGatedPayload) ComposedFrom(events []*Event) (*Event, error) {
 		if !ok {
 			return nil, fmt.Errorf("%s: event %d is not a simple gated payload", op, i)
 		}
+		payload.ID = g.GetID()
 		if g.Header != nil {
 			for hdrK, hdrV := range g.Header {
 				if payload.Header == nil {
@@ -255,7 +273,7 @@ func (s *SimpleGatedPayload) ComposedFrom(events []*Event) (*Event, error) {
 	}
 	return &Event{
 		Type:      events[0].Type,
-		CreatedAt: time.Now(),
+		CreatedAt: now,
 		Payload:   payload,
 	}, nil
 }
