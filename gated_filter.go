@@ -19,9 +19,11 @@ type Gateable interface {
 	// indicator.
 	FlushEvents() bool
 
-	// ComposedFrom creates one event which is a composition of the list events
-	// parameter.  The Event returned must not have a Gateable payload.
-	ComposedFrom(now time.Time, events []*Event) (*Event, error)
+	// ComposeFrom creates one event which is a composition of the list events
+	// parameter.  When ComposeFrom(...) is called by a GatedFilter the
+	// receiver will always be nil. The Event returned must not have a Gateable
+	// payload.
+	ComposeFrom(now time.Time, events []*Event) (*Event, error)
 }
 
 type gatedEvent struct {
@@ -91,6 +93,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		// in the pipeline
 		return e, nil
 	}
+	composeFrom := g.ComposeFrom
 
 	if g.GetID() == "" {
 		return nil, fmt.Errorf("%s: %s", op, "event missing ID")
@@ -113,7 +116,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 
 	// before we do much of anything else, let's take care of any expiring Gated
 	// events.
-	if err := w.ProcessExpiredEvents(ctx); err != nil {
+	if err := w.processExpiredEvents(ctx, composeFrom); err != nil {
 		return nil, err
 	}
 
@@ -136,22 +139,25 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		defer w.orderedGated.Remove(w.gated[g.GetID()].element)
 		defer delete(w.gated, g.GetID())
 
-		return g.ComposedFrom(w.Now(), w.gated[g.GetID()].events)
+		return composeFrom(w.Now(), w.gated[g.GetID()].events)
 	}
 
 	return nil, nil
 }
 
-// ProcessExpiredEvents will check gated events for expiry and send them along
+// processExpiredEvents will check gated events for expiry and send them along
 // to the Broker as they expire.  If the GatedFilter has no broker, the expired
 // events are just deleted.
-func (w *GatedFilter) ProcessExpiredEvents(ctx context.Context) error {
+func (w *GatedFilter) processExpiredEvents(ctx context.Context, f func(time.Time, []*Event) (*Event, error)) error {
 	const op = "eventlogger.(GatedFilter).ProcessExpiredEvents"
 	if w.orderedGated == nil {
 		return nil
 	}
 	if w.Expiration == 0 {
 		w.Expiration = DefaultGatedEventTimeout
+	}
+	if len(w.gated) == 0 {
+		return nil
 	}
 	// Iterate through list, starting with the oldest gated event at the front.
 	for e := w.orderedGated.Front(); e != nil; e = e.Next() {
@@ -161,11 +167,14 @@ func (w *GatedFilter) ProcessExpiredEvents(ctx context.Context) error {
 			defer w.orderedGated.Remove(ge.element)
 			defer delete(w.gated, ge.element.Value.(*gatedEvent).id)
 
-			// well, it's one way to have a static method in Go...
-			tmp := &SimpleGatedPayload{}
-			e, err := tmp.ComposedFrom(w.Now(), ge.events)
+			e, err := f(w.Now(), ge.events)
 			if err != nil {
-				return err
+				return fmt.Errorf("%s: %w", op, err)
+			}
+			_, ok := e.Payload.(Gateable)
+			if ok {
+				// a Gateable payload would create infinite loop.
+				return fmt.Errorf("%s: %T.ComposeFrom returned a Gateable payload", op, e.Payload)
 			}
 			switch {
 			case w.Broker == nil:
@@ -236,7 +245,7 @@ func (s *SimpleGatedPayload) FlushEvents() bool {
 // ComposedFrom will build a single event which will be Flushed/Processed from a
 // collection of gated events.  The event returned does not contain a Gateable
 // payload intentionally.
-func (s *SimpleGatedPayload) ComposedFrom(now time.Time, events []*Event) (*Event, error) {
+func (s *SimpleGatedPayload) ComposeFrom(now time.Time, events []*Event) (*Event, error) {
 	const op = "eventlogger.(SimpleGatedPayload).ComposedFrom"
 	if now.IsZero() {
 		return nil, fmt.Errorf("%s: missing now", op)
