@@ -117,7 +117,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	// before we do much of anything else, let's take care of any expiring Gated
 	// events.
 	if err := w.processExpiredEvents(ctx, composeFrom); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	// Is it first time we've seen this gated event ID?
@@ -153,12 +153,13 @@ func (w *GatedFilter) processExpiredEvents(ctx context.Context, f func(time.Time
 	if w.orderedGated == nil {
 		return nil
 	}
-	if w.Expiration == 0 {
-		w.Expiration = DefaultGatedEventTimeout
-	}
 	if len(w.gated) == 0 {
 		return nil
 	}
+	if w.Expiration == 0 {
+		w.Expiration = DefaultGatedEventTimeout
+	}
+
 	// Iterate through list, starting with the oldest gated event at the front.
 	for e := w.orderedGated.Front(); e != nil; e = e.Next() {
 		ge := e.Value.(*gatedEvent)
