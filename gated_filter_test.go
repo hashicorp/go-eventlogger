@@ -176,3 +176,30 @@ func TestGatedFilter_Process(t *testing.T) {
 	}
 
 }
+
+func TestGatedFilter_Now(t *testing.T) {
+	t.Parallel()
+	t.Run("default-now", func(t *testing.T) {
+		assert := assert.New(t)
+		gf := eventlogger.GatedFilter{}
+		n := time.Now()
+		got := gf.Now()
+		assert.True(got.Before(time.Now()))
+		assert.True(got.After(n))
+	})
+	t.Run("override-now", func(t *testing.T) {
+		assert := assert.New(t)
+		n := time.Now()
+		gf := eventlogger.GatedFilter{
+			NowFunc: func() time.Time { return n },
+		}
+		assert.Equal(n, gf.Now())
+	})
+}
+
+func TestGatedFilter_Type(t *testing.T) {
+	t.Parallel()
+	assert := assert.New(t)
+	gf := eventlogger.GatedFilter{}
+	assert.Equal(eventlogger.NodeTypeFilter, gf.Type())
+}
