@@ -2,23 +2,26 @@ package eventlogger_test
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/eventlogger"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGatedFilter_simple(t *testing.T) {
-	require := require.New(t)
-	gw := eventlogger.GatedFilter{}
+func TestGatedFilter_Process(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	now := time.Now()
+	testGf := &eventlogger.GatedFilter{
+		NowFunc: func() time.Time { return now },
+	}
 
-	events := []*eventlogger.Event{
+	setupEvents := []*eventlogger.Event{
 		{
 			Type:      "test",
-			CreatedAt: time.Now(),
+			CreatedAt: now,
 			Payload: &eventlogger.SimpleGatedPayload{
 				ID: "event-1",
 				Header: map[string]interface{}{
@@ -33,7 +36,7 @@ func TestGatedFilter_simple(t *testing.T) {
 		},
 		{
 			Type:      "test",
-			CreatedAt: time.Now(),
+			CreatedAt: now,
 			Payload: &eventlogger.SimpleGatedPayload{
 				ID: "event-1",
 				Header: map[string]interface{}{
@@ -46,27 +49,130 @@ func TestGatedFilter_simple(t *testing.T) {
 			},
 		},
 	}
-	for _, e := range events {
-		got, err := gw.Process(context.Background(), e)
-		require.NoError(err)
-		require.Empty(got)
-	}
 
-	got, err := gw.Process(context.Background(), &eventlogger.Event{
-		Type:      "test",
-		CreatedAt: time.Now(),
-		Payload: &eventlogger.SimpleGatedPayload{
-			ID:    "event-1",
-			Flush: true,
-			Detail: map[string]interface{}{
-				"file_name":   "file3.txt",
-				"total_bytes": 1000000,
+	tests := []struct {
+		name            string
+		gf              *eventlogger.GatedFilter
+		setupEvents     []*eventlogger.Event
+		testEvent       *eventlogger.Event
+		wantEvent       *eventlogger.Event
+		wantErr         bool
+		wantErrContains string
+	}{
+		{
+			name:        "simple",
+			gf:          testGf,
+			setupEvents: setupEvents,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &eventlogger.SimpleGatedPayload{
+					ID:    "event-1",
+					Flush: true,
+					Detail: map[string]interface{}{
+						"file_name":   "file3.txt",
+						"total_bytes": 1000000,
+					},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: struct {
+					ID      string
+					Header  map[string]interface{}
+					Details []*eventlogger.Event
+				}{
+					ID: "event-1",
+					Header: map[string]interface{}{
+						"roles": []string{"admin", "anon"},
+						"tmz":   "EST",
+						"user":  "alice",
+					},
+					Details: []*eventlogger.Event{
+						{
+							Type:      "test",
+							CreatedAt: now,
+							Payload: map[string]interface{}{
+								"file_name":   "file1.txt",
+								"total_bytes": 1024,
+							},
+						},
+						{
+							Type:      "test",
+							CreatedAt: now,
+							Payload: map[string]interface{}{
+								"file_name":   "file2.txt",
+								"total_bytes": 512,
+							},
+						},
+						{
+							Type:      "test",
+							CreatedAt: now,
+							Payload: map[string]interface{}{
+								"file_name":   "file3.txt",
+								"total_bytes": 1000000,
+							},
+						},
+					},
+				},
 			},
 		},
-	})
-	require.NoError(err)
-	j, err := json.Marshal(got)
-	require.NoError(err)
-	fmt.Println(string(j))
+		{
+			name:            "missing-event",
+			gf:              testGf,
+			wantErr:         true,
+			wantErrContains: "missing event",
+		},
+		{
+			name: "not-gateable",
+			gf:   testGf,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "not-gateable",
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "not-gateable",
+			},
+		},
+		{
+			name: "missing-id",
+			gf:   testGf,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &eventlogger.SimpleGatedPayload{
+					Header: map[string]interface{}{
+						"missing-id": true,
+					},
+				},
+			},
+			wantErr:         true,
+			wantErrContains: "missing ID",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			for _, e := range tt.setupEvents {
+				_, err := tt.gf.Process(ctx, e)
+				require.NoError(err)
+			}
+			got, err := tt.gf.Process(ctx, tt.testEvent)
+			if tt.wantErr {
+				require.Error(err)
+				assert.Nil(got)
+				if tt.wantErrContains != "" {
+					assert.Contains(err.Error(), tt.wantErrContains)
+				}
+				return
+			}
+			require.NoError(err)
+			assert.Equal(tt.wantEvent, got)
+		})
+	}
 
 }
