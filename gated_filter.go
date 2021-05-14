@@ -15,9 +15,9 @@ type Gateable interface {
 	// payload is part of a group of Gateable payloads.
 	GetID() string
 
-	// FlushEvents returns true when the Gateable event payload includes a Flush
+	// FlushEvent returns true when the Gateable event payload includes a Flush
 	// indicator.
-	FlushEvents() bool
+	FlushEvent() bool
 
 	// ComposeFrom creates one event which is a composition of the list events
 	// parameter.  When ComposeFrom(...) is called by a GatedFilter the
@@ -39,9 +39,9 @@ const DefaultGatedEventTimeout = time.Second * 10
 
 // GatedFilter provides the ability to buffer events identified by
 // Gateable.GetID() until an event is processed that returns true for
-// Gateable.FlushEvents().
+// Gateable.FlushEvent().
 //
-// When a Gateable Event returns true for FlushEvents(), the filter will call
+// When a Gateable Event returns true for FlushEvent(), the filter will call
 // Gateable.ComposedOf(...) with the list of gated events with the
 // Gateable.GetID() up to that point in time and return the resulting composed
 // event.
@@ -65,14 +65,15 @@ type GatedFilter struct {
 	// will default to time.Now() if it's unset.
 	NowFunc func() time.Time
 
-	l sync.RWMutex
-
 	// gated uses Gateable.GetID() to uniquely identify collections of Gatable
 	// payloads within a gatedEvent
 	gated map[string]*gatedEvent
 
 	// orderedGated gives us an ordered list of gated events, so we can efficiently process expired entries.
 	orderedGated *list.List
+
+	composeFrom func(now time.Time, events []*Event) (*Event, error)
+	l           sync.RWMutex
 }
 
 var _ Node = &GatedFilter{}
@@ -93,12 +94,9 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		// in the pipeline
 		return e, nil
 	}
-	composeFrom := g.ComposeFrom
-
 	if g.GetID() == "" {
 		return nil, fmt.Errorf("%s: %s", op, "event missing ID")
 	}
-
 	w.l.Lock()
 	defer w.l.Unlock()
 
@@ -113,10 +111,13 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	if w.Expiration == 0 {
 		w.Expiration = DefaultGatedEventTimeout
 	}
+	if w.composeFrom == nil {
+		w.composeFrom = g.ComposeFrom
+	}
 
 	// before we do much of anything else, let's take care of any expiring Gated
 	// events.
-	if err := w.processExpiredEvents(ctx, composeFrom); err != nil {
+	if err := w.processExpiredEvents(ctx); err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -133,13 +134,13 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	// append the inbound event to our existing events for this ID
 	w.gated[g.GetID()].events = append(w.gated[g.GetID()].events, e)
 
-	// Is this event a signal to FlushEvents?
-	if g.FlushEvents() {
+	// Is this event a signal to FlushEvent?
+	if g.FlushEvent() {
 		// need to remove this ID, even if there's an error during composition.
 		defer w.orderedGated.Remove(w.gated[g.GetID()].element)
 		defer delete(w.gated, g.GetID())
 
-		return composeFrom(w.Now(), w.gated[g.GetID()].events)
+		return w.composeFrom(w.Now(), w.gated[g.GetID()].events)
 	}
 
 	return nil, nil
@@ -148,8 +149,11 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 // processExpiredEvents will check gated events for expiry and send them along
 // to the Broker as they expire.  If the GatedFilter has no broker, the expired
 // events are just deleted.
-func (w *GatedFilter) processExpiredEvents(ctx context.Context, f func(time.Time, []*Event) (*Event, error)) error {
+func (w *GatedFilter) processExpiredEvents(ctx context.Context) error {
 	const op = "eventlogger.(GatedFilter).ProcessExpiredEvents"
+	if w.composeFrom == nil {
+		return fmt.Errorf("%s: composedFrom func is not initialized", op)
+	}
 	if w.orderedGated == nil {
 		return nil
 	}
@@ -163,34 +167,68 @@ func (w *GatedFilter) processExpiredEvents(ctx context.Context, f func(time.Time
 	// Iterate through list, starting with the oldest gated event at the front.
 	for e := w.orderedGated.Front(); e != nil; e = e.Next() {
 		ge := e.Value.(*gatedEvent)
-		if w.Now().After(ge.exp) {
-			// need to remove this, even if there's an error during composition
-			defer w.orderedGated.Remove(ge.element)
-			defer delete(w.gated, ge.element.Value.(*gatedEvent).id)
-
-			e, err := f(w.Now(), ge.events)
-			if err != nil {
+		switch {
+		case w.Now().After(ge.exp):
+			if err := w.openGate(ctx, ge); err != nil {
 				return fmt.Errorf("%s: %w", op, err)
 			}
-			_, ok := e.Payload.(Gateable)
-			if ok {
-				// a Gateable payload would create infinite loop.
-				return fmt.Errorf("%s: %T.ComposeFrom returned a Gateable payload", op, e.Payload)
-			}
-			switch {
-			case w.Broker == nil:
-				// no op... perhaps we should log this somehow in the future if
-				// the GatedFilter adds a logger.  For now, we'll just drop the
-				// event into the bit bucket to nowhere.
-			default:
-				if _, err := w.Broker.SendEvent(ctx, e); err != nil {
-					return err
-				}
-			}
-		} else {
+		default:
 			// since the event are ordered by when they arrived, once we hit one
 			// that's not expired we're done.
 			break
+		}
+	}
+	return nil
+}
+
+func (w *GatedFilter) FlushAll(ctx context.Context) error {
+	const op = "eventlogger.(GatedFilter).FlushAll"
+	if len(w.gated) == 0 {
+		return nil
+	}
+	if w.composeFrom == nil {
+		return fmt.Errorf("%s: composedFrom func is not initialized", op)
+	}
+
+	// Iterate through list, starting with the oldest gated event at the front.
+	for e := w.orderedGated.Front(); e != nil; e = e.Next() {
+		ge := e.Value.(*gatedEvent)
+		if err := w.openGate(ctx, ge); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+	return nil
+}
+
+func (w *GatedFilter) openGate(ctx context.Context, ge *gatedEvent) error {
+	const op = "eventlogger.(GatedFilter).foo"
+	if ge == nil {
+		return fmt.Errorf("%s: missing gated event", op)
+	}
+	if w.composeFrom == nil {
+		return fmt.Errorf("%s: composedFrom func is not initialized", op)
+	}
+	// need to remove this, even if there's an error during composition
+	defer w.orderedGated.Remove(ge.element)
+	defer delete(w.gated, ge.element.Value.(*gatedEvent).id)
+
+	e, err := w.composeFrom(w.Now(), ge.events)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	_, ok := e.Payload.(Gateable)
+	if ok {
+		// a Gateable payload would create infinite loop.
+		return fmt.Errorf("%s: %T.ComposeFrom returned a Gateable payload", op, e.Payload)
+	}
+	switch {
+	case w.Broker == nil:
+		// no op... perhaps we should log this somehow in the future if
+		// the GatedFilter adds a logger.  For now, we'll just drop the
+		// event into the bit bucket to nowhere.
+	default:
+		if _, err := w.Broker.SendEvent(ctx, e); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -220,7 +258,7 @@ type SimpleGatedPayload struct {
 	// ID must be a unique ID
 	ID string
 
-	// Flush value is returned from FlushEvents()
+	// Flush value is returned from FlushEvent()
 	Flush bool
 
 	// Header is top level header info
@@ -237,9 +275,9 @@ func (s *SimpleGatedPayload) GetID() string {
 	return s.ID
 }
 
-// FlushEvents tells the GatedFilter to flush/process the events associated with
+// FlushEvent tells the GatedFilter to flush/process the events associated with
 // the Gateable ID
-func (s *SimpleGatedPayload) FlushEvents() bool {
+func (s *SimpleGatedPayload) FlushEvent() bool {
 	return s.Flush
 }
 
