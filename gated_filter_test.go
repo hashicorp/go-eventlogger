@@ -2,6 +2,11 @@ package eventlogger_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -51,13 +56,14 @@ func TestGatedFilter_Process(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		gf              *eventlogger.GatedFilter
-		setupEvents     []*eventlogger.Event
-		testEvent       *eventlogger.Event
-		wantEvent       *eventlogger.Event
-		wantErr         bool
-		wantErrContains string
+		name             string
+		gf               *eventlogger.GatedFilter
+		setupEvents      []*eventlogger.Event
+		ignoreTimestamps bool
+		testEvent        *eventlogger.Event
+		wantEvent        *eventlogger.Event
+		wantErr          bool
+		wantErrContains  string
 	}{
 		{
 			name:        "simple",
@@ -81,7 +87,7 @@ func TestGatedFilter_Process(t *testing.T) {
 				Payload: struct {
 					ID      string
 					Header  map[string]interface{}
-					Details []*eventlogger.Event
+					Details []eventlogger.SimpleGatedDetailsPayload
 				}{
 					ID: "event-1",
 					Header: map[string]interface{}{
@@ -89,10 +95,10 @@ func TestGatedFilter_Process(t *testing.T) {
 						"tmz":   "EST",
 						"user":  "alice",
 					},
-					Details: []*eventlogger.Event{
+					Details: []eventlogger.SimpleGatedDetailsPayload{
 						{
 							Type:      "test",
-							CreatedAt: now,
+							CreatedAt: now.String(),
 							Payload: map[string]interface{}{
 								"file_name":   "file1.txt",
 								"total_bytes": 1024,
@@ -100,7 +106,7 @@ func TestGatedFilter_Process(t *testing.T) {
 						},
 						{
 							Type:      "test",
-							CreatedAt: now,
+							CreatedAt: now.String(),
 							Payload: map[string]interface{}{
 								"file_name":   "file2.txt",
 								"total_bytes": 512,
@@ -108,7 +114,48 @@ func TestGatedFilter_Process(t *testing.T) {
 						},
 						{
 							Type:      "test",
-							CreatedAt: now,
+							CreatedAt: now.String(),
+							Payload: map[string]interface{}{
+								"file_name":   "file3.txt",
+								"total_bytes": 1000000,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "expired-no-broker",
+			gf: &eventlogger.GatedFilter{
+				Expiration: 1 * time.Nanosecond,
+			},
+			ignoreTimestamps: true,
+			setupEvents:      setupEvents,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &eventlogger.SimpleGatedPayload{
+					ID:    "event-1",
+					Flush: true,
+					Detail: map[string]interface{}{
+						"file_name":   "file3.txt",
+						"total_bytes": 1000000,
+					},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type: "test",
+				// not setting CreatedAt because ignoreTimestamps == true
+				Payload: struct {
+					ID      string
+					Header  map[string]interface{}
+					Details []eventlogger.SimpleGatedDetailsPayload
+				}{
+					ID: "event-1",
+					Details: []eventlogger.SimpleGatedDetailsPayload{
+						{
+							Type:      "test",
+							CreatedAt: now.String(),
 							Payload: map[string]interface{}{
 								"file_name":   "file3.txt",
 								"total_bytes": 1000000,
@@ -171,10 +218,167 @@ func TestGatedFilter_Process(t *testing.T) {
 				return
 			}
 			require.NoError(err)
+			if tt.ignoreTimestamps {
+				tt.wantEvent.CreatedAt = got.CreatedAt
+			}
 			assert.Equal(tt.wantEvent, got)
 		})
 	}
+	t.Run("expiration-with-broker", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		b, cleanup, tmpDir := testBroker(t, "expiration-with-broker", "test")
+		defer cleanup()
 
+		gf := &eventlogger.GatedFilter{
+			Expiration: 1 * time.Nanosecond,
+			Broker:     b,
+		}
+		gated, err := gf.Process(ctx, setupEvents[0])
+		require.NoError(err)
+		require.Empty(gated)
+
+		got, err := gf.Process(ctx, &eventlogger.Event{
+			Type:      "test",
+			CreatedAt: now,
+			Payload: &eventlogger.SimpleGatedPayload{
+				ID:    "event-1",
+				Flush: true,
+				Detail: map[string]interface{}{
+					"file_name":   "file3.txt",
+					"total_bytes": 1000000,
+				},
+			},
+		})
+		require.NoError(err)
+		wantEvent := &eventlogger.Event{
+			Type:      "test",
+			CreatedAt: got.CreatedAt,
+			Payload: struct {
+				ID      string
+				Header  map[string]interface{}
+				Details []eventlogger.SimpleGatedDetailsPayload
+			}{
+				ID: "event-1",
+				Details: []eventlogger.SimpleGatedDetailsPayload{
+					{
+						Type:      "test",
+						CreatedAt: now.String(),
+						Payload: map[string]interface{}{
+							"file_name":   "file3.txt",
+							"total_bytes": 1000000,
+						},
+					},
+				},
+			},
+		}
+		assert.Equal(wantEvent, got)
+
+		// Check the contents of the log
+		files, err := ioutil.ReadDir(tmpDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(files) > 1 {
+			t.Errorf("Expected 1 log file, got %d", len(files))
+		}
+
+		dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type loggedEvent struct {
+			CreatedAt string `json:"created_at"`
+			EventType string `json:"event_type"`
+			Payload   struct {
+				ID      string                 `json:"id"`
+				Header  map[string]interface{} `json:"header,omitempty"`
+				Details []struct {
+					Type      string                 `json:"type"`
+					CreatedAt string                 `json:"created_at"`
+					Payload   map[string]interface{} `json:"payload"`
+				}
+			}
+		}
+		gotEvent := &loggedEvent{}
+		require.NoError(json.Unmarshal(dat, gotEvent))
+
+		wantReadEvent := &loggedEvent{
+			CreatedAt: gotEvent.CreatedAt,
+			EventType: "test",
+			Payload: struct {
+				ID      string                 "json:\"id\""
+				Header  map[string]interface{} "json:\"header,omitempty\""
+				Details []struct {
+					Type      string                 "json:\"type\""
+					CreatedAt string                 "json:\"created_at\""
+					Payload   map[string]interface{} "json:\"payload\""
+				}
+			}{
+				ID: "event-1",
+				Header: map[string]interface{}{
+					"tmz":  "EST",
+					"user": "alice",
+				},
+				Details: []struct {
+					Type      string                 "json:\"type\""
+					CreatedAt string                 "json:\"created_at\""
+					Payload   map[string]interface{} "json:\"payload\""
+				}{
+					{
+						Type:      "test",
+						CreatedAt: now.String(),
+						Payload: map[string]interface{}{
+							"file_name":   "file1.txt",
+							"total_bytes": float64(1024),
+						},
+					},
+				},
+			},
+		}
+		assert.Equal(wantReadEvent, gotEvent)
+
+	})
+
+}
+
+func testBroker(t *testing.T, testName string, eventType string) (*eventlogger.Broker, func(), string) {
+	t.Helper()
+	require := require.New(t)
+	require.NotEmpty(eventType)
+	tmpDir, err := ioutil.TempDir("", testName)
+	require.NoError(err)
+	cleanup := func() {
+		os.RemoveAll(tmpDir)
+	}
+
+	// Marshal to JSON
+	n1 := &eventlogger.JSONFormatter{}
+	// Send to FileSink
+	n2 := &eventlogger.FileSink{Path: tmpDir, FileName: "file.log"}
+
+	// Create a broker
+	b := eventlogger.NewBroker()
+
+	// Register the graph with the broker
+	et := eventlogger.EventType(eventType)
+	nodes := []eventlogger.Node{n1, n2}
+	nodeIDs := make([]eventlogger.NodeID, len(nodes))
+	for i, node := range nodes {
+		id := eventlogger.NodeID(fmt.Sprintf("node-%d", i))
+		err := b.RegisterNode(id, node)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nodeIDs[i] = id
+	}
+	err = b.RegisterPipeline(eventlogger.Pipeline{
+		EventType:  et,
+		PipelineID: "id",
+		NodeIDs:    nodeIDs,
+	})
+	require.NoError(err)
+	return b, cleanup, tmpDir
 }
 
 func TestGatedFilter_Now(t *testing.T) {
