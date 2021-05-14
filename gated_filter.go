@@ -243,6 +243,14 @@ func (s *SimpleGatedPayload) FlushEvents() bool {
 	return s.Flush
 }
 
+// SimpleGatedDetailsPayload defines a type that SimpleGatedPayload.ComposedFrom
+// will use when creating Event payloads
+type SimpleGatedDetailsPayload struct {
+	Type      string                 `json:"type"`
+	CreatedAt string                 `json:"created_at"`
+	Payload   map[string]interface{} `json:"payload,omitempty"`
+}
+
 // ComposedFrom will build a single event which will be Flushed/Processed from a
 // collection of gated events.  The event returned does not contain a Gateable
 // payload intentionally.
@@ -257,7 +265,7 @@ func (s *SimpleGatedPayload) ComposeFrom(now time.Time, events []*Event) (*Event
 	payload := struct {
 		ID      string
 		Header  map[string]interface{}
-		Details []*Event
+		Details []SimpleGatedDetailsPayload
 	}{}
 	for i, v := range events {
 		g, ok := v.Payload.(*SimpleGatedPayload)
@@ -274,9 +282,9 @@ func (s *SimpleGatedPayload) ComposeFrom(now time.Time, events []*Event) (*Event
 			}
 		}
 		if g.Detail != nil {
-			payload.Details = append(payload.Details, &Event{
-				Type:      v.Type,
-				CreatedAt: v.CreatedAt,
+			payload.Details = append(payload.Details, SimpleGatedDetailsPayload{
+				Type:      string(v.Type),
+				CreatedAt: v.CreatedAt.String(),
 				Payload:   g.Detail,
 			})
 		}
