@@ -181,6 +181,9 @@ func (w *GatedFilter) processExpiredEvents(ctx context.Context) error {
 	return nil
 }
 
+// FlushAll will flush all events that have been gated and is useful for
+// circumstances the system is shuting down and you need to flush everything
+// that's been gated.
 func (w *GatedFilter) FlushAll(ctx context.Context) error {
 	const op = "eventlogger.(GatedFilter).FlushAll"
 	if len(w.gated) == 0 {
