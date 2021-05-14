@@ -84,18 +84,14 @@ func TestGatedFilter_Process(t *testing.T) {
 			wantEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload: struct {
-					ID      string
-					Header  map[string]interface{}
-					Details []eventlogger.SimpleGatedDetailsPayload
-				}{
+				Payload: eventlogger.SimpleGatedEventPayload{
 					ID: "event-1",
 					Header: map[string]interface{}{
 						"roles": []string{"admin", "anon"},
 						"tmz":   "EST",
 						"user":  "alice",
 					},
-					Details: []eventlogger.SimpleGatedDetailsPayload{
+					Details: []eventlogger.SimpleGatedEventDetails{
 						{
 							Type:      "test",
 							CreatedAt: now.String(),
@@ -146,13 +142,9 @@ func TestGatedFilter_Process(t *testing.T) {
 			wantEvent: &eventlogger.Event{
 				Type: "test",
 				// not setting CreatedAt because ignoreTimestamps == true
-				Payload: struct {
-					ID      string
-					Header  map[string]interface{}
-					Details []eventlogger.SimpleGatedDetailsPayload
-				}{
+				Payload: eventlogger.SimpleGatedEventPayload{
 					ID: "event-1",
-					Details: []eventlogger.SimpleGatedDetailsPayload{
+					Details: []eventlogger.SimpleGatedEventDetails{
 						{
 							Type:      "test",
 							CreatedAt: now.String(),
@@ -253,13 +245,9 @@ func TestGatedFilter_Process(t *testing.T) {
 		wantEvent := &eventlogger.Event{
 			Type:      "test",
 			CreatedAt: got.CreatedAt,
-			Payload: struct {
-				ID      string
-				Header  map[string]interface{}
-				Details []eventlogger.SimpleGatedDetailsPayload
-			}{
+			Payload: eventlogger.SimpleGatedEventPayload{
 				ID: "event-1",
-				Details: []eventlogger.SimpleGatedDetailsPayload{
+				Details: []eventlogger.SimpleGatedEventDetails{
 					{
 						Type:      "test",
 						CreatedAt: now.String(),

@@ -253,7 +253,8 @@ func (w *GatedFilter) Now() time.Time {
 	return time.Now()
 }
 
-// SimpleGatedPayload defines a Gateable payload implementation.
+// SimpleGatedPayload implements the Gateable interface for an Event payload and
+// can be used when sending events with a Broker.
 type SimpleGatedPayload struct {
 	// ID must be a unique ID
 	ID string
@@ -281,12 +282,19 @@ func (s *SimpleGatedPayload) FlushEvent() bool {
 	return s.Flush
 }
 
-// SimpleGatedDetailsPayload defines a type that SimpleGatedPayload.ComposedFrom
-// will use when creating Event payloads
-type SimpleGatedDetailsPayload struct {
+// SimpleGatedEventDetails defines the struct used in the
+// SimpleGatedEventPayload.Details list.
+type SimpleGatedEventDetails struct {
 	Type      string                 `json:"type"`
 	CreatedAt string                 `json:"created_at"`
 	Payload   map[string]interface{} `json:"payload,omitempty"`
+}
+
+// SimpleGatedEventPayload defines the resulting Event from SimpleGatedPayload.ComposeFrom
+type SimpleGatedEventPayload struct {
+	ID      string
+	Header  map[string]interface{}
+	Details []SimpleGatedEventDetails
 }
 
 // ComposedFrom will build a single event which will be Flushed/Processed from a
@@ -300,11 +308,7 @@ func (s *SimpleGatedPayload) ComposeFrom(now time.Time, events []*Event) (*Event
 	if len(events) == 0 {
 		return nil, fmt.Errorf("%s: missing events", op)
 	}
-	payload := struct {
-		ID      string
-		Header  map[string]interface{}
-		Details []SimpleGatedDetailsPayload
-	}{}
+	payload := SimpleGatedEventPayload{}
 	for i, v := range events {
 		g, ok := v.Payload.(*SimpleGatedPayload)
 		if !ok {
@@ -320,7 +324,7 @@ func (s *SimpleGatedPayload) ComposeFrom(now time.Time, events []*Event) (*Event
 			}
 		}
 		if g.Detail != nil {
-			payload.Details = append(payload.Details, SimpleGatedDetailsPayload{
+			payload.Details = append(payload.Details, SimpleGatedEventDetails{
 				Type:      string(v.Type),
 				CreatedAt: v.CreatedAt.String(),
 				Payload:   g.Detail,
