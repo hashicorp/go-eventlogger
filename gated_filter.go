@@ -222,7 +222,7 @@ func (w *GatedFilter) FlushAll(ctx context.Context) error {
 }
 
 func (w *GatedFilter) openGate(ctx context.Context, ge *gatedEvent) error {
-	const op = "eventlogger.(GatedFilter).foo"
+	const op = "eventlogger.(GatedFilter).openGate"
 	if ge == nil {
 		return fmt.Errorf("%s: missing gated event", op)
 	}
