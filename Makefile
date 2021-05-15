@@ -1,5 +1,5 @@
 test: 
-	go test ./... -timeout 30m
+	go test ./... -race -timeout 30m
 
 fmt:
 	gofumpt -w $$(find . -name '*.go')
