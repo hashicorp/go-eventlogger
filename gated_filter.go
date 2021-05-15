@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Gateable defines an interface for Event payloads which are gateable by
+// Gateable defines an interface for Event payloads which are "gateable" by
 // the GatedFilter
 type Gateable interface {
 	// GetID returns an ID which allows the GatedFilter to determine that the
@@ -19,17 +19,23 @@ type Gateable interface {
 	// indicator.
 	FlushEvent() bool
 
-	// ComposeFrom creates one event which is a composition of the list events
-	// parameter.  When ComposeFrom(...) is called by a GatedFilter the
-	// receiver will always be nil. The Event returned must not have a Gateable
-	// payload.
+	// ComposeFrom creates one event which is a composition of a list events.
+	// When ComposeFrom(...) is called by a GatedFilter the  receiver will
+	// always be nil. The Event returned must not have a Gateable payload.
 	ComposeFrom(now time.Time, events []*Event) (*Event, error)
 }
 
+// gatedEvent is a list of Events with the same Gateable.GetID().  These events
+// have an exp (expiration) time. A gatedEvent has a list.Element, which allows
+// it to be part of a linked list of gatedEvents.
 type gatedEvent struct {
-	id      string
-	events  []*Event
-	exp     time.Time
+	// id of the event and all the "events"
+	id string
+	// events are an ordered list that all have the same ID
+	events []*Event
+	// exp of the gatedEvent
+	exp time.Time
+	// element of a linked list of gatedEvents
 	element *list.Element
 }
 
@@ -37,18 +43,18 @@ type gatedEvent struct {
 // GatedFilter
 const DefaultGatedEventTimeout = time.Second * 10
 
-// GatedFilter provides the ability to buffer events identified by
+// GatedFilter provides the ability to buffer events identified by a
 // Gateable.GetID() until an event is processed that returns true for
 // Gateable.FlushEvent().
 //
 // When a Gateable Event returns true for FlushEvent(), the filter will call
-// Gateable.ComposedOf(...) with the list of gated events with the
+// Gateable.ComposedOf(...) with the list of gated events with the coresponding
 // Gateable.GetID() up to that point in time and return the resulting composed
 // event.
-
-// If GatedFilter.Broker is nill, expired gated events will simply be being
-// deleted.  If the Broker is NOT nil, then the expiring gated events will be
-// flushed using Gateable.ComposedOf(...) and the resulting composed event sent
+//
+// If GatedFilter.Broker is nill, expired gated events will simply be deleted.
+// If the Broker is NOT nil, then the expiring gated events will be flushed
+// using Gateable.ComposedOf(...) and the resulting composed event sent
 // using the Broker.
 type GatedFilter struct {
 	// Broker used to send along expired gated events
@@ -61,28 +67,32 @@ type GatedFilter struct {
 	// DefaultGatedEventTimeout will be used.
 	Expiration time.Duration
 
-	// NowFunc is a time func that returns the current time and the GatedFilter
-	// will default to time.Now() if it's unset.
+	// NowFunc is a func that returns the current time and the GatedFilter and
+	// if unset, it will default to time.Now()
 	NowFunc func() time.Time
 
-	// gated uses Gateable.GetID() to uniquely identify collections of Gatable
-	// payloads within a gatedEvent
+	// gated uses Gateable.GetID() to uniquely identify gatedEvents (collections of Gatable
+	// payloads)
 	gated map[string]*gatedEvent
 
-	// orderedGated gives us an ordered list of gated events, so we can efficiently process expired entries.
+	// orderedGated gives us an ordered (by timestamp) linked list of gated
+	// events, so we can efficiently process expired entries.
 	orderedGated *list.List
 
+	// composedFrom is a reference to the Gateable.ComposedFrom func for
+	// the specific type of Gateable event
 	composeFrom func(now time.Time, events []*Event) (*Event, error)
 	l           sync.RWMutex
 }
 
 var _ Node = &GatedFilter{}
 
-// Process will call determine if the Event is Gateable.  If it's not Gateable
-// then it's returned.  If the Event is Gateable, it's added to a list of Events
-// for the Gateable.ID() until an event is processed where Gateable.Flush()
-// returns true.  If Gateable.Flush(), then Gateable.ComposedFrom([]*Event) is
-// called with all the gated events for the ID.
+// Process will determine if an Event is Gateable.  Events that are not not
+// Gateable are immediately returned. If the Event is Gateable, it's added to a
+// list of Events using it's Gateable.ID() as an index, until an event with a
+// matching Gateable.ID() is processed where Gateable.Flush() returns true.  If
+// Gateable.Flush(), then Gateable.ComposedFrom([]*Event) is called with all the
+// gated events for the ID.
 func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	const op = "eventlogger.(GatedWriter).Process"
 	if e == nil {
@@ -182,8 +192,8 @@ func (w *GatedFilter) processExpiredEvents(ctx context.Context) error {
 }
 
 // FlushAll will flush all events that have been gated and is useful for
-// circumstances the system is shuting down and you need to flush everything
-// that's been gated.
+// circumstances where the system is shuting down and you need to flush
+// everything that's been gated.
 func (w *GatedFilter) FlushAll(ctx context.Context) error {
 	const op = "eventlogger.(GatedFilter).FlushAll"
 	if len(w.gated) == 0 {
@@ -302,7 +312,8 @@ type SimpleGatedEventPayload struct {
 
 // ComposedFrom will build a single event which will be Flushed/Processed from a
 // collection of gated events.  The event returned does not contain a Gateable
-// payload intentionally.
+// payload intentionally.  Note: the SimpleGatedPayload receiver is always nil
+// when this function is called.
 func (s *SimpleGatedPayload) ComposeFrom(now time.Time, events []*Event) (*Event, error) {
 	const op = "eventlogger.(SimpleGatedPayload).ComposedFrom"
 	if now.IsZero() {
