@@ -108,8 +108,6 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		return nil, fmt.Errorf("%s: %s", op, "event missing ID")
 	}
 	w.l.Lock()
-	defer w.l.Unlock()
-
 	// since there's no factory, we need to make sure the GatedFilter is
 	// initialized properly
 	if w.gated == nil {
@@ -124,13 +122,17 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	if w.composeFrom == nil {
 		w.composeFrom = g.ComposeFrom
 	}
+	w.l.Unlock()
 
 	// before we do much of anything else, let's take care of any expiring Gated
-	// events.
+	// events.  Note: processExpiredEvents will acquire a lock, so we must
+	// unsure the GatedFilter is unlocked before calling the func.
 	if err := w.processExpiredEvents(ctx); err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
+	w.l.Lock()
+	defer w.l.Unlock()
 	// Is it first time we've seen this gated event ID?
 	if _, ok := w.gated[g.GetID()]; !ok {
 		ge := &gatedEvent{
@@ -169,6 +171,8 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 // events are just deleted.
 func (w *GatedFilter) processExpiredEvents(ctx context.Context) error {
 	const op = "eventlogger.(GatedFilter).ProcessExpiredEvents"
+	w.l.Lock()
+	defer w.l.Unlock()
 	if w.composeFrom == nil {
 		return fmt.Errorf("%s: composedFrom func is not initialized", op)
 	}
@@ -204,6 +208,8 @@ func (w *GatedFilter) processExpiredEvents(ctx context.Context) error {
 // everything that's been gated.
 func (w *GatedFilter) FlushAll(ctx context.Context) error {
 	const op = "eventlogger.(GatedFilter).FlushAll"
+	w.l.Lock()
+	defer w.l.Unlock()
 	if len(w.gated) == 0 {
 		return nil
 	}
@@ -221,6 +227,8 @@ func (w *GatedFilter) FlushAll(ctx context.Context) error {
 	return nil
 }
 
+// openGate will not acquire it's own lock, so the caller must do so before
+// calling it.
 func (w *GatedFilter) openGate(ctx context.Context, ge *gatedEvent) error {
 	const op = "eventlogger.(GatedFilter).openGate"
 	if ge == nil {
