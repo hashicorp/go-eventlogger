@@ -315,25 +315,23 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		testEvent *eventlogger.Event
+		t         eventlogger.EventType
+		payload   *eventlogger.SimpleGatedPayload
 		wantEvent *loggedEvent
 		wantErr   bool
 	}{
 		{
 			name: "success",
-			testEvent: &eventlogger.Event{
-				Type:      "test",
-				CreatedAt: now,
-				Payload: &eventlogger.SimpleGatedPayload{
-					ID: "event-1",
-					Header: map[string]interface{}{
-						"user": "alice",
-						"tmz":  "EST",
-					},
-					Detail: map[string]interface{}{
-						"file_name":   "file1.txt",
-						"total_bytes": 1024,
-					},
+			t:    eventlogger.EventType("test"),
+			payload: &eventlogger.SimpleGatedPayload{
+				ID: "event-1",
+				Header: map[string]interface{}{
+					"user": "alice",
+					"tmz":  "EST",
+				},
+				Detail: map[string]interface{}{
+					"file_name":   "file1.txt",
+					"total_bytes": 1024,
 				},
 			},
 			wantEvent: &loggedEvent{
@@ -368,10 +366,11 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 			ctx := context.Background()
 			b, gf, cleanup, tmpDir := testBrokerWithGatedFilter(t, tt.name, "test")
 			gf.Expiration = 100 * time.Minute // Note: be very careful setting the exp to something so large
+			gf.NowFunc = func() time.Time { return now }
 			defer cleanup()
 
-			if tt.testEvent != nil {
-				_, err := b.SendEvent(ctx, tt.testEvent)
+			if tt.payload != nil {
+				_, err := b.Send(ctx, tt.t, tt.payload)
 				require.NoError(err)
 			}
 
@@ -399,6 +398,7 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 				gotEvent := &loggedEvent{}
 				require.NoError(json.Unmarshal(dat, gotEvent))
 				tt.wantEvent.CreatedAt = gotEvent.CreatedAt
+				tt.wantEvent.Payload.Details[0].CreatedAt = gotEvent.Payload.Details[0].CreatedAt
 				assert.Equal(tt.wantEvent, gotEvent)
 			}
 		})

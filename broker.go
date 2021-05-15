@@ -2,7 +2,6 @@ package eventlogger
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -91,30 +90,6 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 		Payload:   payload,
 	}
 
-	return g.process(ctx, e)
-}
-
-// SendEvent writes an event to all registered pipelines for the event's type
-// concurrently and reports on the result.  An error will only be returned if a
-// pipeline's delivery policies could not be satisfied.
-func (b *Broker) SendEvent(ctx context.Context, e *Event) (Status, error) {
-	if e == nil {
-		return Status{}, errors.New("missing event")
-	}
-	b.lock.RLock()
-	g, ok := b.graphs[e.Type]
-	b.lock.RUnlock()
-
-	if e.Formatted == nil {
-		e.Formatted = make(map[string][]byte)
-	}
-	if e.CreatedAt.IsZero() {
-		e.CreatedAt = b.clock.Now()
-	}
-
-	if !ok {
-		return Status{}, fmt.Errorf("No graph for EventType %s", e.Type)
-	}
 	return g.process(ctx, e)
 }
 
