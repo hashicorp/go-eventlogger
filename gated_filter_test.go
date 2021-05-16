@@ -84,6 +84,7 @@ func TestGatedFilter_Process(t *testing.T) {
 			wantEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
+				Formatted: map[string][]byte{},
 				Payload: eventlogger.SimpleGatedEventPayload{
 					ID: "event-1",
 					Header: map[string]interface{}{
@@ -140,7 +141,8 @@ func TestGatedFilter_Process(t *testing.T) {
 				},
 			},
 			wantEvent: &eventlogger.Event{
-				Type: "test",
+				Formatted: map[string][]byte{},
+				Type:      "test",
 				// not setting CreatedAt because ignoreTimestamps == true
 				Payload: eventlogger.SimpleGatedEventPayload{
 					ID: "event-1",
@@ -243,6 +245,7 @@ func TestGatedFilter_Process(t *testing.T) {
 		wantEvent := &eventlogger.Event{
 			Type:      "test",
 			CreatedAt: got.CreatedAt,
+			Formatted: map[string][]byte{},
 			Payload: eventlogger.SimpleGatedEventPayload{
 				ID: "event-1",
 				Details: []eventlogger.SimpleGatedEventDetails{
