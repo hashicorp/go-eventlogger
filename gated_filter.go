@@ -96,7 +96,7 @@ var _ Node = &GatedFilter{}
 func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	const op = "eventlogger.(GatedWriter).Process"
 	if e == nil {
-		return nil, fmt.Errorf("%s: missing event", op)
+		return nil, fmt.Errorf("%s: missing event: %w", op, ErrInvalidParameter)
 	}
 	g, ok := e.Payload.(Gateable)
 	if !ok {
@@ -105,7 +105,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		return e, nil
 	}
 	if g.GetID() == "" {
-		return nil, fmt.Errorf("%s: %s", op, "event missing ID")
+		return nil, fmt.Errorf("%s: missing ID: %w", op, ErrInvalidParameter)
 	}
 	w.l.Lock()
 	// since there's no factory, we need to make sure the GatedFilter is
@@ -175,7 +175,7 @@ func (w *GatedFilter) processExpiredEvents(ctx context.Context) error {
 	w.l.Lock()
 	defer w.l.Unlock()
 	if w.composeFrom == nil {
-		return fmt.Errorf("%s: composedFrom func is not initialized", op)
+		return fmt.Errorf("%s: composedFrom func is not initialized: %w", op, ErrInvalidParameter)
 	}
 	if w.orderedGated == nil {
 		return nil
@@ -215,7 +215,7 @@ func (w *GatedFilter) FlushAll(ctx context.Context) error {
 		return nil
 	}
 	if w.composeFrom == nil {
-		return fmt.Errorf("%s: composedFrom func is not initialized", op)
+		return fmt.Errorf("%s: composedFrom func is not initialized: %w", op, ErrInvalidParameter)
 	}
 
 	// Iterate through list, starting with the oldest gated event at the front.
@@ -233,10 +233,10 @@ func (w *GatedFilter) FlushAll(ctx context.Context) error {
 func (w *GatedFilter) openGate(ctx context.Context, ge *gatedEvent) error {
 	const op = "eventlogger.(GatedFilter).openGate"
 	if ge == nil {
-		return fmt.Errorf("%s: missing gated event", op)
+		return fmt.Errorf("%s: missing gated event: %w", op, ErrInvalidParameter)
 	}
 	if w.composeFrom == nil {
-		return fmt.Errorf("%s: composedFrom func is not initialized", op)
+		return fmt.Errorf("%s: composedFrom func is not initialized: %w", op, ErrInvalidParameter)
 	}
 	// need to remove this, even if there's an error during composition
 	defer w.orderedGated.Remove(ge.element)
@@ -334,14 +334,14 @@ type SimpleGatedEventPayload struct {
 func (s *SimpleGatedPayload) ComposeFrom(events []*Event) (EventType, interface{}, error) {
 	const op = "eventlogger.(SimpleGatedPayload).ComposedFrom"
 	if len(events) == 0 {
-		return "", nil, fmt.Errorf("%s: missing events", op)
+		return "", nil, fmt.Errorf("%s: missing events: %w", op, ErrInvalidParameter)
 	}
 
 	payload := SimpleGatedEventPayload{}
 	for i, v := range events {
 		g, ok := v.Payload.(*SimpleGatedPayload)
 		if !ok {
-			return "", nil, fmt.Errorf("%s: event %d is not a simple gated payload", op, i)
+			return "", nil, fmt.Errorf("%s: event %d is not a simple gated payload: %w", op, i, ErrInvalidParameter)
 		}
 		payload.ID = g.GetID()
 		if g.Header != nil {

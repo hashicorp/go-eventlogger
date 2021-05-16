@@ -64,6 +64,7 @@ func TestGatedFilter_Process(t *testing.T) {
 		wantEvent        *eventlogger.Event
 		wantErr          bool
 		wantErrContains  string
+		wantErrIs        error
 	}{
 		{
 			name:        "simple",
@@ -164,6 +165,7 @@ func TestGatedFilter_Process(t *testing.T) {
 			gf:              testGf,
 			wantErr:         true,
 			wantErrContains: "missing event",
+			wantErrIs:       eventlogger.ErrInvalidParameter,
 		},
 		{
 			name: "not-gateable",
@@ -193,6 +195,7 @@ func TestGatedFilter_Process(t *testing.T) {
 			},
 			wantErr:         true,
 			wantErrContains: "missing ID",
+			wantErrIs:       eventlogger.ErrInvalidParameter,
 		},
 	}
 	for _, tt := range tests {
@@ -208,6 +211,9 @@ func TestGatedFilter_Process(t *testing.T) {
 				assert.Nil(got)
 				if tt.wantErrContains != "" {
 					assert.Contains(err.Error(), tt.wantErrContains)
+				}
+				if tt.wantErrIs != nil {
+					assert.ErrorIs(err, eventlogger.ErrInvalidParameter)
 				}
 				return
 			}
