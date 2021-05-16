@@ -415,7 +415,7 @@ func TestGatedFilter_Now(t *testing.T) {
 		gf := eventlogger.GatedFilter{}
 		n := time.Now()
 		got := gf.Now()
-		assert.True(got.Before(time.Now()))
+		assert.True(got.Equal(time.Now()) || got.Before(time.Now()))
 		assert.True(got.After(n))
 	})
 	t.Run("override-now", func(t *testing.T) {
