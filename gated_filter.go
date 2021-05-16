@@ -22,7 +22,7 @@ type Gateable interface {
 	// ComposeFrom creates one payload which is a composition of a list events.
 	// When ComposeFrom(...) is called by a GatedFilter the receiver will
 	// always be nil. The payload returned must not have a Gateable payload.
-	ComposeFrom(now time.Time, events []*Event) (t EventType, payload interface{}, err error)
+	ComposeFrom(events []*Event) (t EventType, payload interface{}, err error)
 }
 
 // gatedEvent is a list of Events with the same Gateable.GetID().  These events
@@ -81,7 +81,7 @@ type GatedFilter struct {
 
 	// composedFrom is a reference to the Gateable.ComposedFrom func for
 	// the specific type of Gateable event
-	composeFrom func(now time.Time, events []*Event) (t EventType, payload interface{}, e error)
+	composeFrom func(events []*Event) (t EventType, payload interface{}, e error)
 	l           sync.RWMutex
 }
 
@@ -152,7 +152,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 		defer w.orderedGated.Remove(w.gated[g.GetID()].element)
 		defer delete(w.gated, g.GetID())
 
-		t, p, err := w.composeFrom(w.Now(), w.gated[g.GetID()].events)
+		t, p, err := w.composeFrom(w.gated[g.GetID()].events)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
@@ -160,6 +160,7 @@ func (w *GatedFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 			Type:      t,
 			Payload:   p,
 			CreatedAt: w.Now(),
+			Formatted: make(map[string][]byte),
 		}, nil
 	}
 
@@ -241,7 +242,7 @@ func (w *GatedFilter) openGate(ctx context.Context, ge *gatedEvent) error {
 	defer w.orderedGated.Remove(ge.element)
 	defer delete(w.gated, ge.element.Value.(*gatedEvent).id)
 
-	t, p, err := w.composeFrom(w.Now(), ge.events)
+	t, p, err := w.composeFrom(ge.events)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -330,11 +331,8 @@ type SimpleGatedEventPayload struct {
 // Flushed/Processed from a collection of gated events.  The payload returned is
 // not a Gateable payload intentionally.  Note: the SimpleGatedPayload receiver
 // is always nil when this function is called.
-func (s *SimpleGatedPayload) ComposeFrom(now time.Time, events []*Event) (EventType, interface{}, error) {
+func (s *SimpleGatedPayload) ComposeFrom(events []*Event) (EventType, interface{}, error) {
 	const op = "eventlogger.(SimpleGatedPayload).ComposedFrom"
-	if now.IsZero() {
-		return "", nil, fmt.Errorf("%s: missing now", op)
-	}
 	if len(events) == 0 {
 		return "", nil, fmt.Errorf("%s: missing events", op)
 	}
