@@ -107,7 +107,6 @@ func (g *graph) reopen(ctx context.Context) error {
 
 // Recursively reopen every node in the graph.
 func (g *graph) doReopen(ctx context.Context, node *linkedNode) error {
-
 	// Process the current Node
 	err := node.node.Reopen()
 	if err != nil {

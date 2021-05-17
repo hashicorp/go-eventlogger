@@ -260,5 +260,4 @@ func TestFileSink_pruneFiles(t *testing.T) {
 	if want != got {
 		t.Errorf("Expected %d files, got %d", want, got)
 	}
-
 }

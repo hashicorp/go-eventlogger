@@ -1,6 +1,6 @@
 module github.com/hashicorp/eventlogger
 
-go 1.12
+go 1.16
 
 require (
 	github.com/go-test/deep v1.0.4
