@@ -20,7 +20,6 @@ var _ Node = &Filter{}
 // the Event or filter it out of the Pipeline (Filtered Events return nil, nil,
 // which is a successful response).
 func (f *Filter) Process(ctx context.Context, e *Event) (*Event, error) {
-
 	// Use the predicate to see if we want to keep the event.
 	keep, err := f.Predicate(e)
 	if err != nil {
