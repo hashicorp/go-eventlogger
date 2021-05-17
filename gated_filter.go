@@ -52,7 +52,7 @@ const DefaultGatedEventTimeout = time.Second * 10
 // Gateable.GetID() up to that point in time and return the resulting composed
 // event.
 //
-// If GatedFilter.Broker is nill, expired gated events will simply be deleted.
+// If GatedFilter.Broker is nil, expired gated events will simply be deleted.
 // If the Broker is NOT nil, then the expiring gated events will be flushed
 // using Gateable.ComposedOf(...) and the resulting composed event sent
 // using the Broker.
