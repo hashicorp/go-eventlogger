@@ -55,12 +55,6 @@ func (c *clock) Now() time.Time {
 	return c.now
 }
 
-// StopTimeAt allows you to "stop" the Broker's timestamp clock at a predicable
-// point in time, so timestamps are predictable for testing.
-func (b *Broker) StopTimeAt(now time.Time) {
-	b.clock = &clock{now: now}
-}
-
 // Status describes the result of a Send.
 type Status struct {
 	// complete lists the IDs of sinks that successfully wrote the Event.
