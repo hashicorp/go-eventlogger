@@ -50,12 +50,18 @@ const DefaultGatedEventTimeout = time.Second * 10
 // When a Gateable Event returns true for FlushEvent(), the filter will call
 // Gateable.ComposedOf(...) with the list of gated events with the coresponding
 // Gateable.GetID() up to that point in time and return the resulting composed
-// event.
-//
-// If GatedFilter.Broker is nil, expired gated events will simply be deleted.
-// If the Broker is NOT nil, then the expiring gated events will be flushed
-// using Gateable.ComposedOf(...) and the resulting composed event sent
-// using the Broker.
+// event.   There is no dependency on GatedFilter.Broker to handle an event that
+// returns true for FlushEvent() since the GatedFilter simply needs to return
+// the flushed event from GatedFilter.Process(...)
+
+// GatedFilter.Broker is only used when handling expired events or when
+// handling calls to GatedFilter.FlushAll().  If GatedFilter.Broker is nil,
+// expired gated events will simply be deleted. If the Broker is NOT nil, then
+// the expiring gated events will be flushed using Gateable.ComposedOf(...) and
+// the resulting composed event is sent using the Broker.  If the Broker is nil
+// when GatedFilter.FlushAll() is called then the gated events will just be
+// deleted.  If the Broker is not nil when GatedFilter.FlushAll() is called,
+// then all the gated events will be sent using the Broker.
 type GatedFilter struct {
 	// Broker used to send along expired gated events
 	Broker *Broker
@@ -207,6 +213,11 @@ func (w *GatedFilter) processExpiredEvents(ctx context.Context) error {
 // FlushAll will flush all events that have been gated and is useful for
 // circumstances where the system is shuting down and you need to flush
 // everything that's been gated.
+//
+// If the Broker is nil when GatedFilter.FlushAll() is called then the gated
+// events will just be deleted.  If the Broker is not nil when
+// GatedFilter.FlushAll() is called, then all the gated events will be sent
+// using the Broker.
 func (w *GatedFilter) FlushAll(ctx context.Context) error {
 	const op = "eventlogger.(GatedFilter).FlushAll"
 	w.l.Lock()
@@ -216,6 +227,14 @@ func (w *GatedFilter) FlushAll(ctx context.Context) error {
 	}
 	if w.composeFrom == nil {
 		return fmt.Errorf("%s: composedFrom func is not initialized: %w", op, ErrInvalidParameter)
+	}
+
+	if w.Broker == nil {
+		// no op... perhaps we should log this somehow in the future if the
+		// GatedFilter adds a logger.  For now, we'll just drop all the events
+		// into the bit bucket to nowhere.
+		w.gated = nil
+		w.orderedGated = nil
 	}
 
 	// Iterate through list, starting with the oldest gated event at the front.
