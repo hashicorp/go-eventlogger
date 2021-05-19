@@ -1,4 +1,5 @@
-# go-eventlogger
+# go-eventlogger   [![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/go-eventlogger.svg)](https://pkg.go.dev/github.com/hashicorp/go-eventlogger)
+
 
 `go-eventlogger` is a flexible event system libray implemented as a pub/sub model supporting middleware. 
 
@@ -32,9 +33,11 @@ pipelines (graphs), will be configured programmatically.
 
 
 ## Nodes 
-
 A Node is a node in a Pipeline, that can perform operations on an Event.  A node
-has a Type, one of: Processor, Formatter, Sink.
+has a Type, one of: Filter, Formatter, Sink.
+
+![Node example](img/pipeline.jpg)
+
 
 Examples of things that a Node might do to an Event include:
 
