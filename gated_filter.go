@@ -306,16 +306,16 @@ func (w *GatedFilter) Now() time.Time {
 // can be used when sending events with a Broker.
 type SimpleGatedPayload struct {
 	// ID must be a unique ID
-	ID string
+	ID string `json:"id"`
 
 	// Flush value is returned from FlushEvent()
-	Flush bool
+	Flush bool `json:"-"`
 
 	// Header is top level header info
-	Header map[string]interface{}
+	Header map[string]interface{} `json:"header,omitempty"`
 
 	// Detail is detail info
-	Detail map[string]interface{}
+	Detail map[string]interface{} `json:"detail,omitempty"`
 }
 
 var _ Gateable = &SimpleGatedPayload{}
