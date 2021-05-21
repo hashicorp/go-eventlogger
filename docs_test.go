@@ -95,5 +95,5 @@ func ExampleGatedFilter() {
 	}
 
 	// Output:
-	// {"created_at":"2009-11-17T20:34:58.651387237Z","event_type":"test-event","payload":{"ID":"event-1","Header":{"roles":["admin","individual-contributor"],"tmz":"EST","user":"alice"},"Details":[{"type":"test-event","created_at":"2009-11-17 20:34:58.651387237 +0000 UTC","payload":{"file_name":"file1.txt","total_bytes":1024}},{"type":"test-event","created_at":"2009-11-17 20:34:58.651387237 +0000 UTC","payload":{"file_name":"file2.txt","total_bytes":512}}]}}
+	// {"created_at":"2009-11-17T20:34:58.651387237Z","event_type":"test-event","payload":{"id":"event-1","header":{"roles":["admin","individual-contributor"],"tmz":"EST","user":"alice"},"details":[{"type":"test-event","created_at":"2009-11-17 20:34:58.651387237 +0000 UTC","payload":{"file_name":"file1.txt","total_bytes":1024}},{"type":"test-event","created_at":"2009-11-17 20:34:58.651387237 +0000 UTC","payload":{"file_name":"file2.txt","total_bytes":512}}]}}
 }

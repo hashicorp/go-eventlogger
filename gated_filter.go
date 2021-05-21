@@ -341,9 +341,9 @@ type SimpleGatedEventDetails struct {
 
 // SimpleGatedEventPayload defines the resulting Event from SimpleGatedPayload.ComposeFrom
 type SimpleGatedEventPayload struct {
-	ID      string
-	Header  map[string]interface{}
-	Details []SimpleGatedEventDetails
+	ID      string                    `json:"id"`
+	Header  map[string]interface{}    `json:"header,omitempty"`
+	Details []SimpleGatedEventDetails `json:"details,omitempty"`
 }
 
 // ComposedFrom will build a single event payload which will be
