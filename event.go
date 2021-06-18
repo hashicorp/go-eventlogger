@@ -27,3 +27,21 @@ type Event struct {
 	// Payload is the Event's payload data
 	Payload interface{}
 }
+
+// FormattedAs sets a formatted value for the event, for the specified format
+// type.  Any existing value for the type is overwritten.
+func (e *Event) FormattedAs(formatType string, formattedValue []byte) {
+	e.l.Lock()
+	defer e.l.Unlock()
+	e.Formatted[formatType] = formattedValue
+}
+
+// Format will retrieve the formatted value for the specified format type.  The
+// two value return allows the caller to determine the existence of the format
+// type.
+func (e *Event) Format(formatType string) ([]byte, bool) {
+	e.l.Lock()
+	defer e.l.Unlock()
+	v, ok := e.Formatted[formatType]
+	return v, ok
+}
