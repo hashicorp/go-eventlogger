@@ -2,10 +2,50 @@ package encrypt
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_getClassificationFromTag(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		st   reflect.StructTag
+		opt  []Option
+		want *tagInfo
+	}{
+		{
+			name: "no-tag",
+			st:   "",
+			want: &tagInfo{
+				Classification: UnknownClassification,
+				Operation:      UnknownOperation,
+			},
+		},
+		{
+			name: "sensitive-redact",
+			st: func() reflect.StructTag {
+				s := struct {
+					name string `classified:"sensitive,redact"`
+				}{}
+				return reflect.TypeOf(s).Field(0).Tag
+			}(),
+			want: &tagInfo{
+				Classification: SensitiveClassification,
+				Operation:      RedactOperation,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert := assert.New(t)
+			got := getClassificationFromTag(tt.st, tt.opt...)
+			assert.Equal(tt.want, got)
+		})
+	}
+}
 
 func Test_getClassificationFromTagString(t *testing.T) {
 	t.Parallel()
