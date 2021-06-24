@@ -1,4 +1,4 @@
-package eventlogger_test
+package gated_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/eventlogger"
+	"github.com/hashicorp/eventlogger/filters/gated"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func TestGatedFilter_Process(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	now := time.Now()
-	testGf := &eventlogger.GatedFilter{
+	testGf := &gated.Filter{
 		NowFunc: func() time.Time { return now },
 	}
 
@@ -27,7 +28,7 @@ func TestGatedFilter_Process(t *testing.T) {
 		{
 			Type:      "test",
 			CreatedAt: now,
-			Payload: &eventlogger.SimpleGatedPayload{
+			Payload: &gated.Payload{
 				ID: "event-1",
 				Header: map[string]interface{}{
 					"user": "alice",
@@ -42,7 +43,7 @@ func TestGatedFilter_Process(t *testing.T) {
 		{
 			Type:      "test",
 			CreatedAt: now,
-			Payload: &eventlogger.SimpleGatedPayload{
+			Payload: &gated.Payload{
 				ID: "event-1",
 				Header: map[string]interface{}{
 					"roles": []string{"admin", "anon"},
@@ -57,7 +58,7 @@ func TestGatedFilter_Process(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		gf               *eventlogger.GatedFilter
+		gf               *gated.Filter
 		setupEvents      []*eventlogger.Event
 		ignoreTimestamps bool
 		testEvent        *eventlogger.Event
@@ -73,7 +74,7 @@ func TestGatedFilter_Process(t *testing.T) {
 			testEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload: &eventlogger.SimpleGatedPayload{
+				Payload: &gated.Payload{
 					ID:    "event-1",
 					Flush: true,
 					Detail: map[string]interface{}{
@@ -86,14 +87,14 @@ func TestGatedFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Formatted: map[string][]byte{},
-				Payload: eventlogger.SimpleGatedEventPayload{
+				Payload: gated.EventPayload{
 					ID: "event-1",
 					Header: map[string]interface{}{
 						"roles": []string{"admin", "anon"},
 						"tmz":   "EST",
 						"user":  "alice",
 					},
-					Details: []eventlogger.SimpleGatedEventDetails{
+					Details: []gated.EventPayloadDetails{
 						{
 							Type:      "test",
 							CreatedAt: now.String(),
@@ -124,7 +125,7 @@ func TestGatedFilter_Process(t *testing.T) {
 		},
 		{
 			name: "expired-no-broker",
-			gf: &eventlogger.GatedFilter{
+			gf: &gated.Filter{
 				Expiration: 1 * time.Nanosecond,
 			},
 			ignoreTimestamps: true,
@@ -132,7 +133,7 @@ func TestGatedFilter_Process(t *testing.T) {
 			testEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload: &eventlogger.SimpleGatedPayload{
+				Payload: &gated.Payload{
 					ID:    "event-1",
 					Flush: true,
 					Detail: map[string]interface{}{
@@ -145,9 +146,9 @@ func TestGatedFilter_Process(t *testing.T) {
 				Formatted: map[string][]byte{},
 				Type:      "test",
 				// not setting CreatedAt because ignoreTimestamps == true
-				Payload: eventlogger.SimpleGatedEventPayload{
+				Payload: gated.EventPayload{
 					ID: "event-1",
-					Details: []eventlogger.SimpleGatedEventDetails{
+					Details: []gated.EventPayloadDetails{
 						{
 							Type:      "test",
 							CreatedAt: now.String(),
@@ -187,7 +188,7 @@ func TestGatedFilter_Process(t *testing.T) {
 			testEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload: &eventlogger.SimpleGatedPayload{
+				Payload: &gated.Payload{
 					Header: map[string]interface{}{
 						"missing-id": true,
 					},
@@ -231,14 +232,14 @@ func TestGatedFilter_Process(t *testing.T) {
 
 		gf.Expiration = 1 * time.Nanosecond
 
-		gated, err := gf.Process(ctx, setupEvents[0])
+		got, err := gf.Process(ctx, setupEvents[0])
 		require.NoError(err)
-		require.Empty(gated)
+		require.Empty(got)
 
-		got, err := gf.Process(ctx, &eventlogger.Event{
+		got, err = gf.Process(ctx, &eventlogger.Event{
 			Type:      "test",
 			CreatedAt: now,
-			Payload: &eventlogger.SimpleGatedPayload{
+			Payload: &gated.Payload{
 				ID:    "event-1",
 				Flush: true,
 				Detail: map[string]interface{}{
@@ -252,9 +253,9 @@ func TestGatedFilter_Process(t *testing.T) {
 			Type:      "test",
 			CreatedAt: got.CreatedAt,
 			Formatted: map[string][]byte{},
-			Payload: eventlogger.SimpleGatedEventPayload{
+			Payload: gated.EventPayload{
 				ID: "event-1",
-				Details: []eventlogger.SimpleGatedEventDetails{
+				Details: []gated.EventPayloadDetails{
 					{
 						Type:      "test",
 						CreatedAt: now.String(),
@@ -281,7 +282,7 @@ func TestGatedFilter_Process(t *testing.T) {
 		type loggedEvent struct {
 			CreatedAt string `json:"created_at"`
 			EventType string `json:"event_type"`
-			Payload   eventlogger.SimpleGatedEventPayload
+			Payload   gated.EventPayload
 		}
 		gotEvent := &loggedEvent{}
 		require.NoError(json.Unmarshal(dat, gotEvent))
@@ -289,13 +290,13 @@ func TestGatedFilter_Process(t *testing.T) {
 		wantReadEvent := &loggedEvent{
 			CreatedAt: gotEvent.CreatedAt,
 			EventType: "test",
-			Payload: eventlogger.SimpleGatedEventPayload{
+			Payload: gated.EventPayload{
 				ID: "event-1",
 				Header: map[string]interface{}{
 					"tmz":  "EST",
 					"user": "alice",
 				},
-				Details: []eventlogger.SimpleGatedEventDetails{
+				Details: []gated.EventPayloadDetails{
 					{
 						Type:      "test",
 						CreatedAt: now.String(),
@@ -308,7 +309,6 @@ func TestGatedFilter_Process(t *testing.T) {
 			},
 		}
 		assert.Equal(wantReadEvent, gotEvent)
-
 	})
 }
 
@@ -319,20 +319,20 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 	type loggedEvent struct {
 		CreatedAt string `json:"created_at"`
 		EventType string `json:"event_type"`
-		Payload   eventlogger.SimpleGatedEventPayload
+		Payload   gated.EventPayload
 	}
 
 	tests := []struct {
 		name      string
 		t         eventlogger.EventType
-		payload   *eventlogger.SimpleGatedPayload
+		payload   *gated.Payload
 		wantEvent *loggedEvent
 		wantErr   bool
 	}{
 		{
 			name: "success",
 			t:    eventlogger.EventType("test"),
-			payload: &eventlogger.SimpleGatedPayload{
+			payload: &gated.Payload{
 				ID: "event-1",
 				Header: map[string]interface{}{
 					"user": "alice",
@@ -345,13 +345,13 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 			},
 			wantEvent: &loggedEvent{
 				EventType: "test",
-				Payload: eventlogger.SimpleGatedEventPayload{
+				Payload: gated.EventPayload{
 					ID: "event-1",
 					Header: map[string]interface{}{
 						"tmz":  "EST",
 						"user": "alice",
 					},
-					Details: []eventlogger.SimpleGatedEventDetails{
+					Details: []gated.EventPayloadDetails{
 						{
 							Type:      "test",
 							CreatedAt: now.String(),
@@ -418,7 +418,7 @@ func TestGatedFilter_Now(t *testing.T) {
 	t.Parallel()
 	t.Run("default-now", func(t *testing.T) {
 		assert := assert.New(t)
-		gf := eventlogger.GatedFilter{}
+		gf := gated.Filter{}
 		n := time.Now()
 		got := gf.Now()
 		assert.True(got.Equal(time.Now()) || got.Before(time.Now()))
@@ -427,7 +427,7 @@ func TestGatedFilter_Now(t *testing.T) {
 	t.Run("override-now", func(t *testing.T) {
 		assert := assert.New(t)
 		n := time.Now()
-		gf := eventlogger.GatedFilter{
+		gf := gated.Filter{
 			NowFunc: func() time.Time { return n },
 		}
 		assert.Equal(n, gf.Now())
@@ -437,11 +437,11 @@ func TestGatedFilter_Now(t *testing.T) {
 func TestGatedFilter_Type(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
-	gf := eventlogger.GatedFilter{}
+	gf := gated.Filter{}
 	assert.Equal(eventlogger.NodeTypeFilter, gf.Type())
 }
 
-func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) (*eventlogger.Broker, *eventlogger.GatedFilter, func(), string) {
+func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) (*eventlogger.Broker, *gated.Filter, func(), string) {
 	t.Helper()
 	require := require.New(t)
 	require.NotEmpty(eventType)
@@ -454,7 +454,7 @@ func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) 
 	// Create a broker
 	b := eventlogger.NewBroker()
 
-	gf := &eventlogger.GatedFilter{
+	gf := &gated.Filter{
 		Broker: b,
 	}
 

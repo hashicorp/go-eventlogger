@@ -34,9 +34,7 @@ func (w *JSONFormatter) Process(ctx context.Context, e *Event) (*Event, error) {
 		return nil, err
 	}
 
-	e.l.Lock()
-	e.Formatted[JSONFormat] = buf.Bytes()
-	e.l.Unlock()
+	e.FormattedAs(JSONFormat, buf.Bytes())
 	return e, nil
 }
 

@@ -1,16 +1,18 @@
-package eventlogger
+package writer
 
 import (
 	"bytes"
 	"context"
 	"errors"
 	"io"
+
+	"github.com/hashicorp/eventlogger"
 )
 
-// WriterSink writes the []byte respresentation of an Event to an io.Writer as a
-// string.  WriterSink allows you to define sinks for any io.Writer which
+// Sink writes the []byte respresentation of an Event to an io.Writer as a
+// string.  Sink allows you to define sinks for any io.Writer which
 // includes os.Stdout and os.Stderr
-type WriterSink struct {
+type Sink struct {
 	// Format specifies the format the []byte representation is formatted in
 	// Defaults to JSONFormat
 	Format string
@@ -19,16 +21,16 @@ type WriterSink struct {
 	Writer io.Writer
 }
 
-// Reopen does nothing for WriterSinks.  They cannot be rotated.
-func (fs *WriterSink) Reopen() error { return nil }
+// Reopen does nothing for this type of Sink.  They cannot be rotated.
+func (fs *Sink) Reopen() error { return nil }
 
-// Type defines a WriterSink as a NodeTypeSink
-func (fs *WriterSink) Type() NodeType {
-	return NodeTypeSink
+// Type defines the Sink as a NodeTypeSink
+func (fs *Sink) Type() eventlogger.NodeType {
+	return eventlogger.NodeTypeSink
 }
 
-// Process will Write the event to the WriterSink
-func (fs *WriterSink) Process(ctx context.Context, e *Event) (*Event, error) {
+// Process will Write the event to the Sink
+func (fs *Sink) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
 	if fs.Writer == nil {
 		return nil, errors.New("sink writer is nil")
 	}
@@ -38,11 +40,9 @@ func (fs *WriterSink) Process(ctx context.Context, e *Event) (*Event, error) {
 
 	format := fs.Format
 	if fs.Format == "" {
-		format = JSONFormat
+		format = eventlogger.JSONFormat
 	}
-	e.l.RLock()
-	val, ok := e.Formatted[format]
-	e.l.RUnlock()
+	val, ok := e.Format(format)
 	if !ok {
 		return nil, errors.New("event was not marshaled")
 	}

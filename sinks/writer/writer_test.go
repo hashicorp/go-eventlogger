@@ -1,4 +1,4 @@
-package eventlogger
+package writer
 
 import (
 	"bytes"
@@ -7,20 +7,22 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/hashicorp/eventlogger"
 )
 
 func TestWriterSink_Process(t *testing.T) {
 	ctx := context.Background()
 
-	event := &Event{
-		Formatted: map[string][]byte{JSONFormat: []byte("first")},
+	event := &eventlogger.Event{
+		Formatted: map[string][]byte{eventlogger.JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
 
 	tests := []struct {
 		name    string
 		writer  io.ReadWriter
-		e       *Event
+		e       *eventlogger.Event
 		want    string
 		wantErr bool
 	}{
@@ -45,7 +47,7 @@ func TestWriterSink_Process(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := WriterSink{
+			s := Sink{
 				Writer: tt.writer,
 			}
 			_, err := s.Process(ctx, tt.e)
@@ -68,7 +70,7 @@ func TestWriterSink_Process(t *testing.T) {
 		})
 	}
 	t.Run("stdout", func(t *testing.T) {
-		s := WriterSink{
+		s := Sink{
 			Writer: os.Stdout,
 		}
 		_, err := s.Process(ctx, event)
@@ -77,7 +79,7 @@ func TestWriterSink_Process(t *testing.T) {
 		}
 	})
 	t.Run("stderr", func(t *testing.T) {
-		s := WriterSink{
+		s := Sink{
 			Writer: os.Stderr,
 		}
 		_, err := s.Process(ctx, event)

@@ -69,9 +69,7 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	if format == "" {
 		format = JSONFormat
 	}
-	e.l.RLock()
-	val, ok := e.Formatted[format]
-	e.l.RUnlock()
+	val, ok := e.Format(format)
 	if !ok {
 		return nil, errors.New("event was not marshaled")
 	}

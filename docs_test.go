@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/eventlogger"
+	"github.com/hashicorp/eventlogger/filters/gated"
+	"github.com/hashicorp/eventlogger/sinks/writer"
 )
 
 func ExampleGatedFilter() {
@@ -17,8 +19,8 @@ func ExampleGatedFilter() {
 
 	b.StopTimeAt(then) // setting this so the output timestamps are predictable for testing.
 
-	// A GatedFilter for events
-	gf := &eventlogger.GatedFilter{
+	// A gated.Filter for events
+	gf := &gated.Filter{
 		Broker:  b,
 		NowFunc: func() time.Time { return then }, // setting this so the output timestamps are predictable for testing.
 	}
@@ -26,7 +28,7 @@ func ExampleGatedFilter() {
 	jsonFmt := &eventlogger.JSONFormatter{}
 
 	// Send the output to stdout
-	stdoutSink := &eventlogger.WriterSink{
+	stdoutSink := &writer.Sink{
 		Writer: os.Stdout,
 	}
 
@@ -55,7 +57,7 @@ func ExampleGatedFilter() {
 
 	// define a common event ID for a set of events we want gated together.
 	eventID := "event-1"
-	payloads := []*eventlogger.SimpleGatedPayload{
+	payloads := []*gated.Payload{
 		{
 			// our first event
 			ID: eventID,
