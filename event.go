@@ -33,6 +33,9 @@ type Event struct {
 func (e *Event) FormattedAs(formatType string, formattedValue []byte) {
 	e.l.Lock()
 	defer e.l.Unlock()
+	if e.Formatted == nil {
+		e.Formatted = make(map[string][]byte)
+	}
 	e.Formatted[formatType] = formattedValue
 }
 
@@ -40,8 +43,13 @@ func (e *Event) FormattedAs(formatType string, formattedValue []byte) {
 // two value return allows the caller to determine the existence of the format
 // type.
 func (e *Event) Format(formatType string) ([]byte, bool) {
-	e.l.Lock()
-	defer e.l.Unlock()
+	e.l.RLock()
+	defer e.l.RUnlock()
+
+	// while not required, this is a more explicit check for nil
+	if e.Formatted == nil {
+		return nil, false
+	}
 	v, ok := e.Formatted[formatType]
 	return v, ok
 }
