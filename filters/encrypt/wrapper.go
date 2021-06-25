@@ -16,7 +16,10 @@ import (
 type derivedKeyPurpose uint
 
 const (
+	// derivedKeyPurposeUnknown is unknown
 	derivedKeyPurposeUnknown = iota
+
+	// derivedKeyPurposeEvent is per event operations
 	derivedKeyPurposeEvent
 )
 
@@ -44,6 +47,8 @@ type RotateWrapper interface {
 	HmacInfo() []byte
 }
 
+// EventWrapperInfo defines and interface for eventlogger payloads which include
+// data used to derive a per event wrapper.
 type EventWrapperInfo interface {
 	// Event ID to use when deriving keys for crypto operations on the event
 	// payload
