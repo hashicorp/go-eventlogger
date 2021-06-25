@@ -124,7 +124,6 @@ func Test_getClassificationFromTagString(t *testing.T) {
 				Operation:      EncryptOperation,
 			},
 		},
-		// -------------
 		{
 			name: "secret-with-no-operation",
 			tag:  string(SecretClassification),
