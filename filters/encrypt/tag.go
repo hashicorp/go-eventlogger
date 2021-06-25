@@ -22,6 +22,12 @@ func getClassificationFromTag(f reflect.StructTag, opt ...Option) *tagInfo {
 	return getClassificationFromTagString(t, opt...)
 }
 
+// getClassificationFromTagString takes a tag (as a string) and supports the
+// WithFilterOperations option. It will parse the tag string and determine its
+// DataClassification and Operation which will be returned in a tagInfo pointer.
+//
+// The default classification == UnknownOperation and the default operation ==
+// NoOperation. The classification and operation are delimited by a comma ","
 func getClassificationFromTagString(tag string, opt ...Option) *tagInfo {
 	const op = "node.getClassificationFromTagString"
 	segs := strings.Split(tag, ",") // will always return at least 1 segment

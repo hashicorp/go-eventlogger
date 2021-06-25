@@ -1,7 +1,6 @@
 package encrypt
 
 const (
-
 	// RedactedData is the value that replaces redacted data (secrets)
 	RedactedData = "<REDACTED>"
 

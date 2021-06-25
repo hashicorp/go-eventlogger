@@ -8,7 +8,9 @@ import (
 func getOpts(opt ...Option) options {
 	opts := getDefaultOptions()
 	for _, o := range opt {
-		o(&opts)
+		if o != nil {
+			o(&opts)
+		}
 	}
 	return opts
 }
