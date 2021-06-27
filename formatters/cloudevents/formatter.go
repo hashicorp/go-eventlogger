@@ -61,7 +61,7 @@ type CloudEvent struct {
 // format (See: https://github.com/cloudevents/spec)
 type Formatter struct {
 	// Source identifies the context where the events happen and is required.
-	Source url.URL
+	Source *url.URL
 
 	// Schema is the JSON schema for the event data (aka payload) and is optional
 	Schema *url.URL
@@ -75,11 +75,17 @@ var _ eventlogger.Node = &Formatter{}
 
 func (f *Formatter) validate() error {
 	const op = "cloudevents.(Formatter).validate"
-	if f.Source.String() == "" {
+	if f == nil {
+		return fmt.Errorf("%s: missing formatter: %w", op, eventlogger.ErrInvalidParameter)
+	}
+	if f.Source == nil || f.Source.String() == "" {
 		return fmt.Errorf("%s: missing source: %w", op, eventlogger.ErrInvalidParameter)
 	}
 	if err := f.Format.validate(); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
+	}
+	if f.Schema != nil && f.Schema.String() == "" {
+		return fmt.Errorf("%s: an empty schema is not valid: %w", op, eventlogger.ErrInvalidParameter)
 	}
 	return nil
 }
@@ -90,6 +96,9 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 	const op = "cloudevents.(Formatter).Process"
 	if err := f.validate(); err != nil {
 		return nil, fmt.Errorf("%s: invalid Formatter %w", op, err)
+	}
+	if e == nil {
+		return nil, fmt.Errorf("%s: missing event: %w", op, eventlogger.ErrInvalidParameter)
 	}
 
 	var data interface{}
