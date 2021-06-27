@@ -57,9 +57,9 @@ type CloudEvent struct {
 	Time time.Time `json:"time,omitempty"`
 }
 
-// JSONFormatter is a Node which formats the Event as a CloudEvent in JSON
+// Formatter is a Node which formats the Event as a CloudEvent in JSON
 // format (See: https://github.com/cloudevents/spec)
-type JSONFormatter struct {
+type Formatter struct {
 	// Source identifies the context where the events happen and is required.
 	Source url.URL
 
@@ -71,10 +71,10 @@ type JSONFormatter struct {
 	Format Format
 }
 
-var _ eventlogger.Node = &JSONFormatter{}
+var _ eventlogger.Node = &Formatter{}
 
-func (f *JSONFormatter) validate() error {
-	const op = "cloudevents.(JSONFormatter).validate"
+func (f *Formatter) validate() error {
+	const op = "cloudevents.(Formatter).validate"
 	if f.Source.String() == "" {
 		return fmt.Errorf("%s: missing source: %w", op, eventlogger.ErrInvalidParameter)
 	}
@@ -86,10 +86,10 @@ func (f *JSONFormatter) validate() error {
 
 // Process formats the Event as a cloudevent and stores that formatted data in
 // Event.Formatted with a key of "cloudevents-json" (cloudevents.FormatJSON)
-func (f *JSONFormatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
-	const op = "cloudevents.(JSONFormatter).Process"
+func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
+	const op = "cloudevents.(Formatter).Process"
 	if err := f.validate(); err != nil {
-		return nil, fmt.Errorf("%s: invalid JSONFormatter %w", op, err)
+		return nil, fmt.Errorf("%s: invalid Formatter %w", op, err)
 	}
 
 	var data interface{}
@@ -136,16 +136,16 @@ func (f *JSONFormatter) Process(ctx context.Context, e *eventlogger.Event) (*eve
 }
 
 // Reopen is a no op
-func (f *JSONFormatter) Reopen() error {
+func (f *Formatter) Reopen() error {
 	return nil
 }
 
 // Type describes the type of the node as a Formatter.
-func (f *JSONFormatter) Type() eventlogger.NodeType {
+func (f *Formatter) Type() eventlogger.NodeType {
 	return eventlogger.NodeTypeFormatter
 }
 
 // Name returns a representation of the Formatter's name
-func (f *JSONFormatter) Name() string {
+func (f *Formatter) Name() string {
 	return NodeName
 }
