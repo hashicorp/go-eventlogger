@@ -21,7 +21,7 @@ type ID interface {
 }
 
 type Data interface {
-	Data() string
+	Data() interface{}
 }
 
 type CloudEvent struct {
@@ -117,6 +117,10 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 	}
+	var schema string
+	if f.Schema != nil {
+		schema = f.Schema.String()
+	}
 
 	ce := CloudEvent{
 		ID:          id,
@@ -124,13 +128,13 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 		SpecVersion: SpecVersion,
 		Type:        string(e.Type),
 		Data:        data,
-		DataSchema:  f.Schema.String(),
+		DataSchema:  schema,
 		Time:        e.CreatedAt,
 	}
 	switch f.Format {
 	case FormatText, FormatUnspecified:
 		ce.DataContentType = DataContentTypeText
-
+		panic("not implemented")
 	default:
 		ce.DataContentType = DataContentTypeCloudEvents
 
