@@ -104,7 +104,7 @@ func TestFormatter_Process(t *testing.T) {
 			wantErrContains: "missing event",
 		},
 		{
-			name: "simple",
+			name: "simple-JSON",
 			f: &Formatter{
 				Source: testURL,
 				Schema: testURL,
@@ -159,6 +159,29 @@ func TestFormatter_Process(t *testing.T) {
 				Time:            now,
 			},
 		},
+		{
+			name: "simple-Text",
+			f: &Formatter{
+				Source: testURL,
+				Schema: testURL,
+				Format: FormatText,
+			},
+			e: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "test-string",
+			},
+			format: FormatText,
+			wantCloudEvent: CloudEvent{
+				Source:          testURL.String(),
+				DataSchema:      testURL.String(),
+				SpecVersion:     SpecVersion,
+				Type:            "test",
+				Data:            "test-string",
+				DataContentType: "text/plain",
+				Time:            now,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -181,7 +204,13 @@ func TestFormatter_Process(t *testing.T) {
 			if tt.wantCloudEvent.ID == "" {
 				tt.wantCloudEvent.ID = gotCloudEvent.ID
 			}
-			wantJSON, err := json.Marshal(tt.wantCloudEvent)
+			var wantJSON []byte
+			switch tt.format {
+			case FormatJSON:
+				wantJSON, err = json.Marshal(tt.wantCloudEvent)
+			case FormatText:
+				wantJSON, err = json.MarshalIndent(tt.wantCloudEvent, IndentWith, IndentWith)
+			}
 			require.NoError(err)
 			assert.JSONEq(string(wantJSON), string(gotFormatted))
 			t.Log(string(gotFormatted))
