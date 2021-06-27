@@ -14,6 +14,7 @@ import (
 const (
 	NodeName    = "cloudevents-formatter"
 	SpecVersion = "1.0"
+	IndentWith  = "  "
 )
 
 type ID interface {
@@ -132,18 +133,27 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 		Time:        e.CreatedAt,
 	}
 	switch f.Format {
-	case FormatText, FormatUnspecified:
-		ce.DataContentType = DataContentTypeText
-		panic("not implemented")
-	default:
+	case FormatJSON, FormatUnspecified:
 		ce.DataContentType = DataContentTypeCloudEvents
-
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
 		if err := enc.Encode(ce); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: error formatting as JSON: %w", op, err)
 		}
 		e.FormattedAs(string(FormatJSON), buf.Bytes())
+	case FormatText:
+		ce.DataContentType = DataContentTypeText
+		buf := &bytes.Buffer{}
+		enc := json.NewEncoder(buf)
+		enc.SetIndent(IndentWith, IndentWith)
+		if err := enc.Encode(ce); err != nil {
+			return nil, fmt.Errorf("%s: error formatting as text: %w", op, err)
+		}
+		e.FormattedAs(string(FormatText), buf.Bytes())
+	default:
+		// this should be unreachable since f.validate() should catch this error
+		// condition at the top of the function.
+		return nil, fmt.Errorf("%s: %s is not a supported format: %w", op, f.Format, eventlogger.ErrInvalidParameter)
 	}
 	return e, nil
 }
