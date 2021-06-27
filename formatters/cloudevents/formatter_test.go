@@ -2,8 +2,10 @@ package cloudevents
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/eventlogger"
 	"github.com/stretchr/testify/assert"
@@ -43,12 +45,14 @@ func TestFormatter_Process(t *testing.T) {
 	testURL, err := url.Parse("https://localhost")
 	require.NoError(t, err)
 
+	now := time.Now()
+
 	tests := []struct {
 		name            string
 		f               *Formatter
 		e               *eventlogger.Event
 		format          Format
-		wantFormatted   string
+		wantCloudEvent  CloudEvent
 		wantIsError     error
 		wantErrContains string
 	}{
@@ -99,6 +103,62 @@ func TestFormatter_Process(t *testing.T) {
 			wantIsError:     eventlogger.ErrInvalidParameter,
 			wantErrContains: "missing event",
 		},
+		{
+			name: "simple",
+			f: &Formatter{
+				Source: testURL,
+				Schema: testURL,
+				Format: FormatJSON,
+			},
+			e: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "test-string",
+			},
+			format: FormatJSON,
+			wantCloudEvent: CloudEvent{
+				Source:          testURL.String(),
+				DataSchema:      testURL.String(),
+				SpecVersion:     SpecVersion,
+				Type:            "test",
+				Data:            "test-string",
+				DataContentType: "application/cloudevents",
+				Time:            now,
+			},
+		},
+		{
+			name: "optional-interfaces",
+			f: &Formatter{
+				Source: testURL,
+				Format: FormatJSON,
+			},
+			e: &eventlogger.Event{
+				Type:      "optional-interfaces",
+				CreatedAt: now,
+				Payload: &testOptionalInterfaces{
+					payload: map[string]interface{}{
+						"id": "test-id",
+						"data": map[string]interface{}{
+							"name": "alice",
+							"dob":  now,
+						},
+					},
+				},
+			},
+			format: FormatJSON,
+			wantCloudEvent: CloudEvent{
+				ID:          "test-id",
+				Source:      testURL.String(),
+				SpecVersion: SpecVersion,
+				Type:        "optional-interfaces",
+				Data: map[string]interface{}{
+					"name": "alice",
+					"dob":  now,
+				},
+				DataContentType: "application/cloudevents",
+				Time:            now,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -114,9 +174,29 @@ func TestFormatter_Process(t *testing.T) {
 				}
 				return
 			}
-			gotFormatted, ok := gotEvent.Format(tt.wantFormatted)
+			gotFormatted, ok := gotEvent.Format(string(tt.format))
 			require.True(ok)
-			assert.Equal(tt.wantFormatted, gotFormatted)
+			var gotCloudEvent CloudEvent
+			require.NoError(json.Unmarshal(gotFormatted, &gotCloudEvent))
+			if tt.wantCloudEvent.ID == "" {
+				tt.wantCloudEvent.ID = gotCloudEvent.ID
+			}
+			wantJSON, err := json.Marshal(tt.wantCloudEvent)
+			require.NoError(err)
+			assert.JSONEq(string(wantJSON), string(gotFormatted))
+			t.Log(string(gotFormatted))
 		})
 	}
+}
+
+type testOptionalInterfaces struct {
+	payload map[string]interface{}
+}
+
+func (t *testOptionalInterfaces) ID() string {
+	return t.payload["id"].(string)
+}
+
+func (t *testOptionalInterfaces) Data() interface{} {
+	return t.payload["data"].(interface{})
 }
