@@ -209,7 +209,7 @@ func TestFormatter_Process(t *testing.T) {
 			case FormatJSON:
 				wantJSON, err = json.Marshal(tt.wantCloudEvent)
 			case FormatText:
-				wantJSON, err = json.MarshalIndent(tt.wantCloudEvent, IndentWith, IndentWith)
+				wantJSON, err = json.MarshalIndent(tt.wantCloudEvent, TextIndent, TextIndent)
 			}
 			require.NoError(err)
 			assert.JSONEq(string(wantJSON), string(gotFormatted))
