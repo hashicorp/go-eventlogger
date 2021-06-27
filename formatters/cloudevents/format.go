@@ -7,16 +7,19 @@ import (
 )
 
 const (
-	DataContentTypeCloudEvents = "application/cloudevents"
-	DataContentTypeText        = "text/plain"
+	DataContentTypeCloudEvents = "application/cloudevents" // the media type for FormatJSON cloudevent data
+	DataContentTypeText        = "text/plain"              // the media type for FormatText cloudevent data
 )
 
+// Format defines a type for the supported encoding formats used by
+// Formatter.Format and used when when calling eventlogger Event.Format(...)
+// from other nodes
 type Format string
 
 var (
-	FormatJSON        Format = "cloudevents-json"
-	FormatText        Format = "cloudevents-text"
-	FormatUnspecified Format = ""
+	FormatJSON        Format = "cloudevents-json" // JSON encoding which is accessible via Event.Format(...) in other nodes (like FileSinks)
+	FormatText        Format = "cloudevents-text" // Text encoding which is accessible via Event.Format(...) in other nodes (like FileSinks)
+	FormatUnspecified Format = ""                 // Unspecified format which defaults to FormatJSON
 )
 
 func (f Format) validate() error {

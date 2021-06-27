@@ -12,19 +12,32 @@ import (
 )
 
 const (
-	NodeName    = "cloudevents-formatter"
-	SpecVersion = "1.0"
-	IndentWith  = "  "
+	NodeName    = "cloudevents-formatter" // NodeName defines the name of Formatter nodes
+	SpecVersion = "1.0"                   // SpecVersion defines the cloudevents spec version supported
+	TextIndent  = "  "                    // TextIndent defines the prefix/indent used when encoding FormatText
 )
 
+// ID defines an optional single function interface that Event Payloads may
+// implement which returns the cloudevent ID for the event payload. If an Event
+// Payload doesn't implement this optional interface then a unique ID is
+// generated and used for the cloudevent's ID.
 type ID interface {
+	// ID returns the cloudevent ID
 	ID() string
 }
 
+// Data defines an optional single function interface that Event Payloads may
+// implement which returns the cloudevent data for the event payload. If an
+// Event doesn't implement this optional interface then the entire Event Payload
+// is used as the cloudevent data.
 type Data interface {
+	// Data returns the cloudevent Data.
 	Data() interface{}
 }
 
+// CloudEvent defines type which is used when formatting cloudevents.
+//
+// For more info on the fields see: https://github.com/cloudevents/spec)
 type CloudEvent struct {
 	// ID identifies the event, cannot be an empty and is required.  The
 	// combination of Source + ID must be unique.  Events with the same Source +
@@ -61,14 +74,15 @@ type CloudEvent struct {
 // Formatter is a Node which formats the Event as a CloudEvent in JSON
 // format (See: https://github.com/cloudevents/spec)
 type Formatter struct {
-	// Source identifies the context where the events happen and is required.
+	// Source identifies the context where the cloudevents happen and is
+	// required
 	Source *url.URL
 
-	// Schema is the JSON schema for the event data (aka payload) and is optional
+	// Schema is the JSON schema for the cloudevent data and is optional
 	Schema *url.URL
 
 	// Format defines the format created by the node.  If empty (unspecified),
-	// FormatJSON will be used.
+	// FormatJSON will be used
 	Format Format
 }
 
@@ -145,7 +159,7 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 		ce.DataContentType = DataContentTypeText
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
-		enc.SetIndent(IndentWith, IndentWith)
+		enc.SetIndent(TextIndent, TextIndent)
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as text: %w", op, err)
 		}
