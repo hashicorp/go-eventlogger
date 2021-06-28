@@ -1,4 +1,4 @@
-// cloudevents package includes a formatting Node which will transform and
+// Package cloudevents includes a formatting Node which will transform and
 // encode Events into JSON or Text which conforms to the cloudevents spec.
 //
 // For more information about cloudevents see:
