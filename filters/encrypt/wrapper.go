@@ -65,7 +65,7 @@ type EventWrapperInfo interface {
 // for a specific event.  The event must implement the WrapperPayload interface
 // for per event wrappers to be derived.
 func NewEventWrapper(wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper, error) {
-	const op = "node.deriveWrapper"
+	const op = "encrypt.NewEventWrapper"
 	if wrapper == nil {
 		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
 	}
@@ -108,7 +108,7 @@ func derivedKeyId(purpose derivedKeyPurpose, wrapperKeyId, eventId string) strin
 //	reader, _ := NewDerivedReader(wrapper, userId, jobId)
 // 	key := ed25519.GenerateKey(reader)
 func NewDerivedReader(wrapper wrapping.Wrapper, lenLimit int64, salt, info []byte) (*io.LimitedReader, error) {
-	const op = "kms.NewDerivedReader"
+	const op = "encrypt.NewDerivedReader"
 	if wrapper == nil {
 		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
 	}
