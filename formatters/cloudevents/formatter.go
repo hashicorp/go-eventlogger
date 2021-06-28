@@ -125,6 +125,9 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 	var id string
 	if i, ok := e.Payload.(ID); ok {
 		id = i.ID()
+		if id == "" {
+			return nil, fmt.Errorf("%s: returned ID() is empty: %w", op, eventlogger.ErrInvalidParameter)
+		}
 	} else {
 		var err error
 		id, err = newId()

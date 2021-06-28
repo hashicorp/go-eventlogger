@@ -160,6 +160,29 @@ func TestFormatter_Process(t *testing.T) {
 			},
 		},
 		{
+			name: "optional-interfaces",
+			f: &Formatter{
+				Source: testURL,
+				Format: FormatJSON,
+			},
+			e: &eventlogger.Event{
+				Type:      "optional-interfaces",
+				CreatedAt: now,
+				Payload: &testOptionalInterfaces{
+					payload: map[string]interface{}{
+						"id": "",
+						"data": map[string]interface{}{
+							"name": "alice",
+							"dob":  now,
+						},
+					},
+				},
+			},
+			format:          FormatJSON,
+			wantIsError:     eventlogger.ErrInvalidParameter,
+			wantErrContains: "returned ID() is empty",
+		},
+		{
 			name: "simple-Text",
 			f: &Formatter{
 				Source: testURL,
