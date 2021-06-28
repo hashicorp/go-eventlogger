@@ -65,7 +65,7 @@ type EventWrapperInfo interface {
 // for a specific event.  The event must implement the WrapperPayload interface
 // for per event wrappers to be derived.
 func NewEventWrapper(wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper, error) {
-	const op = "node.deriveWrapper"
+	const op = "encrypt.NewEventWrapper"
 	if wrapper == nil {
 		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
 	}
