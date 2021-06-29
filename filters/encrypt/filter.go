@@ -150,6 +150,9 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	payloadValue := reflect.ValueOf(e.Payload)
 	switch payloadValue.Kind() {
 	case reflect.Ptr, reflect.Interface:
+		if payloadValue.IsNil() { // be sure it's not a nil interface
+			return e, nil
+		}
 		payloadValue = reflect.ValueOf(e.Payload).Elem()
 	}
 

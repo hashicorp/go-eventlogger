@@ -51,6 +51,13 @@ func (t *testEventWrapperPayload) EventId() string  { return t.eventId }
 func (t *testEventWrapperPayload) HmacSalt() []byte { return t.salt }
 func (t *testEventWrapperPayload) HmacInfo() []byte { return t.info }
 
+type testNilInterface interface {
+	IsNil() bool
+}
+type testNilInterfaceStruct struct{}
+
+func (t *testNilInterfaceStruct) IsNil() bool { return true }
+
 func TestFilter_Process(t *testing.T) {
 	ctx := context.Background()
 	wrapper := encrypt.TestWrapper(t)
@@ -62,6 +69,10 @@ func TestFilter_Process(t *testing.T) {
 	}
 
 	testString := "test-string"
+
+	var nilInterface testNilInterface
+	var foobar *testNilInterfaceStruct
+	nilInterface = foobar
 
 	tests := []struct {
 		name            string
@@ -239,6 +250,36 @@ func TestFilter_Process(t *testing.T) {
 			},
 			setupWantEvent: func(e *eventlogger.Event) {
 				e.Payload.(*testPayloadStruct).SensitiveUserName = string(encrypt.TestDecryptValue(t, wrapper, []byte(e.Payload.(*testPayloadStruct).SensitiveUserName)))
+			},
+		},
+		{
+			name:   "nil-interface",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: struct {
+					Int    int
+					T      testNilInterface
+					SliceT []testNilInterface
+				}{
+					T:      nilInterface,
+					SliceT: []testNilInterface{nilInterface},
+					Int:    1,
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: struct {
+					Int    int
+					T      testNilInterface
+					SliceT []testNilInterface
+				}{
+					T:      nilInterface,
+					SliceT: []testNilInterface{nilInterface},
+					Int:    1,
+				},
 			},
 		},
 		{
