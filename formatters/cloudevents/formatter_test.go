@@ -3,6 +3,7 @@ package cloudevents
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"testing"
 	"time"
@@ -53,6 +54,7 @@ func TestFormatter_Process(t *testing.T) {
 		e               *eventlogger.Event
 		format          Format
 		wantCloudEvent  CloudEvent
+		wantText        string
 		wantIsError     error
 		wantErrContains string
 	}{
@@ -204,6 +206,16 @@ func TestFormatter_Process(t *testing.T) {
 				DataContentType: "text/plain",
 				Time:            now,
 			},
+			wantText: `{
+	"id": "%s",
+	"source": "https://localhost",
+	"specversion": "1.0",
+	"type": "test",
+	"data": "test-string",
+	"datacontentype": "text/plain",
+	"dataschema": "https://localhost",
+	"time": %s
+	}`,
 		},
 	}
 	for _, tt := range tests {
@@ -232,7 +244,15 @@ func TestFormatter_Process(t *testing.T) {
 			case FormatJSON:
 				wantJSON, err = json.Marshal(tt.wantCloudEvent)
 			case FormatText:
+				// test the raw JSON
+				jsonTime, err := gotCloudEvent.Time.MarshalJSON()
+				require.NoError(err)
+				wantRawJSON := []byte(fmt.Sprintf(tt.wantText, gotCloudEvent.ID, jsonTime))
+				assert.JSONEq(string(wantRawJSON), string(gotFormatted))
+
+				// test the marshaled JSON
 				wantJSON, err = json.MarshalIndent(tt.wantCloudEvent, TextIndent, TextIndent)
+				require.NoError(err)
 			}
 			require.NoError(err)
 			assert.JSONEq(string(wantJSON), string(gotFormatted))
