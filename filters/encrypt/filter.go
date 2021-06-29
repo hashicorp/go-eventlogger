@@ -41,8 +41,7 @@ type Filter struct {
 	// rotated with an event that has a payload satisfying the RotateWrapper
 	// interface.  If an event's payload satisfies the
 	// EventWrapperInfointerface, event specific HmacSalt will be used for
-	// operations on that
-	// specific event.
+	// operations on that specific event.
 	HmacInfo []byte
 
 	// FilterOperationOverrides provide an optional a set of runtime overrides
