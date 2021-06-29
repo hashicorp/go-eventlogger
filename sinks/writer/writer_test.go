@@ -15,7 +15,7 @@ func TestWriterSink_Process(t *testing.T) {
 	ctx := context.Background()
 
 	event := &eventlogger.Event{
-		Formatted: map[string][]byte{eventlogger.JSONFormat: []byte("first")},
+		Formatted: map[string][]byte{eventlogger.JSONFormat: []byte("first\n")},
 		Payload:   "First entry",
 	}
 
@@ -30,7 +30,7 @@ func TestWriterSink_Process(t *testing.T) {
 			name:   "simple",
 			writer: &bytes.Buffer{},
 			e:      event,
-			want:   "first",
+			want:   "first\n",
 		},
 		{
 			name:    "nil-writer",
