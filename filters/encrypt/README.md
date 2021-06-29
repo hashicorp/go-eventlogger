@@ -1,7 +1,7 @@
 # encrypt package
 
 The encrypt package implements a new Filter that supports filtering fields in an
-event payload using a custom tag named `classification`.
+event payload using a custom tag named `classified`.
 
 **tagged struct example**
 ```go
