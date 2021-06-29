@@ -207,15 +207,16 @@ func TestFormatter_Process(t *testing.T) {
 				Time:            now,
 			},
 			wantText: `{
-	"id": "%s",
-	"source": "https://localhost",
-	"specversion": "1.0",
-	"type": "test",
-	"data": "test-string",
-	"datacontentype": "text/plain",
-	"dataschema": "https://localhost",
-	"time": %s
-	}`,
+  "id": "%s",
+  "source": "https://localhost",
+  "specversion": "1.0",
+  "type": "test",
+  "data": "test-string",
+  "datacontentype": "text/plain",
+  "dataschema": "https://localhost",
+  "time": %s
+}
+`,
 		},
 	}
 	for _, tt := range tests {
@@ -247,8 +248,8 @@ func TestFormatter_Process(t *testing.T) {
 				// test the raw JSON
 				jsonTime, err := gotCloudEvent.Time.MarshalJSON()
 				require.NoError(err)
-				wantRawJSON := []byte(fmt.Sprintf(tt.wantText, gotCloudEvent.ID, jsonTime))
-				assert.JSONEq(string(wantRawJSON), string(gotFormatted))
+				wantRawText := []byte(fmt.Sprintf(tt.wantText, gotCloudEvent.ID, jsonTime))
+				assert.Equal(string(wantRawText), string(gotFormatted))
 
 				// test the marshaled JSON
 				wantJSON, err = json.MarshalIndent(tt.wantCloudEvent, TextIndent, TextIndent)

@@ -162,7 +162,7 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 		ce.DataContentType = DataContentTypeText
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
-		enc.SetIndent(TextIndent, TextIndent)
+		enc.SetIndent("", TextIndent)
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as text: %w", op, err)
 		}
