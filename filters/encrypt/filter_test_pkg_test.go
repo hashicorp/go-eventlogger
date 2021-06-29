@@ -415,7 +415,7 @@ func TestFilter_Process(t *testing.T) {
 			testEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload:   nil,
+				Payload:   testString,
 			},
 			wantErrIs:       encrypt.ErrInvalidParameter,
 			wantErrContains: "missing wrapper",

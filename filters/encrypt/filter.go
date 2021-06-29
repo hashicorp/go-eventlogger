@@ -158,14 +158,16 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 
 	taggedInterface, isTaggable := payloadValue.Interface().(Taggable)
 
+	// make a copy of the overrides before we begin processing this event, which
+	// will give us a consistent set of overrides for this event.
+	filterOverrides := ef.copyFilterOperationOverrides()
+
 	switch {
 	case pType == reflect.TypeOf("") || pType == reflect.TypeOf([]uint8{}):
 		if !payloadValue.CanSet() {
 			return nil, fmt.Errorf("%s: unable to redact string payload (not setable): %w", op, ErrInvalidParameter)
 		}
-		ef.l.RLock()
-		classificationTag := getClassificationFromTagString(string(SecretClassification), withFilterOperations(ef.FilterOperationOverrides))
-		ef.l.RUnlock()
+		classificationTag := getClassificationFromTagString(string(SecretClassification), withFilterOperations(filterOverrides))
 		if err := ef.filterValue(ctx, payloadValue, classificationTag, opts...); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
@@ -177,9 +179,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		switch {
 		// if the field is a slice of string or slice of []byte
 		case pType == reflect.TypeOf([]string{}) || pType == reflect.TypeOf([]*string{}) || pType == reflect.TypeOf([][]uint8{}):
-			ef.l.RLock()
-			classificationTag := getClassificationFromTagString(string(SecretClassification), withFilterOperations(ef.FilterOperationOverrides))
-			ef.l.RUnlock()
+			classificationTag := getClassificationFromTagString(string(SecretClassification), withFilterOperations(filterOverrides))
 			if err := ef.filterSlice(ctx, classificationTag, payloadValue, opts...); err != nil {
 				return nil, fmt.Errorf("%s: %w", op, err)
 			}
@@ -193,22 +193,35 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 				if f.Kind() != reflect.Struct {
 					continue
 				}
-				if err := ef.filterField(ctx, f, opts...); err != nil {
+				if err := ef.filterField(ctx, f, filterOverrides, opts...); err != nil {
 					return nil, fmt.Errorf("%s: %w", op, err)
 				}
 			}
 		}
 	case pKind == reflect.Struct:
-		if err := ef.filterField(ctx, payloadValue, opts...); err != nil {
+		if err := ef.filterField(ctx, payloadValue, filterOverrides, opts...); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 	}
 	return e, nil
 }
 
+func (ef *Filter) copyFilterOperationOverrides() map[DataClassification]FilterOperation {
+	if ef.FilterOperationOverrides == nil {
+		return nil
+	}
+	ef.l.RLock()
+	defer ef.l.RUnlock()
+	cp := map[DataClassification]FilterOperation{}
+	for k, v := range ef.FilterOperationOverrides {
+		cp[k] = v
+	}
+	return cp
+}
+
 // filterField will recursively iterate over all the fields for a struct value
 // and filter them based on their DataClassification
-func (ef *Filter) filterField(ctx context.Context, v reflect.Value, opt ...Option) error {
+func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverrides map[DataClassification]FilterOperation, opt ...Option) error {
 	const op = "event.(Filter).filterField"
 	// check for nil value (prevent panics)
 	if v == reflect.ValueOf(nil) {
@@ -239,9 +252,7 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, opt ...Optio
 		switch {
 		// if the field is a string or []byte then we just need to sanitize it
 		case ftype == reflect.TypeOf("") || ftype == reflect.TypeOf([]uint8{}):
-			ef.l.RLock() // passing a ref to the FilterOperationOverrides map
-			classificationTag := getClassificationFromTag(v.Type().Field(i).Tag, withFilterOperations(ef.FilterOperationOverrides))
-			ef.l.RUnlock()
+			classificationTag := getClassificationFromTag(v.Type().Field(i).Tag, withFilterOperations(filterOverrides))
 			if err := ef.filterValue(ctx, field, classificationTag, opt...); err != nil {
 				return fmt.Errorf("%s: %w", op, err)
 			}
@@ -250,9 +261,7 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, opt ...Optio
 			switch {
 			// if the field is a slice of string or slice of []byte
 			case ftype == reflect.TypeOf([]string{}) || ftype == reflect.TypeOf([][]uint8{}):
-				ef.l.RLock() // passing a ref to the FilterOperationOverrides map
-				classificationTag := getClassificationFromTag(v.Type().Field(i).Tag, withFilterOperations(ef.FilterOperationOverrides))
-				ef.l.RUnlock()
+				classificationTag := getClassificationFromTag(v.Type().Field(i).Tag, withFilterOperations(filterOverrides))
 				if err := ef.filterSlice(ctx, classificationTag, field, opt...); err != nil {
 					return err
 				}
@@ -266,14 +275,14 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, opt ...Optio
 					if f.Kind() != reflect.Struct {
 						continue
 					}
-					if err := ef.filterField(ctx, f, opt...); err != nil {
+					if err := ef.filterField(ctx, f, filterOverrides, opt...); err != nil {
 						return err
 					}
 				}
 			}
 		// if the field is a struct
 		case fkind == reflect.Struct:
-			if err := ef.filterField(ctx, field, opt...); err != nil {
+			if err := ef.filterField(ctx, field, filterOverrides, opt...); err != nil {
 				return err
 			}
 
