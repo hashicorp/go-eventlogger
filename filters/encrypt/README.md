@@ -7,14 +7,14 @@ event payload using a custom tag named `classification`.
 ```go
 type testPayloadStruct struct {
     Public    string `classified:"public"`
-	Sensitive string `classified:"sensitive"`
+    Sensitive string `classified:"sensitive"`
     Secret    []byte `classified:"secret"`
 }
 
 ```
 
 encrypt.Filter supports filtering the following struct field types within an
-event payload, when they are tagged with a `classification` tag:
+event payload, when they are tagged with a `classified` tag:
 * `string`
 * `[]string`
 * `[]byte`
