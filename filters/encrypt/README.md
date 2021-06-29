@@ -7,7 +7,7 @@ event payload using a custom tag named `classified`.
 ```go
 type testPayloadStruct struct {
     Public    string `classified:"public"`
-    Sensitive string `classified:"sensitive"`
+    Sensitive string `classified:"sensitive,redact"` // example of classification,operation
     Secret    []byte `classified:"secret"`
 }
 
