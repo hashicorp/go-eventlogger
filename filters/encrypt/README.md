@@ -73,7 +73,11 @@ The Filter node will contain an optional field:
 
 This map can provide an optional set of runtime overrides for the FilterOperations to be applied to DataClassifications.
 
-Normally, the filter operation applied to a field is determined by the operation specified in its classified tag. If no operation is specified in the tag, then a set of reasonable default filter operations are applied. FilterOperationOverrides provides the ability to override an event's "classified" tag settings.
+Normally, the filter operation applied to a field is determined by the operation
+specified in its classified tag. If no operation is specified in the tag, then a
+set of reasonable default filter operations are applied. 
+
+FilterOperationOverrides provides the ability to override an event's "classified" tag settings.
 
 
 # Default filter operations
