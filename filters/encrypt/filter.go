@@ -467,7 +467,7 @@ func (ef *Filter) encrypt(ctx context.Context, data []byte, opt ...Option) (stri
 }
 
 func (ef *Filter) hmacSha256(ctx context.Context, data []byte, opt ...Option) (string, error) {
-	const op = "event.(Filter).hmacField"
+	const op = "event.(Filter).hmacSha256"
 	if data == nil {
 		return "", fmt.Errorf("%s: missing data: %w", op, ErrInvalidParameter)
 	}
