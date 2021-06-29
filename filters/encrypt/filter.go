@@ -40,7 +40,7 @@ type Filter struct {
 	// Info for deriving a hmac-sha256 operations key (can be nil). This may be
 	// rotated with an event that has a payload satisfying the RotateWrapper
 	// interface.  If an event's payload satisfies the
-	// EventWrapperInfointerface, event specific HmacSalt will be used for
+	// EventWrapperInfo interface, event specific HmacInfo will be used for
 	// operations on that specific event.
 	HmacInfo []byte
 
