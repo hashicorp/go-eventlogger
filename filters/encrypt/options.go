@@ -31,18 +31,21 @@ func getDefaultOptions() options {
 	return options{}
 }
 
+// WithWrapper defines an optional wrapper.
 func WithWrapper(wrapper wrapping.Wrapper) Option {
 	return func(o *options) {
 		o.withWrapper = wrapper
 	}
 }
 
+// WithSalt defines optional salt.
 func WithSalt(salt []byte) Option {
 	return func(o *options) {
 		o.withSalt = salt
 	}
 }
 
+// WithInfo defines optional info.
 func WithInfo(info []byte) Option {
 	return func(o *options) {
 		o.withInfo = info
