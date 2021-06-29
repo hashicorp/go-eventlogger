@@ -1,7 +1,10 @@
 # encrypt package
 
 The encrypt package implements a new Filter that supports filtering fields in an
-event payload using a custom tag named `classified`.
+event payload using a custom tag named `classified`.  This new tag supports two
+fields. The first field tag is the classification of the data (valid values are
+public, sensitive and secret).  The second field is an optional filter operation
+to apply (valid values are redact, encrypt, hmac-sha256).
 
 **tagged struct example**
 ```go
