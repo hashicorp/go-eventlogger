@@ -104,6 +104,10 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	if e == nil {
 		return nil, fmt.Errorf("%s: missing event: %w", op, ErrInvalidParameter)
 	}
+	if e.Payload == nil {
+		return e, nil
+	}
+
 	if i, ok := e.Payload.(RotateWrapper); ok {
 		ef.l.Lock()
 		defer ef.l.Unlock()
@@ -121,7 +125,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		return nil, nil
 	}
 
-	var opts []Option
+	opts := make([]Option, 0, 3)
 	var optWrapper wrapping.Wrapper
 	if i, ok := e.Payload.(EventWrapperInfo); ok {
 		ef.l.RLock()
@@ -138,10 +142,6 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 
 	if ef.Wrapper == nil && optWrapper == nil {
 		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
-	}
-
-	if e.Payload == nil {
-		return e, nil
 	}
 
 	// Get both the value and the type of what the payload points to. Value is
