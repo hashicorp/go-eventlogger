@@ -6,7 +6,7 @@ const (
 
 	// DataClassificationTagName is the tag name for classifying data into
 	// DataClassification's
-	DataClassificationTagName = "classified"
+	DataClassificationTagName = "classification"
 )
 
 // DataClassification defines a type for classification of data into categories

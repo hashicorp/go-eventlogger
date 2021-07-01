@@ -13,8 +13,8 @@ import (
 )
 
 type testPayloadStruct struct {
-	PublicId          string `classified:"public"`
-	SensitiveUserName string `classified:"sensitive"`
+	PublicId          string `classification:"public"`
+	SensitiveUserName string `classification:"sensitive"`
 	LoginTimestamp    time.Time
 	TaggedMap         encrypt.TestTaggedMap
 }
@@ -22,12 +22,12 @@ type testPayloadStruct struct {
 type testPayload struct {
 	notExported       string
 	NotTagged         string
-	SensitiveRedacted []byte `classified:"sensitive,redact"`
+	SensitiveRedacted []byte `classification:"sensitive,redact"`
 	StructPtr         *testPayloadStruct
 	StructValue       testPayloadStruct
 	StructPtrSlice    []*testPayloadStruct
 	StructValueSlice  []testPayloadStruct
-	Keys              [][]byte `classified:"secret"`
+	Keys              [][]byte `classification:"secret"`
 }
 
 type testWrapperPayload struct {

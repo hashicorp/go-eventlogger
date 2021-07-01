@@ -90,15 +90,15 @@ func (t TestTaggedMap) Tags() ([]PointerTag, error) {
 }
 
 type testUserInfo struct {
-	PublicId          string `classified:"public"`
-	SensitiveUserName string `classified:"sensitive"`
+	PublicId          string `classification:"public"`
+	SensitiveUserName string `classification:"sensitive"`
 	LoginTimestamp    time.Time
 }
 
 type testPayload struct {
 	notExported       string
 	NotTagged         string
-	SensitiveRedacted []byte `classified:"sensitive,redact"`
+	SensitiveRedacted []byte `classification:"sensitive,redact"`
 	UserInfo          *testUserInfo
-	Keys              [][]byte `classified:"secret"`
+	Keys              [][]byte `classification:"secret"`
 }

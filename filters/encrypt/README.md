@@ -1,7 +1,7 @@
 # encrypt package
 
 The encrypt package implements a new Filter that supports filtering fields in an
-event payload using a custom tag named `classified`.  This new tag supports two
+event payload using a custom tag named `classification`.  This new tag supports two
 fields. The first field tag is the classification of the data (valid values are
 public, sensitive and secret).  The second field is an optional filter operation
 to apply (valid values are redact, encrypt, hmac-sha256).
@@ -9,15 +9,15 @@ to apply (valid values are redact, encrypt, hmac-sha256).
 **tagged struct example**
 ```go
 type testPayloadStruct struct {
-    Public    string `classified:"public"`
-    Sensitive string `classified:"sensitive,redact"` // example of classification,operation
-    Secret    []byte `classified:"secret"`
+    Public    string `classification:"public"`
+    Sensitive string `classification:"sensitive,redact"` // example of classification,operation
+    Secret    []byte `classification:"secret"`
 }
 
 ```
 
 encrypt.Filter supports filtering the following struct field types within an
-event payload, when they are tagged with a `classified` tag:
+event payload, when they are tagged with a `classification` tag:
 * `string`
 * `[]string`
 * `[]byte`
@@ -77,10 +77,10 @@ The Filter node will contain an optional field:
 This map can provide an optional set of runtime overrides for the FilterOperations to be applied to DataClassifications.
 
 Normally, the filter operation applied to a field is determined by the operation
-specified in its classified tag. If no operation is specified in the tag, then a
+specified in its classification tag. If no operation is specified in the tag, then a
 set of reasonable default filter operations are applied. 
 
-FilterOperationOverrides provides the ability to override an event's "classified" tag settings.
+FilterOperationOverrides provides the ability to override an event's "classification" tag settings.
 
 
 # Default filter operations
