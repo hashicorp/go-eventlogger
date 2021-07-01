@@ -2,12 +2,12 @@ package encrypt
 
 import (
 	"context"
-	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"sync"
 
@@ -332,9 +332,13 @@ func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, _ ...Option) e
 // filterSlice will filter a slice reflect.Value
 func (ef *Filter) filterSlice(ctx context.Context, classificationTag *tagInfo, slice reflect.Value, opt ...Option) error {
 	const op = "event.(Filter).filterSlice"
-	if classificationTag == nil {
+	switch {
+	case classificationTag == nil:
 		return fmt.Errorf("%s: missing classification tag: %w", op, ErrInvalidParameter)
+	case classificationTag.Classification == PublicClassification:
+		return nil
 	}
+
 	// check for nil value (prevent panics)
 	if slice == reflect.ValueOf(nil) {
 		return nil
@@ -348,9 +352,7 @@ func (ef *Filter) filterSlice(ctx context.Context, classificationTag *tagInfo, s
 	if ftype != reflect.TypeOf([]string{}) && ftype != reflect.TypeOf([]*string{}) && ftype != reflect.TypeOf([][]uint8{}) {
 		return fmt.Errorf("%s: slice parameter is not a []string or [][]byte: (%s): %w", op, slice.String(), ErrInvalidParameter)
 	}
-	if classificationTag.Classification == PublicClassification {
-		return nil
-	}
+
 	if slice.Len() == 0 {
 		return nil
 	}
@@ -366,8 +368,12 @@ func (ef *Filter) filterSlice(ctx context.Context, classificationTag *tagInfo, s
 // filterValue will filter a value based on it's DataClassification
 func (ef *Filter) filterValue(ctx context.Context, fv reflect.Value, classificationTag *tagInfo, opt ...Option) error {
 	const op = "event.(Filter).filterValue"
-	if classificationTag == nil {
+	switch {
+	case classificationTag == nil:
 		return fmt.Errorf("%s: missing classification tag: %w", op, ErrInvalidParameter)
+	case classificationTag.Classification == PublicClassification:
+		return nil
+
 	}
 
 	// check for nil value (prevent panics)
@@ -396,8 +402,8 @@ func (ef *Filter) filterValue(ctx context.Context, fv reflect.Value, classificat
 	}
 
 	switch classificationTag.Classification {
-	case PublicClassification:
-		return nil
+	// case PublicClassification is handled at the top of the function, so it's
+	// not included in this switch.
 	case SecretClassification, SensitiveClassification:
 		var raw []byte
 		switch {
@@ -521,9 +527,13 @@ func (ef *Filter) hmacSha256(ctx context.Context, data []byte, opt ...Option) (s
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
-	key, _, err := ed25519.GenerateKey(reader)
+	key := make([]byte, 32)
+	n, err := io.ReadFull(reader, key)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
+	}
+	if n != 32 {
+		return "", fmt.Errorf("%s: expected to read 32 bytes and got: %d", op, n)
 	}
 	mac := hmac.New(sha256.New, key)
 	_, _ = mac.Write(data)
