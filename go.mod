@@ -6,6 +6,7 @@ require (
 	github.com/go-test/deep v1.0.4
 	github.com/hashicorp/go-kms-wrapping v0.6.2
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/hashicorp/vault/sdk v0.2.0
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/mitchellh/pointerstructure v1.2.0
 	github.com/stretchr/testify v1.7.0
