@@ -3,11 +3,11 @@ package encrypt
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"io"
 	"testing"
 	"time"
 
@@ -61,8 +61,11 @@ func TestHmacSha256(t *testing.T, data []byte, w wrapping.Wrapper, salt, info []
 	require := require.New(t)
 	reader, err := NewDerivedReader(w, 32, salt, info)
 	require.NoError(err)
-	key, _, err := ed25519.GenerateKey(reader)
+
+	key := make([]byte, 32)
+	n, err := io.ReadFull(reader, key)
 	require.NoError(err)
+	require.Equal(32, n)
 
 	mac := hmac.New(sha256.New, key)
 	_, _ = mac.Write(data)
