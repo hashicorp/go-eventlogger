@@ -1,4 +1,4 @@
-package eventlogger_test
+package gated_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/eventlogger/sinks/writer"
 )
 
-func ExampleGatedFilter() {
+func ExampleFilter() {
 	then := time.Date(
 		2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
 	// Create a broker
@@ -55,6 +55,13 @@ func ExampleGatedFilter() {
 		// handle error
 	}
 
+	// ensure errors are returned if any of the nodes return an error while
+	// processing an event, since the event won't be written to the sink. This
+	// is possible if you don't have a Filter that filters out events.
+	if err := b.SetSuccessThreshold(et, 1); err != nil {
+		// handle err
+	}
+
 	// define a common event ID for a set of events we want gated together.
 	eventID := "event-1"
 	payloads := []*gated.Payload{
@@ -91,8 +98,10 @@ func ExampleGatedFilter() {
 	ctx := context.Background()
 	for _, p := range payloads {
 		// Send our gated event payloads
-		if _, err := b.Send(ctx, et, p); err != nil {
-			// handle err
+		if status, err := b.Send(ctx, et, p); err != nil {
+			// handle err and status.Warnings
+			fmt.Println("err: ", err)
+			fmt.Println("warnings: ", status.Warnings)
 		}
 	}
 

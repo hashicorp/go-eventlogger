@@ -62,6 +62,13 @@ func ExampleFilter() {
 		panic(err)
 	}
 
+	// ensure errors are returned if any of the nodes return an error while
+	// processing an event, since the event won't be written to the sink.  This
+	// is possible if you don't have a Filter that filters out events.
+	if err := b.SetSuccessThreshold(et, 1); err != nil {
+		// handle err
+	}
+
 	p := &struct {
 		NoClassification string
 		Public           string `classification:"public"`
@@ -76,8 +83,10 @@ func ExampleFilter() {
 
 	ctx := context.Background()
 
-	if _, err := b.Send(ctx, et, p); err != nil {
-		panic(err)
+	if status, err := b.Send(ctx, et, p); err != nil {
+		// handle err and status.Warnings
+		fmt.Println("err: ", err)
+		fmt.Println("warnings: ", status.Warnings)
 	}
 
 	// Output:
