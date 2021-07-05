@@ -49,13 +49,6 @@ func ExampleSink() {
 		// handle error
 	}
 
-	// ensure errors are returned if any of the nodes return an error while
-	// processing an event, since the event won't be written to the sink. This
-	// is possible if you don't have a Filter that filters out events.
-	if err := b.SetSuccessThreshold(et, 1); err != nil {
-		// handle err
-	}
-
 	p := map[string]interface{}{
 		"name":      "bob",
 		"role":      "user",

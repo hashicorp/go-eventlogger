@@ -59,12 +59,6 @@ func ExampleFormatter() {
 		// handle error
 	}
 
-	// ensure errors are returned if any of the nodes return an error while
-	// processing an event, since the event won't be written to the sink.
-	if err := b.SetSuccessThreshold(et, 1); err != nil {
-		// handle err
-	}
-
 	p := &testPayload{
 		payload: map[string]interface{}{
 			"id": "test-id",
