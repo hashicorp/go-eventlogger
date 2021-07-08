@@ -48,12 +48,12 @@ type Filter struct {
 	// for the FilterOperations to be applied to DataClassifications.
 	//
 	// Normally, the filter operation applied to a field is determined by the
-	// operation specified in it's "classification" tag. If no operation is
+	// operation specified in it's "class" tag. If no operation is
 	// specified in the tag, then a set of reasonable default filter operations
 	// are applied.
 	//
 	// FilterOperationOverrides provides the ability to override an event's
-	// "classification" tag settings.
+	// "class" tag settings.
 	FilterOperationOverrides map[DataClassification]FilterOperation
 
 	l sync.RWMutex
