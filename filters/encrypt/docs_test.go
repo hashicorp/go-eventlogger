@@ -76,8 +76,10 @@ func ExampleFilter() {
 
 	ctx := context.Background()
 
-	if _, err := b.Send(ctx, et, p); err != nil {
-		panic(err)
+	if status, err := b.Send(ctx, et, p); err != nil {
+		// handle err and status.Warnings
+		fmt.Println("err: ", err)
+		fmt.Println("warnings: ", status.Warnings)
 	}
 
 	// Output:

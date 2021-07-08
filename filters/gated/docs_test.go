@@ -1,4 +1,4 @@
-package eventlogger_test
+package gated_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/eventlogger/sinks/writer"
 )
 
-func ExampleGatedFilter() {
+func ExampleFilter() {
 	then := time.Date(
 		2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
 	// Create a broker
@@ -91,8 +91,10 @@ func ExampleGatedFilter() {
 	ctx := context.Background()
 	for _, p := range payloads {
 		// Send our gated event payloads
-		if _, err := b.Send(ctx, et, p); err != nil {
-			// handle err
+		if status, err := b.Send(ctx, et, p); err != nil {
+			// handle err and status.Warnings
+			fmt.Println("err: ", err)
+			fmt.Println("warnings: ", status.Warnings)
 		}
 	}
 
