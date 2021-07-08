@@ -13,34 +13,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFormatter_Type(t *testing.T) {
+func TestFormatterFilter_Type(t *testing.T) {
 	t.Parallel()
 	t.Run("assert-type", func(t *testing.T) {
 		assert := assert.New(t)
-		f := Formatter{}
-		assert.Equal(eventlogger.NodeTypeFormatter, f.Type())
+		f := FormatterFilter{}
+		assert.Equal(eventlogger.NodeTypeFormatterFilter, f.Type())
 	})
 }
 
-func TestFormatter_Name(t *testing.T) {
+func TestFormatterFilter_Name(t *testing.T) {
 	t.Parallel()
 	t.Run("assert-name", func(t *testing.T) {
 		assert := assert.New(t)
-		f := Formatter{}
+		f := FormatterFilter{}
 		assert.Equal(NodeName, f.Name())
 	})
 }
 
-func TestFormatter_Reopen(t *testing.T) {
+func TestFormatterFilter_Reopen(t *testing.T) {
 	t.Parallel()
 	t.Run("assert-no-error", func(t *testing.T) {
 		assert := assert.New(t)
-		f := Formatter{}
+		f := FormatterFilter{}
 		assert.NoError(f.Reopen())
 	})
 }
 
-func TestFormatter_Process(t *testing.T) {
+func TestFormatterFilter_Process(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	testURL, err := url.Parse("https://localhost")
@@ -50,28 +50,28 @@ func TestFormatter_Process(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		f               *Formatter
+		f               *FormatterFilter
 		e               *eventlogger.Event
 		format          Format
-		wantCloudEvent  CloudEvent
+		wantCloudEvent  *CloudEvent
 		wantText        string
 		wantIsError     error
 		wantErrContains string
 	}{
 		{
-			name:            "missing-formatter",
+			name:            "missing-formatter-filter",
 			wantIsError:     eventlogger.ErrInvalidParameter,
-			wantErrContains: "missing formatter",
+			wantErrContains: "missing formatter filter",
 		},
 		{
 			name:            "missing-source-nil",
-			f:               &Formatter{},
+			f:               &FormatterFilter{},
 			wantIsError:     eventlogger.ErrInvalidParameter,
 			wantErrContains: "missing source",
 		},
 		{
 			name: "missing-source-empty",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: &url.URL{},
 			},
 			wantIsError:     eventlogger.ErrInvalidParameter,
@@ -79,7 +79,7 @@ func TestFormatter_Process(t *testing.T) {
 		},
 		{
 			name: "invalid-format",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: testURL,
 				Format: "invaid",
 				Schema: testURL,
@@ -89,7 +89,7 @@ func TestFormatter_Process(t *testing.T) {
 		},
 		{
 			name: "empty-schema",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: testURL,
 				Format: FormatJSON,
 				Schema: &url.URL{},
@@ -99,7 +99,7 @@ func TestFormatter_Process(t *testing.T) {
 		},
 		{
 			name: "missing-event",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: testURL,
 			},
 			wantIsError:     eventlogger.ErrInvalidParameter,
@@ -107,7 +107,7 @@ func TestFormatter_Process(t *testing.T) {
 		},
 		{
 			name: "simple-JSON",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: testURL,
 				Schema: testURL,
 				Format: FormatJSON,
@@ -118,7 +118,7 @@ func TestFormatter_Process(t *testing.T) {
 				Payload:   "test-string",
 			},
 			format: FormatJSON,
-			wantCloudEvent: CloudEvent{
+			wantCloudEvent: &CloudEvent{
 				Source:          testURL.String(),
 				DataSchema:      testURL.String(),
 				SpecVersion:     SpecVersion,
@@ -129,8 +129,43 @@ func TestFormatter_Process(t *testing.T) {
 			},
 		},
 		{
+			name: "filter-no-error",
+			f: &FormatterFilter{
+				Source: testURL,
+				Schema: testURL,
+				Format: FormatJSON,
+				Predicate: func(cloudevent interface{}) (bool, error) {
+					return false, nil
+				},
+			},
+			e: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "test-string",
+			},
+			format: FormatJSON,
+		},
+		{
+			name: "filter-with-error",
+			f: &FormatterFilter{
+				Source: testURL,
+				Schema: testURL,
+				Format: FormatJSON,
+				Predicate: func(cloudevent interface{}) (bool, error) {
+					return false, eventlogger.ErrInvalidParameter
+				},
+			},
+			e: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "test-string",
+			},
+			format:      FormatJSON,
+			wantIsError: eventlogger.ErrInvalidParameter,
+		},
+		{
 			name: "optional-interfaces",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: testURL,
 				Format: FormatJSON,
 			},
@@ -148,7 +183,7 @@ func TestFormatter_Process(t *testing.T) {
 				},
 			},
 			format: FormatJSON,
-			wantCloudEvent: CloudEvent{
+			wantCloudEvent: &CloudEvent{
 				ID:          "test-id",
 				Source:      testURL.String(),
 				SpecVersion: SpecVersion,
@@ -163,7 +198,7 @@ func TestFormatter_Process(t *testing.T) {
 		},
 		{
 			name: "optional-interfaces",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: testURL,
 				Format: FormatJSON,
 			},
@@ -186,7 +221,7 @@ func TestFormatter_Process(t *testing.T) {
 		},
 		{
 			name: "simple-Text",
-			f: &Formatter{
+			f: &FormatterFilter{
 				Source: testURL,
 				Schema: testURL,
 				Format: FormatText,
@@ -197,7 +232,7 @@ func TestFormatter_Process(t *testing.T) {
 				Payload:   "test-string",
 			},
 			format: FormatText,
-			wantCloudEvent: CloudEvent{
+			wantCloudEvent: &CloudEvent{
 				Source:          testURL.String(),
 				DataSchema:      testURL.String(),
 				SpecVersion:     SpecVersion,
@@ -231,6 +266,10 @@ func TestFormatter_Process(t *testing.T) {
 				if tt.wantErrContains != "" {
 					assert.Contains(err.Error(), tt.wantErrContains)
 				}
+				return
+			}
+			if tt.wantCloudEvent == nil {
+				assert.Nil(gotEvent)
 				return
 			}
 			gotFormatted, ok := gotEvent.Format(string(tt.format))
