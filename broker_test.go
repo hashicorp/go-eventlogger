@@ -27,7 +27,6 @@ func nodesToNodeIDs(t *testing.T, broker *Broker, nodes ...Node) []NodeID {
 }
 
 func TestBroker(t *testing.T) {
-
 	// Filter out the purple nodes
 	filter := &Filter{
 		Predicate: func(e *Event) (bool, error) {
@@ -39,8 +38,8 @@ func TestBroker(t *testing.T) {
 	formatter := &JSONFormatter{}
 
 	formatterFilter := &JSONFormatterFilter{
-		Predicate: func(e *Event) (bool, error) {
-			color, ok := e.Payload.(map[string]interface{})["color"]
+		Predicate: func(e interface{}) (bool, error) {
+			color, ok := e.(*Event).Payload.(map[string]interface{})["color"]
 			return !ok || color != "purple", nil
 		},
 	}
@@ -144,7 +143,6 @@ func TestBroker(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestPipeline(t *testing.T) {

@@ -12,13 +12,14 @@ import (
 // is useful when you want to specify filters based on structure of the
 // formatted JSON vs the structure of the event.
 type JSONFormatterFilter struct {
-	Predicate Predicate
+	Predicate func(e interface{}) (bool, error)
 }
 
 var _ Node = &JSONFormatterFilter{}
 
 // Process formats the Event as JSON and stores that formatted data in
-// Event.Formatted with a key of "json"
+// Event.Formatted with a key of "json" and then may filter the event based on
+// the struct used to format the JSON.
 func (w *JSONFormatterFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
