@@ -28,7 +28,7 @@ func Test_getClassificationFromTag(t *testing.T) {
 			name: "sensitive-redact",
 			st: func() reflect.StructTag {
 				s := struct {
-					name string `classification:"sensitive,redact"`
+					name string `class:"sensitive,redact"`
 				}{}
 				return reflect.TypeOf(s).Field(0).Tag
 			}(),
