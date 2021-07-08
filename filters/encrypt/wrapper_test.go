@@ -56,7 +56,6 @@ func Test_NewEventWrapper(t *testing.T) {
 			assert.Equal(derivedKeyId(derivedKeyPurposeEvent, tt.wrapper.KeyID(), tt.eventId), got.KeyID())
 		})
 	}
-
 }
 
 func Test_derivedKeyPurpose_String(t *testing.T) {
