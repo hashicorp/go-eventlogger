@@ -64,9 +64,9 @@ func ExampleFilter() {
 
 	p := &struct {
 		NoClassification string
-		Public           string `classification:"public"`
-		Sensitive        string `classification:"sensitive,redact"`
-		Secret           string `classification:"secret,redact"`
+		Public           string `class:"public"`
+		Sensitive        string `class:"sensitive,redact"`
+		Secret           string `class:"secret,redact"`
 	}{
 		NoClassification: "no classification",
 		Public:           "public",
