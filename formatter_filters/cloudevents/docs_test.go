@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/eventlogger"
-	"github.com/hashicorp/eventlogger/formatters/cloudevents"
+	"github.com/hashicorp/eventlogger/formatter_filters/cloudevents"
 	"github.com/hashicorp/eventlogger/sinks/writer"
 )
 
