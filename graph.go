@@ -146,8 +146,8 @@ func (g *graph) doValidate(parent, node *linkedNode) error {
 		return fmt.Errorf("non-sink node has no children")
 	case !isInner && parent == nil:
 		return fmt.Errorf("sink node at root")
-	case !isInner && parent.node.Type() != NodeTypeFormatter:
-		return fmt.Errorf("sink node without preceding formatter")
+	case !isInner && (parent.node.Type() != NodeTypeFormatter && parent.node.Type() != NodeTypeFormatterFilter):
+		return fmt.Errorf("sink node without preceding formatter or formatter filter")
 	case !isInner:
 		return nil
 	}

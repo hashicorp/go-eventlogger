@@ -13,6 +13,7 @@ const (
 	NodeTypeFilter
 	NodeTypeFormatter
 	NodeTypeSink
+	NodeTypeFormatterFilter // A node that formats and then filters the events based on the new format.
 )
 
 // A Node in a graph

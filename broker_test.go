@@ -27,96 +27,124 @@ func nodesToNodeIDs(t *testing.T, broker *Broker, nodes ...Node) []NodeID {
 }
 
 func TestBroker(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
 
 	// Filter out the purple nodes
-	n1 := &Filter{
+	filter := &Filter{
 		Predicate: func(e *Event) (bool, error) {
 			color, ok := e.Payload.(map[string]interface{})["color"]
 			return !ok || color != "purple", nil
 		},
 	}
 	// Marshal to JSON
-	n2 := &JSONFormatter{}
-	// Send to FileSink
-	n3 := &FileSink{Path: tmpDir, FileName: "file.log"}
+	formatter := &JSONFormatter{}
+
+	formatterFilter := &JSONFormatterFilter{
+		Predicate: func(e *Event) (bool, error) {
+			color, ok := e.Payload.(map[string]interface{})["color"]
+			return !ok || color != "purple", nil
+		},
+	}
 
 	// Create a broker
 	broker := NewBroker()
 	now := time.Now()
 	broker.clock = &clock{now}
 
-	// Register the graph with the broker
-	et := EventType("Foo")
-	nodeIDs := nodesToNodeIDs(t, broker, n1, n2, n3)
-	err = broker.RegisterPipeline(Pipeline{
-		EventType:  et,
-		PipelineID: "id",
-		NodeIDs:    nodeIDs,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Set success threshold to 1
-	err = broker.SetSuccessThreshold(et, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Process some Events
-	payloads := []interface{}{
-		map[string]interface{}{
-			"color": "red",
-			"width": 1,
+	tests := []struct {
+		name  string
+		nodes []Node
+	}{
+		{
+			name:  "with-formatter",
+			nodes: []Node{filter, formatter},
 		},
-		map[string]interface{}{
-			"color": "green",
-			"width": 2,
-		},
-		map[string]interface{}{
-			"color": "purple",
-			"width": 3,
-		},
-		map[string]interface{}{
-			"color": "blue",
-			"width": 4,
+		{
+			name:  "with-formatter-filter",
+			nodes: []Node{formatterFilter},
 		},
 	}
-	for _, p := range payloads {
-		_, err = broker.Send(context.Background(), et, p)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir, err := ioutil.TempDir("", tt.name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			// Send to FileSink
+			sink := &FileSink{Path: tmpDir, FileName: "file.log"}
+			tt.nodes = append(tt.nodes, sink)
+
+			// Register the graph with the broker
+			et := EventType("Foo")
+			nodeIDs := nodesToNodeIDs(t, broker, tt.nodes...)
+			err = broker.RegisterPipeline(Pipeline{
+				EventType:  et,
+				PipelineID: "id",
+				NodeIDs:    nodeIDs,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Set success threshold to 1
+			err = broker.SetSuccessThreshold(et, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Process some Events
+			payloads := []interface{}{
+				map[string]interface{}{
+					"color": "red",
+					"width": 1,
+				},
+				map[string]interface{}{
+					"color": "green",
+					"width": 2,
+				},
+				map[string]interface{}{
+					"color": "purple",
+					"width": 3,
+				},
+				map[string]interface{}{
+					"color": "blue",
+					"width": 4,
+				},
+			}
+			for _, p := range payloads {
+				_, err = broker.Send(context.Background(), et, p)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// Check the contents of the log
+			files, err := ioutil.ReadDir(tmpDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(files) > 1 {
+				t.Errorf("Expected 1 log file, got %d", len(files))
+			}
+
+			dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			prefix := fmt.Sprintf(`{"created_at":"%s","event_type":"Foo","payload":`, now.Format(time.RFC3339Nano))
+			suffix := "}\n"
+			var expect string
+			for _, s := range []string{`{"color":"red","width":1}`, `{"color":"green","width":2}`, `{"color":"blue","width":4}`} {
+				expect += fmt.Sprintf("%s%s%s", prefix, s, suffix)
+			}
+			if diff := deep.Equal(string(dat), expect); diff != nil {
+				t.Fatal(diff)
+			}
+		})
 	}
 
-	// Check the contents of the log
-	files, err := ioutil.ReadDir(tmpDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(files) > 1 {
-		t.Errorf("Expected 1 log file, got %d", len(files))
-	}
-
-	dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	prefix := fmt.Sprintf(`{"created_at":"%s","event_type":"Foo","payload":`, now.Format(time.RFC3339Nano))
-	suffix := "}\n"
-	var expect string
-	for _, s := range []string{`{"color":"red","width":1}`, `{"color":"green","width":2}`, `{"color":"blue","width":4}`} {
-		expect += fmt.Sprintf("%s%s%s", prefix, s, suffix)
-	}
-	if diff := deep.Equal(string(dat), expect); diff != nil {
-		t.Fatal(diff)
-	}
 }
 
 func TestPipeline(t *testing.T) {

@@ -90,9 +90,19 @@ func TestValidate(t *testing.T) {
 			false,
 		},
 		{
-			"good graph",
+			"good graph using a formatter",
 			[]Node{
 				&JSONFormatter{},
+				&FileSink{
+					Path: "/path/to/file",
+				},
+			},
+			true,
+		},
+		{
+			"good graph using a formatter filter",
+			[]Node{
+				&JSONFormatterFilter{},
 				&FileSink{
 					Path: "/path/to/file",
 				},
