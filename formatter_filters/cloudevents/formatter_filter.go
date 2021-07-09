@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	NodeName    = "cloudevents-formatter" // NodeName defines the name of Formatter nodes
-	SpecVersion = "1.0"                   // SpecVersion defines the cloudevents spec version supported
-	TextIndent  = "  "                    // TextIndent defines the prefix/indent used when encoding FormatText
+	NodeName    = "cloudevents-formatter-filter" // NodeName defines the name of FormatterFilter nodes
+	SpecVersion = "1.0"                          // SpecVersion defines the cloudevents spec version supported
+	TextIndent  = "  "                           // TextIndent defines the prefix/indent used when encoding FormatText
 )
 
 // ID defines an optional single function interface that Event Payloads may
@@ -71,9 +71,9 @@ type CloudEvent struct {
 	Time time.Time `json:"time,omitempty"`
 }
 
-// Formatter is a Node which formats the Event as a CloudEvent in JSON
+// FormatterFilter is a Node which formats the Event as a CloudEvent in JSON
 // format (See: https://github.com/cloudevents/spec)
-type Formatter struct {
+type FormatterFilter struct {
 	// Source identifies the context where the cloudevents happen and is
 	// required
 	Source *url.URL
@@ -84,14 +84,18 @@ type Formatter struct {
 	// Format defines the format created by the node.  If empty (unspecified),
 	// FormatJSON will be used
 	Format Format
+
+	// Predicate is a func that returns true if we want to keep the cloudevent.
+	// The interface{} parameter will be a CloudEvent struct.
+	Predicate func(cloudevent interface{}) (bool, error)
 }
 
-var _ eventlogger.Node = &Formatter{}
+var _ eventlogger.Node = &FormatterFilter{}
 
-func (f *Formatter) validate() error {
-	const op = "cloudevents.(Formatter).validate"
+func (f *FormatterFilter) validate() error {
+	const op = "cloudevents.(FormatterFilter).validate"
 	if f == nil {
-		return fmt.Errorf("%s: missing formatter: %w", op, eventlogger.ErrInvalidParameter)
+		return fmt.Errorf("%s: missing formatter filter: %w", op, eventlogger.ErrInvalidParameter)
 	}
 	if f.Source == nil || f.Source.String() == "" {
 		return fmt.Errorf("%s: missing source: %w", op, eventlogger.ErrInvalidParameter)
@@ -106,11 +110,13 @@ func (f *Formatter) validate() error {
 }
 
 // Process formats the Event as a cloudevent and stores that formatted data in
-// Event.Formatted with a key of "cloudevents-json" (cloudevents.FormatJSON)
-func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
-	const op = "cloudevents.(Formatter).Process"
+// Event.Formatted with a key of "cloudevents-json" (cloudevents.FormatJSON).
+// If the node has a Predicate, then the filter will be applied to the resulting
+// CloudEvent.
+func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
+	const op = "cloudevents.(FormatterFilter).Process"
 	if err := f.validate(); err != nil {
-		return nil, fmt.Errorf("%s: invalid Formatter %w", op, err)
+		return nil, fmt.Errorf("%s: invalid formatter filter %w", op, err)
 	}
 	if e == nil {
 		return nil, fmt.Errorf("%s: missing event: %w", op, eventlogger.ErrInvalidParameter)
@@ -172,20 +178,33 @@ func (f *Formatter) Process(ctx context.Context, e *eventlogger.Event) (*eventlo
 		// condition at the top of the function.
 		return nil, fmt.Errorf("%s: %s is not a supported format: %w", op, f.Format, eventlogger.ErrInvalidParameter)
 	}
+
+	if f.Predicate != nil {
+		// Use the predicate to see if we want to keep the event using it's
+		// formatted struct as a parmeter to the predicate.
+		keep, err := f.Predicate(ce)
+		if err != nil {
+			return nil, fmt.Errorf("%s: unable to filter: %w", op, err)
+		}
+		if !keep {
+			// Return nil to signal that the event should be discarded.
+			return nil, nil
+		}
+	}
 	return e, nil
 }
 
 // Reopen is a no op
-func (f *Formatter) Reopen() error {
+func (f *FormatterFilter) Reopen() error {
 	return nil
 }
 
 // Type describes the type of the node as a Formatter.
-func (f *Formatter) Type() eventlogger.NodeType {
-	return eventlogger.NodeTypeFormatter
+func (f *FormatterFilter) Type() eventlogger.NodeType {
+	return eventlogger.NodeTypeFormatterFilter
 }
 
 // Name returns a representation of the Formatter's name
-func (f *Formatter) Name() string {
+func (f *FormatterFilter) Name() string {
 	return NodeName
 }

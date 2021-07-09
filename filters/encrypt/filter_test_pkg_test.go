@@ -693,5 +693,4 @@ func TestFilter_Rotate(t *testing.T) {
 		assert.Equal(tt.wantSalt, tt.node.HmacSalt)
 		assert.Equal(tt.wantwithInfo, tt.node.HmacInfo)
 	}
-
 }

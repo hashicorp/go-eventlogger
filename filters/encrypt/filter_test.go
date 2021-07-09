@@ -136,7 +136,6 @@ func TestFilter_filterSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			assert, require := assert.New(t), require.New(t)
 			err := tt.ef.filterSlice(ctx, tt.classification, tt.fv, tt.opt...)
 			if tt.wantErrIs != nil {
@@ -619,5 +618,4 @@ func Test_setValue(t *testing.T) {
 			assert.Equal(fmt.Sprintf("%s", tt.fv), tt.newVal)
 		})
 	}
-
 }

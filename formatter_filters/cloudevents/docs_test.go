@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/eventlogger"
-	"github.com/hashicorp/eventlogger/formatters/cloudevents"
+	"github.com/hashicorp/eventlogger/formatter_filters/cloudevents"
 	"github.com/hashicorp/eventlogger/sinks/writer"
 )
 
@@ -24,10 +24,14 @@ func ExampleFormatter() {
 	if err != nil {
 		// handle err
 	}
-	// format as cloudevents
-	cloudEventsFmt := &cloudevents.Formatter{
+	// format as cloudevents and filter "admin" roles
+	cloudEventsFmt := &cloudevents.FormatterFilter{
 		Format: cloudevents.FormatJSON,
 		Source: eventSource,
+		Predicate: func(ce interface{}) (bool, error) {
+			role, ok := ce.(cloudevents.CloudEvent).Data.(map[string]interface{})["role"]
+			return !ok || role != "admin", nil
+		},
 	}
 
 	// Send the output to stdout
@@ -59,23 +63,36 @@ func ExampleFormatter() {
 		// handle error
 	}
 
-	p := &testPayload{
-		payload: map[string]interface{}{
-			"id": "test-id",
-			"data": map[string]interface{}{
-				"name":      "bob",
-				"role":      "user",
-				"pronouns":  []string{"they", "them"},
-				"coworkers": []string{"alice", "eve"},
+	payloads := []*testPayload{
+		{
+			payload: map[string]interface{}{
+				"id": "test-id",
+				"data": map[string]interface{}{
+					"name":      "bob",
+					"role":      "user",
+					"pronouns":  []string{"they", "them"},
+					"coworkers": []string{"alice", "eve"},
+				},
+			},
+		},
+		{
+			payload: map[string]interface{}{
+				"id": "test-id",
+				"data": map[string]interface{}{
+					"name": "alice",
+					"role": "admin",
+				},
 			},
 		},
 	}
-
-	if status, err := b.Send(context.Background(), et, p); err != nil {
-		// handle err and status.Warnings
-		fmt.Println("err: ", err)
-		fmt.Println("warnings: ", status.Warnings)
+	for _, p := range payloads {
+		if status, err := b.Send(context.Background(), et, p); err != nil {
+			// handle err and status.Warnings
+			fmt.Println("err: ", err)
+			fmt.Println("warnings: ", status.Warnings)
+		}
 	}
+
 	// Output:
 	// {"id":"test-id","source":"https://github.com/hashicorp/go-eventlogger/formatters/cloudevents","specversion":"1.0","type":"test-event","data":{"coworkers":["alice","eve"],"name":"bob","pronouns":["they","them"],"role":"user"},"datacontentype":"application/cloudevents","time":"2009-11-17T20:34:58.651387237Z"}
 }
