@@ -110,9 +110,10 @@ func (f *FormatterFilter) validate() error {
 }
 
 // Process formats the Event as a cloudevent and stores that formatted data in
-// Event.Formatted with a key of "cloudevents-json" (cloudevents.FormatJSON).
-// If the node has a Predicate, then the filter will be applied to the resulting
-// CloudEvent.
+// Event.Formatted0 with a key of either "cloudevents-json"
+// (cloudevents.FormatJSON) or "cloudevents-text" (cloudevents.FormatText) based
+// on the FormatterFilter.Format value. If the node has a Predicate, then the
+// filter will be applied to the resulting CloudEvent.
 func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
 	const op = "cloudevents.(FormatterFilter).Process"
 	if err := f.validate(); err != nil {
