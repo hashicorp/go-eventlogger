@@ -261,3 +261,69 @@ func TestFileSink_pruneFiles(t *testing.T) {
 		t.Errorf("Expected %d files, got %d", want, got)
 	}
 }
+func TestFileSink_FileMode(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configuredFileMode := os.FileMode(0640)
+	fs := FileSink{
+		Path:     tmpDir,
+		FileName: "audit.log",
+		Mode:     configuredFileMode,
+	}
+	err = fs.open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fileInfo, err := os.Stat(fs.f.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the file mode matches the desired mode
+	actualMode := fileInfo.Mode()
+	if actualMode != configuredFileMode {
+		t.Errorf("Expected file mode %q, got %q", configuredFileMode.Perm(), actualMode.Perm())
+	}
+}
+
+func TestFileSink_DirMode(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	parentDirMode := os.FileMode(0750)
+
+	// Change mode on parent directory
+	os.Chmod(tmpDir, parentDirMode)
+
+	fs := FileSink{
+		Path:     tmpDir,
+		FileName: "audit.log",
+	}
+	err = fs.open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dirInfo, err := os.Stat(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the parent directory's permissions remain unchanged
+	actualDirMode := dirInfo.Mode()
+	if actualDirMode.Perm() != parentDirMode.Perm() {
+		t.Errorf("Expected file mode %q, got %s", parentDirMode.Perm(), actualDirMode.Perm())
+	}
+}
