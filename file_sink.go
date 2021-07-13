@@ -172,9 +172,10 @@ func (fs *FileSink) open() error {
 	}
 
 	// Change the file mode in case the log file already existed. We special
-	// case /dev/null since we can't chmod it and bypass if the mode is zero
+	// case a few paths since we can't chmod them, and bypass if the mode is zero
 	switch newfilePath {
 	case "/dev/null":
+	case "/dev/stderr":
 	case "/dev/stdout":
 	default:
 		if fs.Mode != 0 {
