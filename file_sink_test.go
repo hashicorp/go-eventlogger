@@ -324,6 +324,6 @@ func TestFileSink_DirMode(t *testing.T) {
 	// Ensure the parent directory's permissions remain unchanged
 	actualDirMode := dirInfo.Mode()
 	if actualDirMode.Perm() != parentDirMode.Perm() {
-		t.Errorf("Expected file mode %q, got %s", parentDirMode.Perm(), actualDirMode.Perm())
+		t.Errorf("Expected file mode %q, got %q", parentDirMode.Perm(), actualDirMode.Perm())
 	}
 }
