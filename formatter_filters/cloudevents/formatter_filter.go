@@ -87,8 +87,8 @@ type FormatterFilter struct {
 
 	// Predicate is a func that returns true if we want to keep the cloudevent.
 	// The context parameter is the context of Process(ctx context.Context, e
-	// *eventlogger.Event) and the interface{} parameter will be a CloudEvent
-	// struct.
+	// *eventlogger.Event) and the interface{} parameter will be a
+	// cloudevents.Event struct.
 	Predicate func(ctx context.Context, cloudevent interface{}) (bool, error)
 }
 
