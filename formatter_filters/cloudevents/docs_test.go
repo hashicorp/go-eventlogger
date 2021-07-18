@@ -28,8 +28,8 @@ func ExampleFormatter() {
 	cloudEventsFmt := &cloudevents.FormatterFilter{
 		Format: cloudevents.FormatJSON,
 		Source: eventSource,
-		Predicate: func(ce interface{}) (bool, error) {
-			role, ok := ce.(cloudevents.CloudEvent).Data.(map[string]interface{})["role"]
+		Predicate: func(ctx context.Context, ce interface{}) (bool, error) {
+			role, ok := ce.(cloudevents.Event).Data.(map[string]interface{})["role"]
 			return !ok || role != "admin", nil
 		},
 	}
