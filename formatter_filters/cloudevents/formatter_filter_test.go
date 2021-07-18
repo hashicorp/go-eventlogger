@@ -53,7 +53,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 		f               *FormatterFilter
 		e               *eventlogger.Event
 		format          Format
-		wantCloudEvent  *CloudEvent
+		wantCloudEvent  *Event
 		wantText        string
 		wantIsError     error
 		wantErrContains string
@@ -118,7 +118,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				Payload:   "test-string",
 			},
 			format: FormatJSON,
-			wantCloudEvent: &CloudEvent{
+			wantCloudEvent: &Event{
 				Source:          testURL.String(),
 				DataSchema:      testURL.String(),
 				SpecVersion:     SpecVersion,
@@ -134,7 +134,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				Source: testURL,
 				Schema: testURL,
 				Format: FormatJSON,
-				Predicate: func(cloudevent interface{}) (bool, error) {
+				Predicate: func(ctx context.Context, cloudevent interface{}) (bool, error) {
 					return false, nil
 				},
 			},
@@ -151,7 +151,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				Source: testURL,
 				Schema: testURL,
 				Format: FormatJSON,
-				Predicate: func(cloudevent interface{}) (bool, error) {
+				Predicate: func(ctx context.Context, cloudevent interface{}) (bool, error) {
 					return false, eventlogger.ErrInvalidParameter
 				},
 			},
@@ -183,7 +183,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				},
 			},
 			format: FormatJSON,
-			wantCloudEvent: &CloudEvent{
+			wantCloudEvent: &Event{
 				ID:          "test-id",
 				Source:      testURL.String(),
 				SpecVersion: SpecVersion,
@@ -232,7 +232,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				Payload:   "test-string",
 			},
 			format: FormatText,
-			wantCloudEvent: &CloudEvent{
+			wantCloudEvent: &Event{
 				Source:          testURL.String(),
 				DataSchema:      testURL.String(),
 				SpecVersion:     SpecVersion,
@@ -274,7 +274,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 			}
 			gotFormatted, ok := gotEvent.Format(string(tt.format))
 			require.True(ok)
-			var gotCloudEvent CloudEvent
+			var gotCloudEvent Event
 			require.NoError(json.Unmarshal(gotFormatted, &gotCloudEvent))
 			if tt.wantCloudEvent.ID == "" {
 				tt.wantCloudEvent.ID = gotCloudEvent.ID
