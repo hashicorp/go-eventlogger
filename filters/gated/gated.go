@@ -10,6 +10,11 @@ import (
 	"github.com/hashicorp/eventlogger"
 )
 
+// Sender defines an interface for sending events via broker.
+type Sender interface {
+	Send(ctx context.Context, t eventlogger.EventType, payload interface{}) (eventlogger.Status, error)
+}
+
 // Gateable defines an interface for Event payloads which are "gateable" by
 // the gated.Filter
 type Gateable interface {
@@ -66,7 +71,7 @@ const DefaultEventTimeout = time.Second * 10
 // then all the gated events will be sent using the Broker.
 type Filter struct {
 	// Broker used to send along expired gated events
-	Broker *eventlogger.Broker
+	Broker Sender
 
 	// Expiration for gated events.  It's important because without an
 	// expiration gated events that aren't flushed/processed could consume all
@@ -224,7 +229,7 @@ func (w *Filter) FlushAll(ctx context.Context) error {
 	const op = "eventlogger.(Filter).FlushAll"
 	w.l.Lock()
 	defer w.l.Unlock()
-	if len(w.gated) == 0 {
+	if len(w.gated) == 0 || w.orderedGated == nil {
 		return nil
 	}
 	if w.composeFrom == nil {
@@ -237,6 +242,7 @@ func (w *Filter) FlushAll(ctx context.Context) error {
 		// into the bit bucket to nowhere.
 		w.gated = nil
 		w.orderedGated = nil
+		return nil
 	}
 
 	// Iterate through list, starting with the oldest gated event at the front.

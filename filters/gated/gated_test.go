@@ -227,8 +227,7 @@ func TestGatedFilter_Process(t *testing.T) {
 	}
 	t.Run("expiration-with-broker", func(t *testing.T) {
 		assert, require := assert.New(t), require.New(t)
-		_, gf, cleanup, tmpDir := testBrokerWithGatedFilter(t, "expiration-with-broker", "test")
-		defer cleanup()
+		_, gf, tmpDir := testBrokerWithGatedFilter(t, "expiration-with-broker", "test")
 
 		gf.Expiration = 1 * time.Nanosecond
 
@@ -368,15 +367,13 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 			name: "no-gated-events",
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			ctx := context.Background()
-			b, gf, cleanup, tmpDir := testBrokerWithGatedFilter(t, tt.name, "test")
+			b, gf, tmpDir := testBrokerWithGatedFilter(t, tt.name, "test")
 			gf.Expiration = 100 * time.Minute // Note: be very careful setting the exp to something so large
 			gf.NowFunc = func() time.Time { return now }
-			defer cleanup()
 
 			if tt.payload != nil {
 				_, err := b.Send(ctx, tt.t, tt.payload)
@@ -412,6 +409,38 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 			}
 		})
 	}
+	name := "no-broker"
+	t.Run(name, func(t *testing.T) {
+		// the gated Filter with no broker should FlushAll events to /dev/null
+		// and therefore produce no events in the file sink
+		assert, require := assert.New(t), require.New(t)
+		ctx := context.Background()
+
+		b, gf, tmpDir := testBrokerWithGatedFilter(t, name, "test")
+		gf.Broker = nil
+
+		payload := &gated.Payload{
+			ID: "event-1",
+			Header: map[string]interface{}{
+				"user": "alice",
+				"tmz":  "EST",
+			},
+			Detail: map[string]interface{}{
+				"file_name":   "file1.txt",
+				"total_bytes": 1024,
+			},
+		}
+
+		_, err := b.Send(ctx, eventlogger.EventType("test"), payload)
+		require.NoError(err)
+
+		err = gf.FlushAll(ctx)
+		require.NoError(err)
+
+		files, err := ioutil.ReadDir(tmpDir)
+		require.NoError(err)
+		assert.Len(files, 0)
+	})
 }
 
 func TestGatedFilter_Now(t *testing.T) {
@@ -441,15 +470,15 @@ func TestGatedFilter_Type(t *testing.T) {
 	assert.Equal(eventlogger.NodeTypeFilter, gf.Type())
 }
 
-func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) (*eventlogger.Broker, *gated.Filter, func(), string) {
+func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) (*eventlogger.Broker, *gated.Filter, string) {
 	t.Helper()
 	require := require.New(t)
 	require.NotEmpty(eventType)
 	tmpDir, err := ioutil.TempDir("", testName)
 	require.NoError(err)
-	cleanup := func() {
+	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
-	}
+	})
 
 	// Create a broker
 	b := eventlogger.NewBroker()
@@ -481,5 +510,5 @@ func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) 
 		NodeIDs:    nodeIDs,
 	})
 	require.NoError(err)
-	return b, gf, cleanup, tmpDir
+	return b, gf, tmpDir
 }
