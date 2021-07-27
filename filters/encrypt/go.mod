@@ -3,7 +3,7 @@ module github.com/hashicorp/eventlogger/filters/encrypt
 go 1.16
 
 require (
-	github.com/hashicorp/eventlogger v0.0.0-20210726222305-64f872d8d1e3
+	github.com/hashicorp/eventlogger v0.1.0
 	github.com/hashicorp/go-kms-wrapping v0.6.4
 	github.com/mitchellh/pointerstructure v1.2.0
 	github.com/stretchr/testify v1.7.0
