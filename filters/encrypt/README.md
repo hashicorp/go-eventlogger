@@ -88,3 +88,6 @@ FilterOperationOverrides provides the ability to override an event's "class" tag
 * SensitiveClassification: EncryptOperation
 * SecretClassification: RedactOperation
 * NoClassification: RedactOperation
+
+Note: The function `encrypt.DefaultFilterOperations()` returns a `map[DataClassification]FilterOperation` of
+these defaults. 

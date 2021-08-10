@@ -53,16 +53,17 @@ func getClassificationFromTagString(tag string, opt ...Option) *tagInfo {
 		}
 	}
 
+	defaultOps := DefaultFilterOperations()
 	switch classification {
 	case PublicClassification:
 		return &tagInfo{
 			Classification: PublicClassification,
-			Operation:      NoOperation,
+			Operation:      defaultOps[PublicClassification],
 		}
 	case SensitiveClassification:
 		if operation == NoOperation {
 			// set a default
-			operation = EncryptOperation
+			operation = defaultOps[SensitiveClassification]
 		}
 		return &tagInfo{
 			Classification: SensitiveClassification,
@@ -71,7 +72,7 @@ func getClassificationFromTagString(tag string, opt ...Option) *tagInfo {
 	case SecretClassification:
 		if operation == NoOperation {
 			// set a default
-			operation = RedactOperation
+			operation = defaultOps[SecretClassification]
 		}
 		return &tagInfo{
 			Classification: SecretClassification,
@@ -83,5 +84,15 @@ func getClassificationFromTagString(tag string, opt ...Option) *tagInfo {
 			Classification: UnknownClassification,
 			Operation:      UnknownOperation,
 		}
+	}
+}
+
+// DefaultFilterOperations returns a map of DataClassification to its default
+// FilterOperation (when no overrides are configured for the filter node).
+func DefaultFilterOperations() map[DataClassification]FilterOperation {
+	return map[DataClassification]FilterOperation{
+		PublicClassification:    NoOperation,
+		SensitiveClassification: EncryptOperation,
+		SecretClassification:    RedactOperation,
 	}
 }
