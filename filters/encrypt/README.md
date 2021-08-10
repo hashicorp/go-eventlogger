@@ -1,4 +1,4 @@
-# encrypt package
+# encrypt package [![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/eventlogger/filters/encrypt.svg)](https://pkg.go.dev/github.com/hashicorp/eventlogger/filters/encrypt)
 
 The encrypt package implements a new Filter that supports filtering fields in an
 event payload using a custom tag named `class`.  This new tag supports two
