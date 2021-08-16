@@ -134,14 +134,25 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
-		optWrapper := w
+		optWrapper = w
 		opts = append(opts, WithWrapper(optWrapper))
 		opts = append(opts, WithInfo(i.HmacInfo()))
 		opts = append(opts, WithSalt(i.HmacSalt()))
 	}
 
+	// depending on what filter operations are initialized, a wrapper may or may
+	// not be required.
 	if ef.Wrapper == nil && optWrapper == nil {
-		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
+		filterOps := DefaultFilterOperations()
+		for k, v := range ef.FilterOperationOverrides {
+			filterOps[k] = v
+		}
+		for _, filterOperation := range filterOps {
+			switch filterOperation {
+			case EncryptOperation, HmacSha256Operation:
+				return nil, fmt.Errorf("%s: missing wrapper and configured %s filter operation requires a wrapper: %w", op, filterOperation, ErrInvalidParameter)
+			}
+		}
 	}
 
 	// Get both the value and the type of what the payload points to. Value is

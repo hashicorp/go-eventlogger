@@ -456,10 +456,44 @@ func TestFilter_Process(t *testing.T) {
 			testEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload:   testString,
+				Payload: &testPayloadStruct{
+					PublicId:          "id-12",
+					SensitiveUserName: "Alice Eve Doe",
+				},
 			},
 			wantErrIs:       encrypt.ErrInvalidParameter,
 			wantErrContains: "missing wrapper",
+		},
+		{
+			name: "missing-wrapper-but-only-redacting",
+			filter: &encrypt.Filter{
+				FilterOperationOverrides: map[encrypt.DataClassification]encrypt.FilterOperation{
+					encrypt.SecretClassification:    encrypt.RedactOperation,
+					encrypt.SensitiveClassification: encrypt.RedactOperation,
+				},
+			},
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayload{
+					SensitiveRedacted: []byte("sensitive-redacted"),
+					NotTagged:         "not-tagged",
+					StructValue: testPayloadStruct{
+						SensitiveUserName: "sensitive-username",
+					},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayload{
+					SensitiveRedacted: []byte(encrypt.RedactedData),
+					NotTagged:         encrypt.RedactedData,
+					StructValue: testPayloadStruct{
+						SensitiveUserName: encrypt.RedactedData,
+					},
+				},
+			},
 		},
 	}
 
@@ -468,7 +502,6 @@ func TestFilter_Process(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 
 			got, err := tt.filter.Process(ctx, tt.testEvent)
-
 			if tt.wantErrIs != nil {
 				require.Error(err)
 				assert.ErrorIs(err, tt.wantErrIs)
