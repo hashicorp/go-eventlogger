@@ -58,4 +58,11 @@ func Test_getOpts(t *testing.T) {
 		}
 		assert.Equal(opts, testOpts)
 	})
+	t.Run("withIgnoreTaggable", func(t *testing.T) {
+		assert := assert.New(t)
+		opts := getOpts(withIgnoreTaggable())
+		testOpts := getDefaultOptions()
+		testOpts.withIgnoreTaggable = true
+		assert.Equal(opts, testOpts)
+	})
 }

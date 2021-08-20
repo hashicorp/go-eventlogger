@@ -25,6 +25,7 @@ type options struct {
 	withInfo                 []byte
 	withFilterOperations     map[DataClassification]FilterOperation
 	withPointerstructureInfo *pointerstructureInfo
+	withIgnoreTaggable       bool
 }
 
 func getDefaultOptions() options {
@@ -69,5 +70,11 @@ func withPointer(i interface{}, pointer string) Option {
 			i:       i,
 			pointer: pointer,
 		}
+	}
+}
+
+func withIgnoreTaggable() Option {
+	return func(o *options) {
+		o.withIgnoreTaggable = true
 	}
 }

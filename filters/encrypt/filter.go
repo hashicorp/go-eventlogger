@@ -13,8 +13,10 @@ import (
 
 	"github.com/hashicorp/eventlogger"
 	wrapping "github.com/hashicorp/go-kms-wrapping"
+	"github.com/mitchellh/copystructure"
 	"github.com/mitchellh/pointerstructure"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // Filter is an eventlogger Filter Node which will filter string and
@@ -163,6 +165,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		return nil, err
 	}
 	e = dup.(*eventlogger.Event)
+
 	// Get both the value and the type of what the payload points to. Value is
 	// used to mutate underlying data and Type is used to get the name of the
 	// field.
@@ -196,6 +199,15 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	case isTaggable:
 		if err := ef.filterTaggable(ctx, taggedInterface, opts...); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		if pKind != reflect.Map {
+			// okay, we've dealt with the "Taggable" things, let's check for other
+			// fields that need to be filtered, but be sure to ignore taggable
+			// on the next recursion or will be in an infinite loop
+			opts := append(opts, withIgnoreTaggable())
+			if err := ef.filterField(ctx, payloadValue, filterOverrides, opts...); err != nil {
+				return nil, fmt.Errorf("%s: %w", op, err)
+			}
 		}
 	case pKind == reflect.Slice:
 		switch {
@@ -250,21 +262,46 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 		return nil
 	}
 
+	opts := getOpts(opt...)
+	// we want to check if we should ignore taggable for this recursion, but
+	// then strip the option, so the next level of recursion can redact both
+	// taggable things and other fields.
+	if opts.withIgnoreTaggable {
+		var removeIdx int
+		for i := 0; i < len(opt)-1; i++ {
+			currentOpt := getOpts(opt[i])
+			if currentOpt.withIgnoreTaggable {
+				removeIdx = i
+				break
+			}
+		}
+		opt = append(opt[:removeIdx], opt[removeIdx+1:]...)
+	}
+
 	for i := 0; i < v.Type().NumField(); i++ {
 		field := v.Field(i)
+		fkind := field.Kind()
 
 		// skip non-exported fields which cannot interface.
 		if !field.CanInterface() {
 			continue
 		}
+
+		switch fkind {
 		case reflect.Ptr, reflect.Interface:
 			field = v.Field(i).Elem()
 			if field == reflect.ValueOf(nil) {
 				continue
 			}
+			if field.Kind() == reflect.Ptr { // well, it was an interface and we sill need to determine what the ptr is...
+				field = field.Elem()
+				if field == reflect.ValueOf(nil) {
+					continue
+				}
+			}
+			fkind = field.Kind() // re-init to the kind after deferencing the pointer or interface...
 		}
 
-		fkind := field.Kind()
 		ftype := field.Type()
 
 		var taggedInterface Taggable
@@ -305,15 +342,25 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 					}
 				}
 			}
+
+		case isTaggable && !opts.withIgnoreTaggable:
+			if err := ef.filterTaggable(ctx, taggedInterface, opt...); err != nil {
+				return fmt.Errorf("%s: %w", op, err)
+			}
+			if fkind != reflect.Map {
+				// okay, we've dealt with the "Taggable" things, let's check for other
+				// fields that need to be filtered, but be sure to ignore taggable
+				// on the next recursion or will be in an infinite loop
+				opt = append(opt, withIgnoreTaggable())
+				if err := ef.filterField(ctx, field, filterOverrides, opt...); err != nil {
+					return fmt.Errorf("%s: %w", op, err)
+				}
+			}
+
 		// if the field is a struct
 		case fkind == reflect.Struct:
 			if err := ef.filterField(ctx, field, filterOverrides, opt...); err != nil {
 				return err
-			}
-
-		case isTaggable:
-			if err := ef.filterTaggable(ctx, taggedInterface, opt...); err != nil {
-				return fmt.Errorf("%s: %w", op, err)
 			}
 		}
 	}

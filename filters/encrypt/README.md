@@ -22,9 +22,8 @@ event payload, when they are tagged with a `class` tag:
 * `[]string`
 * `[]byte`
 * `[][]byte`
-
-encrypt.Filter also supports filtering any field of type `map[string]interface{}` that implements the
-`encrypt.Taggable` interface. 
+* `wrapperspb.StringValue`
+* `wrapperspb.BytesValue`
 
 The following DataClassifications are supported:
 * PublicClassification
@@ -40,9 +39,11 @@ The following FilterOperations are supported:
 
 
 # Taggable interface
-`map[string]interface{}` fields in an event payloads can be filtered using a
-`[]PointerTag` for the map. To be filtered a `map[string]interface{}` field is
-required to implement a single function interface:
+Go `maps` and `google.protobuf.Struct` in an event payloads can be filtered by
+implementing a single function `Taggable` interface, which returns a
+`[]PointerTag` for fields that must be filtered.  You may have payloads and/or
+payload fields which implement the `Taggable` interface and also contain fields
+that are tagged with the `class` tag.
 ```go
 // Taggable defines an interface for taggable maps
 type Taggable interface {
@@ -51,7 +52,7 @@ type Taggable interface {
 }
 
 // PointerTag provides the pointerstructure pointer string to get/set a key
-// within a map[string]interface{} along with its DataClassification and
+// within a map or struct.Value along with its DataClassification and
 // FilterOperation.
 type PointerTag struct {
 	// Pointer is the pointerstructure pointer string to get/set a key within a

@@ -120,7 +120,6 @@ func TestFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Payload: &testPayload{
-					notExported:       "not-exported",
 					NotTagged:         encrypt.RedactedData,
 					SensitiveRedacted: []byte(encrypt.RedactedData),
 					StructPtr: &testPayloadStruct{
@@ -276,8 +275,8 @@ func TestFilter_Process(t *testing.T) {
 					T      testNilInterface
 					SliceT []testNilInterface
 				}{
-					T:      nilInterface,
-					SliceT: []testNilInterface{nilInterface},
+					T:      nil,
+					SliceT: []testNilInterface{nil},
 					Int:    1,
 				},
 			},
@@ -568,9 +567,6 @@ func TestFilter_Process(t *testing.T) {
 			Type:      "test",
 			CreatedAt: now,
 			Payload: &testEventWrapperPayload{
-				eventId: "event-id",
-				info:    []byte("event-info"),
-				salt:    []byte("event-salt"),
 				StructValue: testPayloadStruct{
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",
@@ -583,10 +579,13 @@ func TestFilter_Process(t *testing.T) {
 		assert.Equal(wrapper, ef.Wrapper)
 		assert.Equal([]byte("info"), ef.HmacInfo)
 		assert.Equal([]byte("salt"), ef.HmacSalt)
+
+		// assert that the node made a copy of the event before modifying it.
+		assert.NotEqual(e.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName, got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)
+
 		eventWrapper, err := encrypt.NewEventWrapper(wrapper, "event-id")
 		require.NoError(err)
-
-		e.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName = string(encrypt.TestDecryptValue(t, eventWrapper, []byte(e.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)))
+		got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName = string(encrypt.TestDecryptValue(t, eventWrapper, []byte(got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)))
 		assert.Equal(want, got)
 	})
 	t.Run("event-wrapper-info-payload-hmac", func(t *testing.T) {
@@ -616,9 +615,6 @@ func TestFilter_Process(t *testing.T) {
 			Type:      "test",
 			CreatedAt: now,
 			Payload: &testEventWrapperPayload{
-				eventId: "event-id",
-				info:    []byte("event-info"),
-				salt:    []byte("event-salt"),
 				StructValue: testPayloadStruct{
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",
