@@ -253,7 +253,10 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 	for i := 0; i < v.Type().NumField(); i++ {
 		field := v.Field(i)
 
-		switch v.Field(i).Kind() {
+		// skip non-exported fields which cannot interface.
+		if !field.CanInterface() {
+			continue
+		}
 		case reflect.Ptr, reflect.Interface:
 			field = v.Field(i).Elem()
 			if field == reflect.ValueOf(nil) {
