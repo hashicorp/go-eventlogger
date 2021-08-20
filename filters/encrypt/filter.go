@@ -155,6 +155,14 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		}
 	}
 
+	// since the node will be modifying the event data (aka redact/encrypt), we
+	// need our own copy, otherwise we could be changing the event across other
+	// pipelines and nodes and creating a host of problems and race conditions.
+	dup, err := copystructure.Copy(e)
+	if err != nil {
+		return nil, err
+	}
+	e = dup.(*eventlogger.Event)
 	// Get both the value and the type of what the payload points to. Value is
 	// used to mutate underlying data and Type is used to get the name of the
 	// field.
