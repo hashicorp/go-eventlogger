@@ -461,8 +461,16 @@ func (ef *Filter) filterValue(ctx context.Context, fv reflect.Value, classificat
 			return fmt.Errorf("%s: unknown filter operation for field: %s: %w", op, classificationTag.Operation, ErrInvalidParameter)
 		}
 		if opts.withPointerstructureInfo != nil {
-			if _, err := pointerstructure.Set(opts.withPointerstructureInfo.i, opts.withPointerstructureInfo.pointer, data); err != nil {
-				return fmt.Errorf("%s: %w", op, err)
+			switch {
+			case ftype == reflect.TypeOf(structpb.Value{}):
+				// support for tagging maps which are google.protobuf.Struct and use structpb.Value for their values.
+				if _, err := pointerstructure.Set(opts.withPointerstructureInfo.i, opts.withPointerstructureInfo.pointer, structpb.NewStringValue(data)); err != nil {
+					return fmt.Errorf("%s: %w", op, err)
+				}
+			default:
+				if _, err := pointerstructure.Set(opts.withPointerstructureInfo.i, opts.withPointerstructureInfo.pointer, data); err != nil {
+					return fmt.Errorf("%s: %w", op, err)
+				}
 			}
 		} else {
 			if err := setValue(fv, data); err != nil {
