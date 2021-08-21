@@ -17,6 +17,7 @@ import (
 	"github.com/mitchellh/pointerstructure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // Filter is an eventlogger Filter Node which will filter string and
@@ -170,6 +171,9 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	// used to mutate underlying data and Type is used to get the name of the
 	// field.
 	payloadValue := reflect.ValueOf(e.Payload)
+
+	taggedInterface, isTaggable := payloadValue.Interface().(Taggable)
+
 	switch payloadValue.Kind() {
 	case reflect.Ptr, reflect.Interface:
 		if payloadValue.IsNil() { // be sure it's not a nil interface
@@ -180,8 +184,6 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 
 	pType := payloadValue.Type()
 	pKind := payloadValue.Kind()
-
-	taggedInterface, isTaggable := payloadValue.Interface().(Taggable)
 
 	// make a copy of the overrides before we begin processing this event, which
 	// will give us a consistent set of overrides for this event.
