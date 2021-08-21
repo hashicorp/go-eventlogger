@@ -320,6 +320,11 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 			if err := ef.filterValue(ctx, field, classificationTag, opt...); err != nil {
 				return fmt.Errorf("%s: %w", op, err)
 			}
+		case ftype == reflect.TypeOf(wrapperspb.StringValue{}) || ftype == reflect.TypeOf(wrapperspb.BytesValue{}):
+			classificationTag := getClassificationFromTag(v.Type().Field(i).Tag, withFilterOperations(filterOverrides))
+			if err := ef.filterValue(ctx, field.FieldByName("Value"), classificationTag, opt...); err != nil {
+				return err
+			}
 		// if the field is a slice
 		case fkind == reflect.Slice:
 			switch {
@@ -483,7 +488,12 @@ func (ef *Filter) filterValue(ctx context.Context, fv reflect.Value, classificat
 			if err != nil {
 				return fmt.Errorf("%s: unable to get value from taggable interface using pointer: %s: %w", op, opts.withPointerstructureInfo.pointer, err)
 			}
-			raw = []byte(fmt.Sprintf("%s", i))
+			switch {
+			case reflect.TypeOf(i) == reflect.TypeOf(&structpb.Value{}):
+				raw = []byte(i.(*structpb.Value).GetStringValue())
+			default:
+				raw = []byte(fmt.Sprintf("%s", i))
+			}
 		case fv.Type() == reflect.TypeOf(""):
 			raw = []byte(fv.String())
 		case fv.Type() == reflect.TypeOf([]uint8(nil)):
