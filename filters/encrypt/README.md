@@ -64,7 +64,8 @@ type PointerTag struct {
 	Classification DataClassification
 
 	// Filter is the FilterOperation to apply to the data pointed to by the
-	// Pointer
+	// Pointer.  This is optional and the default operations (or overrides) will
+	// apply when not specified
 	Filter FilterOperation
 }
 ``` 

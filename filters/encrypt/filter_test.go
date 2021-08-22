@@ -57,7 +57,7 @@ func TestFilter_filterTaggable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			err := tt.ef.filterTaggable(ctx, tt.t, tt.opt...)
+			err := tt.ef.filterTaggable(ctx, tt.t, tt.ef.copyFilterOperationOverrides(), tt.opt...)
 			if tt.wantErrIs != nil {
 				require.Error(err)
 				assert.ErrorIs(err, tt.wantErrIs)

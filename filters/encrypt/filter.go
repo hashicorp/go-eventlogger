@@ -199,7 +199,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 	case isTaggable:
-		if err := ef.filterTaggable(ctx, taggedInterface, opts...); err != nil {
+		if err := ef.filterTaggable(ctx, taggedInterface, filterOverrides, opts...); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		if pKind != reflect.Map {
@@ -351,7 +351,7 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 			}
 
 		case isTaggable && !opts.withIgnoreTaggable:
-			if err := ef.filterTaggable(ctx, taggedInterface, opt...); err != nil {
+			if err := ef.filterTaggable(ctx, taggedInterface, filterOverrides, opt...); err != nil {
 				return fmt.Errorf("%s: %w", op, err)
 			}
 			if fkind != reflect.Map {
@@ -375,7 +375,7 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 }
 
 // filterTaggable will filter data that implements the Taggable interface
-func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, _ ...Option) error {
+func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverrides map[DataClassification]FilterOperation, opt ...Option) error {
 	const op = "event.(Filter).filterTaggable"
 	if t == nil {
 		return fmt.Errorf("%s: missing taggable interface: %w", op, ErrInvalidParameter)
@@ -394,10 +394,7 @@ func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, _ ...Option) e
 			}
 		}
 		rv := reflect.Indirect(reflect.ValueOf(value))
-		info := &tagInfo{
-			Classification: pt.Classification,
-			Operation:      pt.Filter,
-		}
+		info := getClassificationFromTagString(fmt.Sprintf("%s,%s", pt.Classification, pt.Filter), withFilterOperations(filterOverrides))
 		if err = ef.filterValue(ctx, rv, info, withPointer(t, pt.Pointer)); err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}

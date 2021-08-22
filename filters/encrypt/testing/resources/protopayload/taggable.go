@@ -21,7 +21,7 @@ func (pp *WithTaggable) Tags() ([]encrypt.PointerTag, error) {
 			ptrs = append(ptrs, encrypt.PointerTag{
 				Pointer:        "/TaggableAttributes/Fields/" + TaggedStringField,
 				Classification: encrypt.SensitiveClassification,
-				Filter:         encrypt.EncryptOperation,
+				Filter:         encrypt.RedactOperation,
 			})
 		}
 		_, ok = pp.TaggableAttributes.GetFields()[TaggedBytesField]
@@ -29,7 +29,6 @@ func (pp *WithTaggable) Tags() ([]encrypt.PointerTag, error) {
 			ptrs = append(ptrs, encrypt.PointerTag{
 				Pointer:        "/TaggableAttributes/Fields/" + TaggedBytesField,
 				Classification: encrypt.SensitiveClassification,
-				Filter:         encrypt.EncryptOperation,
 			})
 		}
 	}
@@ -39,7 +38,6 @@ func (pp *WithTaggable) Tags() ([]encrypt.PointerTag, error) {
 			ptrs = append(ptrs, encrypt.PointerTag{
 				Pointer:        "/EmbeddedTaggable/ETaggableAttributes/Fields/" + TaggedStringField,
 				Classification: encrypt.SensitiveClassification,
-				Filter:         encrypt.EncryptOperation,
 			})
 		}
 	}

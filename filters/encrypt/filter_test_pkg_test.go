@@ -328,6 +328,7 @@ func TestFilter_Process(t *testing.T) {
 					taggable.SecretBytesValue.Value = []byte(encrypt.RedactedData)
 					taggable.UnclassifiedBytesValue.Value = []byte(encrypt.RedactedData)
 
+					taggable.TaggableAttributes.Fields[protopayload.TaggedStringField] = structpb.NewStringValue(encrypt.RedactedData) // overridden by Tags()
 					taggable.EmbeddedTaggable.ESecretString = encrypt.RedactedData
 					return taggable
 				}(),
@@ -342,9 +343,6 @@ func TestFilter_Process(t *testing.T) {
 
 				s := taggable.EmbeddedTaggable.ETaggableAttributes.Fields[protopayload.TaggedStringField].GetStringValue()
 				taggable.EmbeddedTaggable.ETaggableAttributes.Fields[protopayload.TaggedStringField] = structpb.NewStringValue(string(encrypt.TestDecryptValue(t, wrapper, []byte(s))))
-
-				s = taggable.TaggableAttributes.Fields[protopayload.TaggedStringField].GetStringValue()
-				taggable.TaggableAttributes.Fields[protopayload.TaggedStringField] = structpb.NewStringValue(string(encrypt.TestDecryptValue(t, wrapper, []byte(s))))
 
 				s = taggable.TaggableAttributes.Fields[protopayload.TaggedBytesField].GetStringValue()
 				taggable.TaggableAttributes.Fields[protopayload.TaggedBytesField] = structpb.NewStringValue(string(encrypt.TestDecryptValue(t, wrapper, []byte(s))))
