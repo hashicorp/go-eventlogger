@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package resources.protopayload;
+
+option go_package = "github.com/hashicorp/eventlogger/filters/encrypt/testing/resources/protopayload;protopayload";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+message WithTaggable {
+  // @inject_tag: `class:"public"`
+  string public_string = 10;
+  // @inject_tag: `class:"sensitive"`
+  string sensitive_string = 20;
+  // @inject_tag: `class:"secret"`
+  string secret_string = 30;
+  // intentionally unclassified
+  string unclassified_string = 40;
+
+  // @inject_tag: `class:"public"`
+  bytes public_bytes = 50;
+  // @inject_tag: `class:"sensitive"`
+  bytes sensitive_bytes = 60;
+  // @inject_tag: `class:"secret"`
+  bytes secret_bytes = 70;
+  // intentionally unclassified
+  bytes unclassified_bytes = 80;
+
+  // @inject_tag: `class:"public"`
+  google.protobuf.StringValue public_string_value = 90;
+  // @inject_tag: `class:"sensitive"`
+  google.protobuf.StringValue sensitive_string_value = 100;
+  // @inject_tag: `class:"secret"`
+  google.protobuf.StringValue secret_string_value = 110;
+  // intentionally unclassified
+  google.protobuf.StringValue unclassified_string_value = 120;
+
+  // @inject_tag: `class:"public"`
+  google.protobuf.BytesValue public_bytes_value = 130;
+  // @inject_tag: `class:"sensitive"`
+  google.protobuf.BytesValue sensitive_bytes_value = 140;
+  // @inject_tag: `class:"secret"`
+  google.protobuf.BytesValue secret_bytes_value = 150;
+  // intentionally unclassified
+  google.protobuf.BytesValue unclassified_bytes_value = 160;
+
+  // will always be unset and unclassified
+  google.protobuf.StringValue unset_string_value = 170;
+
+  // attributes will need to be redacted via Taggable
+  google.protobuf.Struct taggable_attributes = 180;
+
+  google.protobuf.Struct nontaggable_attributes = 190;
+
+  EmbeddedTaggable embedded_taggable = 200;
+
+  google.protobuf.Timestamp create_time = 210;
+}
+
+message EmbeddedTaggable {
+  // @inject_tag: `class:"public"`
+  string e_public_string = 10;
+
+  // @inject_tag: `class:"secret"`
+  string e_secret_string = 30;
+
+  google.protobuf.Struct e_taggable_attributes = 180;
+}
