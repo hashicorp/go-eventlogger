@@ -56,6 +56,6 @@ $ classtaglint -json .
 ...
 $ go vet -vettool=$(which classtaglint)
 ...
-$ $ go vet -vettool=$(which classtaglint) -json 
+$ go vet -vettool=$(which classtaglint) -json 
 ```
 
