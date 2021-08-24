@@ -3,7 +3,7 @@ package cloudevents
 import (
 	"fmt"
 
-	"github.com/hashicorp/vault/sdk/helper/base62"
+	"github.com/hashicorp/go-secure-stdlib/base62"
 )
 
 func newId() (string, error) {

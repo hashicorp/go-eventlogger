@@ -2,14 +2,21 @@ package encrypt_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/eventlogger"
 	"github.com/hashicorp/eventlogger/filters/encrypt"
+	"github.com/hashicorp/eventlogger/filters/encrypt/testing/resources/protopayload"
 	wrapping "github.com/hashicorp/go-kms-wrapping"
+	"github.com/mitchellh/copystructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 type testPayloadStruct struct {
@@ -74,6 +81,50 @@ func TestFilter_Process(t *testing.T) {
 	var foobar *testNilInterfaceStruct
 	nilInterface = foobar
 
+	b, err := structpb.NewValue([]byte("Tagged-Bytes"))
+	require.NoError(t, err)
+
+	testTaggable := &protopayload.WithTaggable{
+		PublicString:            "PublicString",
+		SensitiveString:         "SensitiveString",
+		SecretString:            "SecretString",
+		UnclassifiedString:      "UnclassifiedString",
+		PublicStringValue:       &wrapperspb.StringValue{Value: "PublicStringValue"},
+		SensitiveStringValue:    &wrapperspb.StringValue{Value: "SensitiveStringValue"},
+		SecretStringValue:       &wrapperspb.StringValue{Value: "SecretStringValue"},
+		UnclassifiedStringValue: &wrapperspb.StringValue{Value: "UnclassifiedStringValue"},
+		PublicBytes:             []byte("PublicBytes"),
+		SensitiveBytes:          []byte("SensitiveBytes"),
+		SecretBytes:             []byte("SecretBytes"),
+		UnclassifiedBytes:       []byte("UnclassifiedBytes"),
+		PublicBytesValue:        &wrapperspb.BytesValue{Value: []byte("PublicBytesValue")},
+		SensitiveBytesValue:     &wrapperspb.BytesValue{Value: []byte("SensitiveBytesValue")},
+		SecretBytesValue:        &wrapperspb.BytesValue{Value: []byte("SecretBytesValue")},
+		UnclassifiedBytesValue:  &wrapperspb.BytesValue{Value: []byte("UnclassifiedBytesValue")},
+		TaggableAttributes: &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				protopayload.TaggedStringField:   structpb.NewStringValue("Tagged"),
+				protopayload.UntaggedStringField: structpb.NewStringValue("Untagged"),
+				protopayload.TaggedBytesField:    b,
+			},
+		},
+		NontaggableAttributes: &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				protopayload.UntaggedStringField: structpb.NewStringValue("Untagged"),
+			},
+		},
+		EmbeddedTaggable: &protopayload.EmbeddedTaggable{
+			EPublicString: "PublicString",
+			ESecretString: "SecretString",
+			ETaggableAttributes: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					protopayload.TaggedStringField:   structpb.NewStringValue("Tagged"),
+					protopayload.UntaggedStringField: structpb.NewStringValue("Untagged"),
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		name            string
 		filter          *encrypt.Filter
@@ -120,7 +171,6 @@ func TestFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Payload: &testPayload{
-					notExported:       "not-exported",
 					NotTagged:         encrypt.RedactedData,
 					SensitiveRedacted: []byte(encrypt.RedactedData),
 					StructPtr: &testPayloadStruct{
@@ -253,6 +303,54 @@ func TestFilter_Process(t *testing.T) {
 			},
 		},
 		{
+			name:   "proto-with-taggable",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   testTaggable,
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: func() interface{} {
+					dup, err := copystructure.Copy(testTaggable)
+					require.NoError(t, err)
+					taggable := dup.(*protopayload.WithTaggable)
+
+					taggable.SecretString = encrypt.RedactedData
+					taggable.UnclassifiedString = encrypt.RedactedData
+					taggable.SecretStringValue.Value = encrypt.RedactedData
+					taggable.UnclassifiedStringValue.Value = encrypt.RedactedData
+
+					taggable.SecretBytes = []byte(encrypt.RedactedData)
+					taggable.UnclassifiedBytes = []byte(encrypt.RedactedData)
+					taggable.SecretBytesValue.Value = []byte(encrypt.RedactedData)
+					taggable.UnclassifiedBytesValue.Value = []byte(encrypt.RedactedData)
+
+					taggable.TaggableAttributes.Fields[protopayload.TaggedStringField] = structpb.NewStringValue(encrypt.RedactedData) // overridden by Tags()
+					taggable.EmbeddedTaggable.ESecretString = encrypt.RedactedData
+					return taggable
+				}(),
+			},
+			setupWantEvent: func(e *eventlogger.Event) {
+				taggable := e.Payload.(*protopayload.WithTaggable)
+				taggable.SensitiveString = string(encrypt.TestDecryptValue(t, wrapper, []byte(taggable.SensitiveString)))
+				taggable.SensitiveStringValue = &wrapperspb.StringValue{Value: string(encrypt.TestDecryptValue(t, wrapper, []byte(taggable.SensitiveStringValue.Value)))}
+
+				taggable.SensitiveBytes = encrypt.TestDecryptValue(t, wrapper, taggable.SensitiveBytes)
+				taggable.SensitiveBytesValue = &wrapperspb.BytesValue{Value: encrypt.TestDecryptValue(t, wrapper, taggable.SensitiveBytesValue.Value)}
+
+				s := taggable.EmbeddedTaggable.ETaggableAttributes.Fields[protopayload.TaggedStringField].GetStringValue()
+				taggable.EmbeddedTaggable.ETaggableAttributes.Fields[protopayload.TaggedStringField] = structpb.NewStringValue(string(encrypt.TestDecryptValue(t, wrapper, []byte(s))))
+
+				s = taggable.TaggableAttributes.Fields[protopayload.TaggedBytesField].GetStringValue()
+				taggable.TaggableAttributes.Fields[protopayload.TaggedBytesField] = structpb.NewStringValue(string(encrypt.TestDecryptValue(t, wrapper, []byte(s))))
+				b, _ := base64.StdEncoding.DecodeString(taggable.TaggableAttributes.Fields[protopayload.TaggedBytesField].GetStringValue())
+				t.Log(fmt.Sprintf("decoded TaggableAttributes[%s]", protopayload.TaggedBytesField), "==", string(b))
+			},
+		},
+		{
 			name:   "nil-interface",
 			filter: testEncryptingFilter,
 			testEvent: &eventlogger.Event{
@@ -276,8 +374,8 @@ func TestFilter_Process(t *testing.T) {
 					T      testNilInterface
 					SliceT []testNilInterface
 				}{
-					T:      nilInterface,
-					SliceT: []testNilInterface{nilInterface},
+					T:      nil,
+					SliceT: []testNilInterface{nil},
 					Int:    1,
 				},
 			},
@@ -456,10 +554,44 @@ func TestFilter_Process(t *testing.T) {
 			testEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload:   testString,
+				Payload: &testPayloadStruct{
+					PublicId:          "id-12",
+					SensitiveUserName: "Alice Eve Doe",
+				},
 			},
 			wantErrIs:       encrypt.ErrInvalidParameter,
 			wantErrContains: "missing wrapper",
+		},
+		{
+			name: "missing-wrapper-but-only-redacting",
+			filter: &encrypt.Filter{
+				FilterOperationOverrides: map[encrypt.DataClassification]encrypt.FilterOperation{
+					encrypt.SecretClassification:    encrypt.RedactOperation,
+					encrypt.SensitiveClassification: encrypt.RedactOperation,
+				},
+			},
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayload{
+					SensitiveRedacted: []byte("sensitive-redacted"),
+					NotTagged:         "not-tagged",
+					StructValue: testPayloadStruct{
+						SensitiveUserName: "sensitive-username",
+					},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayload{
+					SensitiveRedacted: []byte(encrypt.RedactedData),
+					NotTagged:         encrypt.RedactedData,
+					StructValue: testPayloadStruct{
+						SensitiveUserName: encrypt.RedactedData,
+					},
+				},
+			},
 		},
 	}
 
@@ -468,7 +600,6 @@ func TestFilter_Process(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 
 			got, err := tt.filter.Process(ctx, tt.testEvent)
-
 			if tt.wantErrIs != nil {
 				require.Error(err)
 				assert.ErrorIs(err, tt.wantErrIs)
@@ -481,7 +612,11 @@ func TestFilter_Process(t *testing.T) {
 			if tt.setupWantEvent != nil {
 				tt.setupWantEvent(got)
 			}
-			assert.Equal(tt.wantEvent, got)
+			actualJson, err := json.Marshal(got)
+			require.NoError(err)
+			wantJson, err := json.Marshal(tt.wantEvent)
+			require.NoError(err)
+			assert.JSONEq(string(wantJson), string(actualJson))
 		})
 	}
 	t.Run("rotate-wrapper-payload", func(t *testing.T) {
@@ -535,9 +670,6 @@ func TestFilter_Process(t *testing.T) {
 			Type:      "test",
 			CreatedAt: now,
 			Payload: &testEventWrapperPayload{
-				eventId: "event-id",
-				info:    []byte("event-info"),
-				salt:    []byte("event-salt"),
 				StructValue: testPayloadStruct{
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",
@@ -550,10 +682,13 @@ func TestFilter_Process(t *testing.T) {
 		assert.Equal(wrapper, ef.Wrapper)
 		assert.Equal([]byte("info"), ef.HmacInfo)
 		assert.Equal([]byte("salt"), ef.HmacSalt)
+
+		// assert that the node made a copy of the event before modifying it.
+		assert.NotEqual(e.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName, got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)
+
 		eventWrapper, err := encrypt.NewEventWrapper(wrapper, "event-id")
 		require.NoError(err)
-
-		e.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName = string(encrypt.TestDecryptValue(t, eventWrapper, []byte(e.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)))
+		got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName = string(encrypt.TestDecryptValue(t, eventWrapper, []byte(got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)))
 		assert.Equal(want, got)
 	})
 	t.Run("event-wrapper-info-payload-hmac", func(t *testing.T) {
@@ -583,9 +718,6 @@ func TestFilter_Process(t *testing.T) {
 			Type:      "test",
 			CreatedAt: now,
 			Payload: &testEventWrapperPayload{
-				eventId: "event-id",
-				info:    []byte("event-info"),
-				salt:    []byte("event-salt"),
 				StructValue: testPayloadStruct{
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",

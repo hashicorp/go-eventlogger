@@ -35,10 +35,10 @@ type Data interface {
 	Data() interface{}
 }
 
-// CloudEvent defines type which is used when formatting cloudevents.
+// Event defines type which is used when formatting cloudevents.
 //
 // For more info on the fields see: https://github.com/cloudevents/spec)
-type CloudEvent struct {
+type Event struct {
 	// ID identifies the event, cannot be an empty and is required.  The
 	// combination of Source + ID must be unique.  Events with the same Source +
 	// ID can be assumed to be duplicates by consumers
@@ -86,8 +86,10 @@ type FormatterFilter struct {
 	Format Format
 
 	// Predicate is a func that returns true if we want to keep the cloudevent.
-	// The interface{} parameter will be a CloudEvent struct.
-	Predicate func(cloudevent interface{}) (bool, error)
+	// The context parameter is the context of Process(ctx context.Context, e
+	// *eventlogger.Event) and the interface{} parameter will be a
+	// cloudevents.Event struct.
+	Predicate func(ctx context.Context, cloudevent interface{}) (bool, error)
 }
 
 var _ eventlogger.Node = &FormatterFilter{}
@@ -147,7 +149,7 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 		schema = f.Schema.String()
 	}
 
-	ce := CloudEvent{
+	ce := Event{
 		ID:          id,
 		Source:      f.Source.String(),
 		SpecVersion: SpecVersion,
@@ -183,7 +185,7 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 	if f.Predicate != nil {
 		// Use the predicate to see if we want to keep the event using it's
 		// formatted struct as a parmeter to the predicate.
-		keep, err := f.Predicate(ce)
+		keep, err := f.Predicate(ctx, ce)
 		if err != nil {
 			return nil, fmt.Errorf("%s: unable to filter: %w", op, err)
 		}
