@@ -412,7 +412,8 @@ func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverride
 		}
 		rv := reflect.Indirect(reflect.ValueOf(value))
 		info := getClassificationFromTagString(fmt.Sprintf("%s,%s", pt.Classification, pt.Filter), withFilterOperations(filterOverrides))
-		if err = ef.filterValue(ctx, rv, info, withPointer(t, pt.Pointer)); err != nil {
+		opt = append(opt, withPointer(t, pt.Pointer))
+		if err = ef.filterValue(ctx, rv, info, opt...); err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
 		segs := strings.Split(pt.Pointer, "/")
@@ -492,7 +493,7 @@ func (ef *Filter) filterSlice(ctx context.Context, classificationTag *tagInfo, s
 	}
 
 	for i := 0; i < slice.Len(); i++ {
-		if err := ef.filterValue(ctx, slice.Index(i), classificationTag); err != nil {
+		if err := ef.filterValue(ctx, slice.Index(i), classificationTag, opt...); err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
 	}

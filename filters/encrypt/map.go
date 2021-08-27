@@ -43,6 +43,7 @@ type tMap struct {
 
 type trackedMaps map[uintptr]*tMap
 
+// newTrackedMaps will create a new trackedMaps
 func newTrackedMaps(tm ...*tMap) (trackedMaps, error) {
 	const op = "encrypt.(eventMaps).newTrackedMaps"
 	maps := make(trackedMaps, len(tm))
@@ -54,8 +55,7 @@ func newTrackedMaps(tm ...*tMap) (trackedMaps, error) {
 	return maps, nil
 }
 
-// trackMap will add the map reflect.Value to the list of tracked maps for the
-// event's payload.
+// trackMap will add the map to the list of tracked maps
 func (maps trackedMaps) trackMap(tm *tMap) error {
 	const op = "encrypt.(eventMaps).trackMap"
 	if tm == nil {
@@ -81,6 +81,7 @@ func (maps trackedMaps) trackMap(tm *tMap) error {
 	}
 }
 
+// unfiltered returns all the maps which haven't been tracked as filtered
 func (maps trackedMaps) unfiltered() []*tMap {
 	unfiltered := make([]*tMap, 0, len(maps))
 	for _, m := range maps {
