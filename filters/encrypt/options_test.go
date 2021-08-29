@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test_getOpts provides unit tests for getOpts and all the options
@@ -63,6 +64,15 @@ func Test_getOpts(t *testing.T) {
 		opts := getOpts(withIgnoreTaggable())
 		testOpts := getDefaultOptions()
 		testOpts.withIgnoreTaggable = true
+		assert.Equal(opts, testOpts)
+	})
+	t.Run("withTrackedMaps", func(t *testing.T) {
+		assert, require := assert.New(t), require.New(t)
+		tm, err := newTrackedMaps()
+		require.NoError(err)
+		opts := getOpts(withTrackedMaps(tm))
+		testOpts := getDefaultOptions()
+		testOpts.withTrackedMaps = tm
 		assert.Equal(opts, testOpts)
 	})
 }

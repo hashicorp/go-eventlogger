@@ -106,6 +106,7 @@ func TestFilter_Process(t *testing.T) {
 				protopayload.TaggedStringField:   structpb.NewStringValue("Tagged"),
 				protopayload.UntaggedStringField: structpb.NewStringValue("Untagged"),
 				protopayload.TaggedBytesField:    b,
+				protopayload.IntField:            structpb.NewNumberValue(10),
 			},
 		},
 		NontaggableAttributes: &structpb.Struct{
@@ -355,9 +356,12 @@ func TestFilter_Process(t *testing.T) {
 					taggable.UnclassifiedBytes = []byte(encrypt.RedactedData)
 					taggable.SecretBytesValue.Value = []byte(encrypt.RedactedData)
 					taggable.UnclassifiedBytesValue.Value = []byte(encrypt.RedactedData)
+					taggable.TaggableAttributes.Fields[protopayload.UntaggedStringField] = structpb.NewStringValue(encrypt.RedactedData)
 
 					taggable.TaggableAttributes.Fields[protopayload.TaggedStringField] = structpb.NewStringValue(encrypt.RedactedData) // overridden by Tags()
 					taggable.EmbeddedTaggable.ESecretString = encrypt.RedactedData
+					taggable.EmbeddedTaggable.ETaggableAttributes.Fields[protopayload.UntaggedStringField] = structpb.NewStringValue(encrypt.RedactedData)
+
 					return taggable
 				}(),
 			},
@@ -637,11 +641,17 @@ func TestFilter_Process(t *testing.T) {
 				return
 			}
 			require.NoError(err)
+			actualJson, err := json.Marshal(got)
+			require.NoError(err)
+			t.Log(string(actualJson))
+
 			if tt.setupWantEvent != nil {
 				tt.setupWantEvent(got)
 			}
-			actualJson, err := json.Marshal(got)
+			actualJson, err = json.Marshal(got)
 			require.NoError(err)
+			t.Log(string(actualJson))
+
 			wantJson, err := json.Marshal(tt.wantEvent)
 			require.NoError(err)
 			assert.JSONEq(string(wantJson), string(actualJson))

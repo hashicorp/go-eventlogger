@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/hashicorp/eventlogger"
@@ -397,7 +396,7 @@ func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverride
 	if err != nil {
 		return fmt.Errorf("%s: unable to get tags from taggable interface: %w", op, err)
 	}
-	tracked, err := newTrackedMaps()
+	trackedMaps, err := newTrackedMaps()
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
@@ -416,49 +415,12 @@ func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverride
 		if err = ef.filterValue(ctx, rv, info, opt...); err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
-		segs := strings.Split(pt.Pointer, "/")
-		switch {
-		case len(segs) == 2:
-			ptr := reflect.ValueOf(t).Pointer()
-			if _, ok := tracked[ptr]; !ok {
-				v := reflect.ValueOf(t)
-				// if v.Kind() == reflect.Ptr {
-				// 	v = reflect.ValueOf(t).Elem()
-				// }
-				tmap := &tMap{
-					value:          v,
-					filteredFields: map[string]struct{}{},
-				}
-				err := tracked.trackMap(tmap)
-				if err != nil {
-					return fmt.Errorf("%s: %w", op, err)
-				}
-			}
-			tracked[ptr].filteredFields[segs[len(segs)-1]] = struct{}{}
-
-		case len(segs) > 2:
-			i, err := pointerstructure.Get(t, strings.Join(segs[:len(segs)-1], "/"))
-			if err != nil {
-
-			}
-			mrv := reflect.ValueOf(i)
-			if _, ok := tracked[mrv.Pointer()]; !ok {
-				tmap := &tMap{
-					value:          mrv,
-					filteredFields: map[string]struct{}{},
-				}
-				if err := tracked.trackMap(tmap); err != nil {
-					return fmt.Errorf("%s: %w", op, err)
-				}
-			}
-			tracked[mrv.Pointer()].filteredFields[segs[len(segs)-1]] = struct{}{}
-
-		default:
-			// not reachable...
+		if err := trackedMaps.trackTaggable(t, pt.Pointer); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
 		}
 	}
-	if err := tracked.processUnfiltered(ctx, ef, filterOverrides, opt...); err != nil {
-		panic(err)
+	if err := trackedMaps.processUnfiltered(ctx, ef, filterOverrides, opt...); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	return nil
@@ -508,7 +470,6 @@ func (ef *Filter) filterValue(ctx context.Context, fv reflect.Value, classificat
 		return fmt.Errorf("%s: missing classification tag: %w", op, ErrInvalidParameter)
 	case classificationTag.Classification == PublicClassification || classificationTag.Operation == NoOperation:
 		return nil
-
 	}
 
 	// check for nil value (prevent panics)
