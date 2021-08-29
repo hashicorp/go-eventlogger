@@ -272,14 +272,14 @@ func TestFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Payload: &encrypt.TestTaggedMap{
-					"foo": "bar",
+					encrypt.TestMapField: "bar",
 				},
 			},
 			wantEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
 				Payload: &encrypt.TestTaggedMap{
-					"foo": "<REDACTED>",
+					encrypt.TestMapField: "<REDACTED>",
 				},
 			},
 		},
@@ -290,14 +290,14 @@ func TestFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Payload: encrypt.TestTaggedMap{
-					"foo": "bar",
+					encrypt.TestMapField: "bar",
 				},
 			},
 			wantEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
 				Payload: encrypt.TestTaggedMap{
-					"foo": "<REDACTED>",
+					encrypt.TestMapField: "<REDACTED>",
 				},
 			},
 		},
@@ -311,7 +311,7 @@ func TestFilter_Process(t *testing.T) {
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",
 					TaggedMap: encrypt.TestTaggedMap{
-						"foo": "bar",
+						encrypt.TestMapField: "bar",
 					},
 				},
 			},
@@ -322,7 +322,7 @@ func TestFilter_Process(t *testing.T) {
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",
 					TaggedMap: encrypt.TestTaggedMap{
-						"foo": "<REDACTED>",
+						encrypt.TestMapField: "<REDACTED>",
 					},
 				},
 			},
