@@ -8,7 +8,7 @@ based linter to analyze usage of the [`github.com/hashicorp/eventlogger/filters/
 
 ```console
 $ classtaglint
-classtaglint: analyze usage of class struct tags
+classtaglint: analyze usage of class struct tags and taggable types
 
 Usage: classtaglint [-flag] [package]
 
