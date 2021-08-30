@@ -254,7 +254,7 @@ func TestFilter_filterValue(t *testing.T) {
 			name:            "unknown-filter-operation",
 			ef:              testFilter,
 			fv:              reflect.ValueOf(&testStr).Elem(),
-			classification:  &tagInfo{Classification: SecretClassification, Operation: NoOperation},
+			classification:  &tagInfo{Classification: SecretClassification, Operation: "not-a-valid-operation"},
 			wantErrIs:       ErrInvalidParameter,
 			wantErrContains: "unknown filter operation",
 		},
@@ -279,6 +279,13 @@ func TestFilter_filterValue(t *testing.T) {
 			fv:             reflect.ValueOf(&testStr),
 			classification: &tagInfo{Classification: SecretClassification, Operation: HmacSha256Operation},
 			wantValue:      TestHmacSha256(t, []byte("fido"), wrapper, []byte("salt"), []byte("info")),
+		},
+		{
+			name:           "success-no-operation",
+			ef:             testFilter,
+			fv:             reflect.ValueOf(&testStr).Elem(),
+			classification: &tagInfo{Classification: SecretClassification, Operation: NoOperation},
+			wantValue:      testStr,
 		},
 		{
 			name:           "success-public",

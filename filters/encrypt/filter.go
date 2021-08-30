@@ -111,6 +111,21 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		return e, nil
 	}
 
+	var filtered bool
+	filterOps := DefaultFilterOperations()
+	for k, v := range ef.FilterOperationOverrides {
+		filterOps[k] = v
+	}
+	for _, op := range filterOps {
+		if op != NoOperation {
+			filtered = true
+		}
+	}
+	// if there's nothing being filtered, then we're done!
+	if !filtered {
+		return e, nil
+	}
+
 	if i, ok := e.Payload.(RotateWrapper); ok {
 		ef.l.Lock()
 		defer ef.l.Unlock()
@@ -146,10 +161,6 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	// depending on what filter operations are initialized, a wrapper may or may
 	// not be required.
 	if ef.Wrapper == nil && optWrapper == nil {
-		filterOps := DefaultFilterOperations()
-		for k, v := range ef.FilterOperationOverrides {
-			filterOps[k] = v
-		}
 		for _, filterOperation := range filterOps {
 			switch filterOperation {
 			case EncryptOperation, HmacSha256Operation:
@@ -444,7 +455,7 @@ func (ef *Filter) filterValue(ctx context.Context, fv reflect.Value, classificat
 	switch {
 	case classificationTag == nil:
 		return fmt.Errorf("%s: missing classification tag: %w", op, ErrInvalidParameter)
-	case classificationTag.Classification == PublicClassification:
+	case classificationTag.Classification == PublicClassification || classificationTag.Operation == NoOperation:
 		return nil
 
 	}

@@ -135,6 +135,34 @@ func TestFilter_Process(t *testing.T) {
 		wantErrContains string
 	}{
 		{
+			name: "all-operations-are-no-op",
+			filter: &encrypt.Filter{
+				FilterOperationOverrides: func() map[encrypt.DataClassification]encrypt.FilterOperation {
+					ops := encrypt.DefaultFilterOperations()
+					for k := range ops {
+						ops[k] = encrypt.NoOperation
+					}
+					return ops
+				}(),
+			},
+			// this payload would normally raise an error because it needs
+			// redacting and the string is not settable... but since we're
+			// overriding all the filter operations to be NoOperation, it will
+			// succeed and it's a simple way to test if the no-op short
+			// circuiting is working when all the filter operations for a node
+			// are set to NoOperation
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   testString,
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   testString,
+			},
+		},
+		{
 			name:   "simple",
 			filter: testEncryptingFilter,
 			testEvent: &eventlogger.Event{
