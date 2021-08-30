@@ -12,7 +12,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/goleak v1.0.0
-	golang.org/x/tools v0.0.0-20210101214203-2dba1e4ea05c // indirect
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
 	mvdan.cc/gofumpt v0.1.1
 )
