@@ -142,8 +142,24 @@ func TestFileSink_TimeRotate(t *testing.T) {
 	}
 
 	want := 2
-	if got, _ := ioutil.ReadDir(tmpDir); len(got) != want {
+	got, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("Error listing log directory: %v", err)
+	}
+	if len(got) != want {
 		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
+	}
+	found := false
+	names := []string{}
+	for _, entry := range got {
+		names = append(names, entry.Name())
+		if entry.Name() == fs.FileName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Did not find expected file %q -- found: %v", fs.FileName, names)
 	}
 }
 
@@ -183,8 +199,24 @@ func TestFileSink_ByteRotate(t *testing.T) {
 	}
 
 	want := 2
-	if got, _ := ioutil.ReadDir(tmpDir); len(got) != want {
+	got, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("Error listing log directory: %v", err)
+	}
+	if len(got) != want {
 		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
+	}
+	found := false
+	names := []string{}
+	for _, entry := range got {
+		names = append(names, entry.Name())
+		if entry.Name() == fs.FileName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Did not find expected file %q -- found: %v", fs.FileName, names)
 	}
 }
 

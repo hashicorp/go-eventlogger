@@ -159,11 +159,9 @@ func (fs *FileSink) open() error {
 	}
 
 	createTime := time.Now()
-	// New file name as the format:
-	// file rotation enabled: filename-timestamp.extension
-	// file rotation disabled: filename.extension
-	newfileName := fs.newFileName(createTime)
-	newfilePath := filepath.Join(fs.Path, newfileName)
+	// New file name: filename.extension
+	// Old file name: filename-timestamp.extension
+	newfilePath := filepath.Join(fs.Path, fs.FileName)
 
 	var err error
 	fs.f, err = os.OpenFile(newfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, mode)
@@ -198,8 +196,18 @@ func (fs *FileSink) rotate() error {
 		((elapsed > fs.MaxDuration) && (fs.MaxDuration > 0)) {
 
 		fs.f.Close()
+
+		// Move current log file to a timestamped file.
+		rotateTime := time.Now().UnixNano()
+		rotateFileName := fmt.Sprintf(fs.fileNamePattern(), strconv.FormatInt(rotateTime, 10))
+		oldPath := filepath.Join(fs.Path, fs.FileName)
+		newPath := filepath.Join(fs.Path, rotateFileName)
+		if err := os.Rename(oldPath, newPath); err != nil {
+			return fmt.Errorf("failed to rotate log file: %v", err)
+		}
+
 		if err := fs.pruneFiles(); err != nil {
-			return err
+			return fmt.Errorf("failed to prune log files: %w", err)
 		}
 		return fs.open()
 	}
