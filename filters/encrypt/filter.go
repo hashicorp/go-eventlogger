@@ -113,11 +113,12 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 
 	var filtered bool
 	filterOps := DefaultFilterOperations()
-	for k, v := range ef.FilterOperationOverrides {
-		filterOps[k] = v
-	}
-	for _, op := range filterOps {
-		if op != NoOperation {
+	for class := range filterOps {
+		override, ok := ef.FilterOperationOverrides[class]
+		if ok {
+			filterOps[class] = override
+		}
+		if filterOps[class] != NoOperation {
 			filtered = true
 		}
 	}
