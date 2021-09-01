@@ -79,9 +79,3 @@ func withIgnoreTaggable() Option {
 		o.withIgnoreTaggable = true
 	}
 }
-
-func withTrackedMaps(tm *trackedMaps) Option {
-	return func(o *options) {
-		o.withTrackedMaps = tm
-	}
-}

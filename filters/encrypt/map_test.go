@@ -345,6 +345,16 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 			wantErrContains: "unfiltered value (slice) is a not a map",
 		},
 		{
+			name: "map-string-interface-with-nil-field",
+			ef:   ef,
+			tm:   newTm(map[string]interface{}{TestMapField: nil}),
+		},
+		{
+			name: "map-string-ptr-with-nil",
+			ef:   ef,
+			tm:   newTm(map[string]*testStruct{TestMapField: nil}),
+		},
+		{
 			name: "no-tracked-maps",
 			ef:   ef,
 			tm:   &trackedMaps{},
@@ -354,6 +364,13 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 			ef:   ef,
 			tm: newTm(map[string]interface{}{
 				TestMapField: "alice",
+			}),
+		},
+		{
+			name: "map-string-interface-of-ptr-structpb",
+			ef:   ef,
+			tm: newTm(map[string]interface{}{
+				TestMapField: structpb.NewStringValue("alice"),
 			}),
 		},
 		{
@@ -431,6 +448,17 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 			}),
 		},
 		{
+			name: "map-string-slice-interface",
+			ef:   ef,
+			tm: newTm(map[string][]interface{}{
+				TestMapField: {
+					&testStruct{
+						Name: "alice",
+					},
+				},
+			}),
+		},
+		{
 			name: "map-string-map-string-string",
 			ef:   ef,
 			tm: newTm(map[string]map[string]string{
@@ -444,6 +472,20 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 			ef:   ef,
 			tm: newTm(map[string]*structpb.Value{
 				TestMapField: structpb.NewStringValue("alice"),
+			}),
+		},
+		{
+			name: "map-string-map-structpbstruct",
+			ef:   ef,
+			tm: newTm(map[string]*structpb.Struct{
+				TestMapField: testStructpbStruct,
+			}),
+		},
+		{
+			name: "slice-map-structpbstruct",
+			ef:   ef,
+			tm: newTm(map[string][]*structpb.Struct{
+				TestMapField: {testStructpbStruct},
 			}),
 		},
 	}
@@ -473,6 +515,11 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 					gotJson, err := json.Marshal(v.Interface())
 					require.NoError(err)
 					switch {
+					case tt.name == "map-string-interface-with-nil-field" || tt.name == "map-string-ptr-with-nil":
+						wantJson, err := json.Marshal(nil)
+						require.NoError(err)
+						assert.JSONEq(string(wantJson), string(gotJson))
+
 					case v.Type() == reflect.TypeOf([]string{}):
 						wantJson, err := json.Marshal([]string{RedactedData})
 						require.NoError(err)
@@ -514,10 +561,31 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 					case v.Type() == reflect.TypeOf(map[string]*structpb.Struct{}):
 						wantJson, err := json.Marshal(
 							map[string]*structpb.Value{
-								TestMapField: structpb.NewStringValue("alice"),
+								TestMapField: structpb.NewStringValue(RedactedData),
 							},
 						)
 
+						require.NoError(err)
+						assert.JSONEq(string(wantJson), string(gotJson))
+
+					case v.Type() == reflect.TypeOf([]*structpb.Struct{}):
+						s, err := structpb.NewStruct(map[string]interface{}{TestMapField: RedactedData})
+						require.NoError(err)
+						wantJson, err := json.Marshal([]*structpb.Struct{s})
+						require.NoError(err)
+						assert.JSONEq(string(wantJson), string(gotJson))
+
+					case v.Type() == reflect.TypeOf(&structpb.Struct{}):
+						s, err := structpb.NewStruct(map[string]interface{}{TestMapField: RedactedData})
+						require.NoError(err)
+						wantJson, err := json.Marshal(s)
+						require.NoError(err)
+						assert.JSONEq(string(wantJson), string(gotJson))
+
+					case tt.name == "map-string-slice-interface":
+						wantJson, err := json.Marshal([]interface{}{
+							testStruct{Name: RedactedData},
+						})
 						require.NoError(err)
 						assert.JSONEq(string(wantJson), string(gotJson))
 

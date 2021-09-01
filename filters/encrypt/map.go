@@ -45,6 +45,7 @@ type tMap struct {
 	l              sync.RWMutex
 }
 
+// markFieldFiltered will mark the specified field as "filtered"
 func (tm *tMap) markFieldFiltered(fieldName string) {
 	tm.l.Lock()
 	defer tm.l.Unlock()
@@ -54,8 +55,9 @@ func (tm *tMap) markFieldFiltered(fieldName string) {
 	tm.filteredFields[fieldName] = struct{}{}
 }
 
+// trackedMaps defines a type for tracking maps while processing event.
 type trackedMaps struct {
-	tracked map[uintptr]*tMap
+	tracked map[uintptr]*tMap // a map of all tracked maps using each map's addr as the index
 	l       sync.RWMutex
 }
 
@@ -99,9 +101,15 @@ func (maps *trackedMaps) trackMap(tm *tMap) error {
 			if maps.tracked == nil {
 				maps.tracked = make(map[uintptr]*tMap)
 			}
-			// we may need to check for kind.Ptr and then set to tm.Elem() but for now
-			// it's not required.
-			maps.tracked[tm.value.Pointer()] = tm
+			// we may need to check for kind.Ptr and then set tm = tm.Elem() but
+			// for now it's not required.
+			ptr := tm.value.Pointer()
+
+			// are we tracking this map already?
+			if _, ok := maps.tracked[ptr]; ok {
+				return
+			}
+			maps.tracked[ptr] = tm
 		}()
 		return nil
 	default:
@@ -166,13 +174,21 @@ func (maps *trackedMaps) processUnfiltered(ctx context.Context, ef *Filter, filt
 			}
 			field := v.MapIndex(key)
 
-			var fPtr bool
-			if field.Kind() == reflect.Ptr {
-				field = field.Elem()
-				fPtr = true
+			if field.CanInterface() && field.Interface() == nil {
+				continue
 			}
+
 			if field.Kind() == reflect.Interface {
 				field = field.Elem()
+			}
+
+			var fPtr bool
+			if field.Kind() == reflect.Ptr {
+				if field == reflect.ValueOf(nil) || field.IsNil() {
+					continue
+				}
+				field = field.Elem()
+				fPtr = true
 			}
 
 			ftype := field.Type()
@@ -226,32 +242,30 @@ func (maps *trackedMaps) processUnfiltered(ctx context.Context, ef *Filter, filt
 					for i := 0; i < field.Len(); i++ {
 						f := field.Index(i)
 						if f.Kind() == reflect.Interface {
-							f.Elem()
+							f = f.Elem()
 						}
 						if f.Kind() == reflect.Ptr {
 							f = f.Elem()
+						}
+						if f.Type() == reflect.TypeOf(structpb.Struct{}) {
+							f = f.FieldByName("Fields")
 						}
 						newMaps, err := newTrackedMaps()
 						if err != nil {
 							return fmt.Errorf("%s: unable to create new tracked maps for slice: %w", op, err)
 						}
+						fkind := f.Kind()
 						switch {
-						case f.Kind() == reflect.Struct:
-							newOpts := make([]Option, 0, len(opt))
-							newOpts = append(newOpts, opt...)
-							newOpts = append(newOpts, withTrackedMaps(newMaps))
-							if err := ef.filterField(ctx, f, filterOverrides, newOpts...); err != nil {
+						case fkind == reflect.Struct:
+							if err := ef.filterField(ctx, f, filterOverrides, newMaps, opt...); err != nil {
 								return fmt.Errorf("%s: unable to filter slice of structs: %w", op, err)
 							}
-
-						case f.Kind() == reflect.Map:
+						case fkind == reflect.Map:
 							newMaps.trackMap(&tMap{
 								value: f,
 							})
-
 						default:
-							// for now, there's no default... perhaps in the
-							// future there will be a reasonable default.
+							// nothing reasonable yet...
 						}
 						if err := newMaps.processUnfiltered(ctx, ef, filterOverrides, opt...); err != nil {
 							return fmt.Errorf("%s: unable to process maps found in slice: %w", op, err)
@@ -260,9 +274,16 @@ func (maps *trackedMaps) processUnfiltered(ctx context.Context, ef *Filter, filt
 				}
 
 			case fkind == reflect.Struct:
+				newMaps, err := newTrackedMaps()
+				if err != nil {
+					return fmt.Errorf("%s: unable to create new tracked maps for slice: %w", op, err)
+				}
 				f := field
-				if err := ef.filterField(ctx, f, filterOverrides, opt...); err != nil {
+				if err := ef.filterField(ctx, f, filterOverrides, newMaps, opt...); err != nil {
 					return fmt.Errorf("%s: unable to filter struct: %w", op, err)
+				}
+				if err := newMaps.processUnfiltered(ctx, ef, filterOverrides, opt...); err != nil {
+					return fmt.Errorf("%s: unable to process maps found in struct: %w", op, err)
 				}
 				if fPtr {
 					f = field.Addr()
@@ -281,7 +302,6 @@ func (maps *trackedMaps) processUnfiltered(ctx context.Context, ef *Filter, filt
 			default:
 				// at this point, there's no reasonable default.. wish there was.
 			}
-
 			// if you want to examine the "after filter" value you'll need to
 			// look at the v.MapIndex(key) directly, not the field.
 		}
