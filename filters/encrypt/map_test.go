@@ -18,14 +18,16 @@ func Test_newTrackedMaps(t *testing.T) {
 	tests := []struct {
 		name            string
 		tm              []*tMap
-		want            trackedMaps
+		want            *trackedMaps
 		wantErr         bool
 		wantErrIs       error
 		wantErrContains string
 	}{
 		{
 			name: "no-args",
-			want: trackedMaps{},
+			want: &trackedMaps{
+				tracked: map[uintptr]*tMap{},
+			},
 		},
 		{
 			name: "bad-map-value",
@@ -60,10 +62,12 @@ func Test_newTrackedMaps(t *testing.T) {
 					filtered: true,
 				},
 			},
-			want: trackedMaps{
-				testTMap.Pointer(): &tMap{
-					value:    testTMap,
-					filtered: true,
+			want: &trackedMaps{
+				tracked: map[uintptr]*tMap{
+					testTMap.Pointer(): {
+						value:    testTMap,
+						filtered: true,
+					},
 				},
 			},
 		},
@@ -95,14 +99,16 @@ func Test_trackedMaps_unfiltered(t *testing.T) {
 
 	tests := []struct {
 		name string
-		tm   trackedMaps
+		tm   *trackedMaps
 		want []*tMap
 	}{
 		{
 			name: "simple",
-			tm: trackedMaps{
-				m1.Pointer(): &tMap{value: m1, filtered: true},
-				m2.Pointer(): &tMap{value: m2, filtered: false},
+			tm: &trackedMaps{
+				tracked: map[uintptr]*tMap{
+					m1.Pointer(): {value: m1, filtered: true},
+					m2.Pointer(): {value: m2, filtered: false},
+				},
 			},
 			want: []*tMap{
 				{value: m2, filtered: false},
@@ -123,16 +129,16 @@ func Test_trackedMaps_trackMap(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		tm              trackedMaps
+		tm              *trackedMaps
 		m               *tMap
-		wantTm          trackedMaps
+		wantTm          *trackedMaps
 		wantErr         bool
 		wantErrIs       error
 		wantErrContains string
 	}{
 		{
 			name:            "missing-map",
-			tm:              trackedMaps{},
+			tm:              &trackedMaps{},
 			m:               nil,
 			wantErr:         true,
 			wantErrIs:       ErrInvalidParameter,
@@ -140,7 +146,7 @@ func Test_trackedMaps_trackMap(t *testing.T) {
 		},
 		{
 			name:            "missing-value",
-			tm:              trackedMaps{},
+			tm:              &trackedMaps{},
 			m:               &tMap{},
 			wantErr:         true,
 			wantErrIs:       ErrInvalidParameter,
@@ -148,7 +154,7 @@ func Test_trackedMaps_trackMap(t *testing.T) {
 		},
 		{
 			name: "not-valid-value",
-			tm:   trackedMaps{},
+			tm:   &trackedMaps{},
 			m: &tMap{
 				value: reflect.ValueOf(""),
 			},
@@ -158,13 +164,15 @@ func Test_trackedMaps_trackMap(t *testing.T) {
 		},
 		{
 			name: "valid",
-			tm:   trackedMaps{},
+			tm:   &trackedMaps{},
 			m: &tMap{
 				value: testTMap,
 			},
-			wantTm: trackedMaps{
-				testTMap.Pointer(): &tMap{
-					value: testTMap,
+			wantTm: &trackedMaps{
+				tracked: map[uintptr]*tMap{
+					testTMap.Pointer(): {
+						value: testTMap,
+					},
 				},
 			},
 		},
@@ -198,17 +206,17 @@ func Test_trackedMaps_trackTaggable(t *testing.T) {
 	}
 	tests := []struct {
 		name            string
-		tm              trackedMaps
+		tm              *trackedMaps
 		taggable        Taggable
 		pointer         string
-		wantTm          trackedMaps
+		wantTm          *trackedMaps
 		wantErr         bool
 		wantErrIs       error
 		wantErrContains string
 	}{
 		{
 			name:            "missing-pointer",
-			tm:              trackedMaps{},
+			tm:              &trackedMaps{},
 			taggable:        TestTaggedMap{},
 			wantErr:         true,
 			wantErrIs:       ErrInvalidParameter,
@@ -216,7 +224,7 @@ func Test_trackedMaps_trackTaggable(t *testing.T) {
 		},
 		{
 			name:            "missing-taggable",
-			tm:              trackedMaps{},
+			tm:              &trackedMaps{},
 			pointer:         "/" + TestMapField,
 			wantErr:         true,
 			wantErrIs:       ErrInvalidParameter,
@@ -224,7 +232,7 @@ func Test_trackedMaps_trackTaggable(t *testing.T) {
 		},
 		{
 			name:            "bad-path",
-			tm:              trackedMaps{},
+			tm:              &trackedMaps{},
 			pointer:         "missing-initial-path-delimiter",
 			taggable:        TestTaggedMap{},
 			wantErr:         true,
@@ -233,7 +241,7 @@ func Test_trackedMaps_trackTaggable(t *testing.T) {
 		},
 		{
 			name:            "pointer-path-invalid",
-			tm:              trackedMaps{},
+			tm:              &trackedMaps{},
 			pointer:         "/unknownMap/" + TestMapField,
 			taggable:        TestTaggedMap{},
 			wantErr:         true,
@@ -241,19 +249,23 @@ func Test_trackedMaps_trackTaggable(t *testing.T) {
 		},
 		{
 			name: "valid",
-			tm: trackedMaps{
-				reflect.ValueOf(testMap).Pointer(): &tMap{
-					value:          reflect.ValueOf(testMap),
-					filteredFields: map[string]struct{}{},
+			tm: &trackedMaps{
+				tracked: map[uintptr]*tMap{
+					reflect.ValueOf(testMap).Pointer(): {
+						value:          reflect.ValueOf(testMap),
+						filteredFields: map[string]struct{}{},
+					},
 				},
 			},
 			pointer:  "/" + TestMapField,
 			taggable: testMap,
-			wantTm: trackedMaps{
-				reflect.ValueOf(testMap).Pointer(): &tMap{
-					value: reflect.ValueOf(testMap),
-					filteredFields: map[string]struct{}{
-						TestMapField: {},
+			wantTm: &trackedMaps{
+				tracked: map[uintptr]*tMap{
+					reflect.ValueOf(testMap).Pointer(): {
+						value: reflect.ValueOf(testMap),
+						filteredFields: map[string]struct{}{
+							TestMapField: {},
+						},
 					},
 				},
 			},
@@ -291,10 +303,12 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 		}
 	}
 
-	newTm := func(m interface{}) trackedMaps {
-		return trackedMaps{
-			reflect.ValueOf(m).Pointer(): &tMap{
-				value: reflect.ValueOf(m),
+	newTm := func(m interface{}) *trackedMaps {
+		return &trackedMaps{
+			tracked: map[uintptr]*tMap{
+				reflect.ValueOf(m).Pointer(): {
+					value: reflect.ValueOf(m),
+				},
 			},
 		}
 	}
@@ -311,7 +325,7 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 	tests := []struct {
 		name            string
 		ef              *Filter
-		tm              trackedMaps
+		tm              *trackedMaps
 		wantErr         bool
 		wantErrIs       error
 		wantErrContains string
@@ -333,7 +347,7 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 		{
 			name: "no-tracked-maps",
 			ef:   ef,
-			tm:   trackedMaps{},
+			tm:   &trackedMaps{},
 		},
 		{
 			name: "map-string-interface",
@@ -449,7 +463,7 @@ func Test_trackedMaps_processUnfiltered(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			for _, m := range tt.tm {
+			for _, m := range tt.tm.tracked {
 				mValue := m.value
 				if m.value.Type() == reflect.TypeOf(&structpb.Struct{}) {
 					mValue = m.value.Elem().FieldByName("Fields")

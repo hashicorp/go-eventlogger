@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/mitchellh/pointerstructure"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -41,14 +42,30 @@ type tMap struct {
 	value          reflect.Value
 	filtered       bool                // true when all fields have been filtered.
 	filteredFields map[string]struct{} // not nil when only some fields have been filtered
+	l              sync.RWMutex
 }
 
-type trackedMaps map[uintptr]*tMap
+func (tm *tMap) markFieldFiltered(fieldName string) {
+	tm.l.Lock()
+	defer tm.l.Unlock()
+	if tm.filteredFields == nil {
+		tm.filteredFields = map[string]struct{}{}
+	}
+	tm.filteredFields[fieldName] = struct{}{}
+}
+
+type trackedMaps struct {
+	tracked map[uintptr]*tMap
+	l       sync.RWMutex
+}
 
 // newTrackedMaps will create a new trackedMaps
-func newTrackedMaps(tm ...*tMap) (trackedMaps, error) {
+func newTrackedMaps(tm ...*tMap) (*trackedMaps, error) {
 	const op = "encrypt.(trackedMaps).newTrackedMaps"
-	maps := make(trackedMaps, len(tm))
+	maps := &trackedMaps{
+		tracked: make(map[uintptr]*tMap, len(tm)),
+	}
+
 	for i, m := range tm {
 		if err := maps.trackMap(m); err != nil {
 			return nil, fmt.Errorf("%s: new map parameter #%d is not a valid: %w", op, i, err)
@@ -58,7 +75,7 @@ func newTrackedMaps(tm ...*tMap) (trackedMaps, error) {
 }
 
 // trackMap will add the map to the list of tracked maps
-func (maps trackedMaps) trackMap(tm *tMap) error {
+func (maps *trackedMaps) trackMap(tm *tMap) error {
 	const op = "encrypt.(trackedMaps).trackMap"
 	if tm == nil {
 		return fmt.Errorf("%s: missing map: %w", op, ErrInvalidParameter)
@@ -75,17 +92,36 @@ func (maps trackedMaps) trackMap(tm *tMap) error {
 	}
 	switch {
 	case isMapPtr || tmKind == reflect.Map || tm.value.Type() == reflect.TypeOf(&structpb.Struct{}):
-		maps[tm.value.Pointer()] = tm // we might need to move this if we ever change the value of tm to tm.Elem()
+		func() {
+			maps.l.Lock()
+			defer maps.l.Unlock()
+
+			if maps.tracked == nil {
+				maps.tracked = make(map[uintptr]*tMap)
+			}
+			// we may need to check for kind.Ptr and then set to tm.Elem() but for now
+			// it's not required.
+			maps.tracked[tm.value.Pointer()] = tm
+		}()
 		return nil
 	default:
 		return fmt.Errorf("%s: %s is not a valid parameter type: %w", op, tm.value.Type(), ErrInvalidParameter)
 	}
 }
 
+// getTracked will retrieve the tracked map and will return false if the map
+// isn't being tracked.
+func (maps *trackedMaps) getTracked(ptr uintptr) (*tMap, bool) {
+	maps.l.RLock()
+	defer maps.l.RUnlock()
+	tm, ok := maps.tracked[ptr]
+	return tm, ok
+}
+
 // unfiltered returns all the maps which haven't been tracked as filtered
-func (maps trackedMaps) unfiltered() []*tMap {
-	unfiltered := make([]*tMap, 0, len(maps))
-	for _, m := range maps {
+func (maps *trackedMaps) unfiltered() []*tMap {
+	unfiltered := make([]*tMap, 0, len(maps.tracked))
+	for _, m := range maps.tracked {
 		if m.filtered {
 			continue
 		}
@@ -97,7 +133,7 @@ func (maps trackedMaps) unfiltered() []*tMap {
 // processUnfiltered will process/filter all the maps being tracked which
 // haven't been tracked as filtered and it will mark them as filtered.  It will
 // skip any fields within a map which have already been marked as filtered.
-func (maps trackedMaps) processUnfiltered(ctx context.Context, ef *Filter, filterOverrides map[DataClassification]FilterOperation, opt ...Option) error {
+func (maps *trackedMaps) processUnfiltered(ctx context.Context, ef *Filter, filterOverrides map[DataClassification]FilterOperation, opt ...Option) error {
 	const op = "encrypt.(trackedMaps).processUnfiltered"
 	if ef == nil {
 		return fmt.Errorf("%s: missing filter node: %w", op, ErrInvalidParameter)
@@ -256,7 +292,7 @@ func (maps trackedMaps) processUnfiltered(ctx context.Context, ef *Filter, filte
 	return nil
 }
 
-func (maps trackedMaps) trackTaggable(taggable Taggable, pointer string) error {
+func (maps *trackedMaps) trackTaggable(taggable Taggable, pointer string) error {
 	const (
 		op            = "encrypt.(trackedMaps).trackTaggable"
 		pathDelimiter = "/"
@@ -282,7 +318,7 @@ func (maps trackedMaps) trackTaggable(taggable Taggable, pointer string) error {
 		ptr := reflect.ValueOf(taggable).Pointer()
 
 		// Are we already tracking this map?
-		if _, ok := maps[ptr]; !ok {
+		if _, ok := maps.getTracked(ptr); !ok {
 			v := reflect.ValueOf(taggable)
 			// not sure if we need to worry if v.Kind() is a reflect.Ptr and
 			// then get the elem... so for now, I'm going to skip that.
@@ -297,7 +333,11 @@ func (maps trackedMaps) trackTaggable(taggable Taggable, pointer string) error {
 		}
 		// now, we're just going to mark a field referenced by the pointer
 		// within the map as "filtered"
-		maps[ptr].filteredFields[segs[len(segs)-1]] = struct{}{}
+		tm, ok := maps.getTracked(ptr)
+		if !ok {
+			return fmt.Errorf("%s: unable to get tracked map", op)
+		}
+		tm.markFieldFiltered(segs[len(segs)-1])
 
 	default:
 		// default is a map that we need to go get via the pointer
@@ -309,7 +349,7 @@ func (maps trackedMaps) trackTaggable(taggable Taggable, pointer string) error {
 		ptr := v.Pointer()
 
 		// Are we already tracking this map?
-		if _, ok := maps[ptr]; !ok {
+		if _, ok := maps.getTracked(ptr); !ok {
 			tmap := &tMap{
 				value:          v,
 				filteredFields: map[string]struct{}{},
@@ -320,7 +360,11 @@ func (maps trackedMaps) trackTaggable(taggable Taggable, pointer string) error {
 		}
 		// now, we're just going to mark a field referenced by the pointer
 		// within the map as "filtered"
-		maps[ptr].filteredFields[segs[len(segs)-1]] = struct{}{}
+		tm, ok := maps.getTracked(ptr)
+		if !ok {
+			return fmt.Errorf("%s: unable to get tracked map", op)
+		}
+		tm.markFieldFiltered(segs[len(segs)-1])
 	}
 	return nil
 }
