@@ -48,7 +48,7 @@ func Test_getOpts(t *testing.T) {
 	t.Run("withPointer", func(t *testing.T) {
 		assert := assert.New(t)
 		m := TestTaggedMap{
-			"foo": "bar",
+			TestMapField: "bar",
 		}
 		opts := getOpts(withPointer(m, "/foo"))
 		testOpts := getDefaultOptions()

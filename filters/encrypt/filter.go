@@ -170,6 +170,11 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		}
 	}
 
+	// before we copy/dup the event, let's find out if we even need
+	if reflect.ValueOf(e.Payload).IsZero() {
+		return e, nil
+	}
+
 	// since the node will be modifying the event data (aka redact/encrypt), we
 	// need our own copy, otherwise we could be changing the event across other
 	// pipelines and nodes and creating a host of problems and race conditions.
@@ -188,9 +193,6 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 
 	switch payloadValue.Kind() {
 	case reflect.Ptr, reflect.Interface:
-		if payloadValue.IsNil() { // be sure it's not a nil interface
-			return e, nil
-		}
 		payloadValue = reflect.ValueOf(e.Payload).Elem()
 	}
 
@@ -200,6 +202,11 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	// make a copy of the overrides before we begin processing this event, which
 	// will give us a consistent set of overrides for this event.
 	filterOverrides := ef.copyFilterOperationOverrides()
+
+	tm, err := newTrackedMaps()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
 
 	switch {
 	case pType == reflect.TypeOf("") || pType == reflect.TypeOf([]uint8{}):
@@ -211,7 +218,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 	case isTaggable:
-		if err := ef.filterTaggable(ctx, taggedInterface, filterOverrides, opts...); err != nil {
+		if err := ef.filterTaggable(ctx, taggedInterface, filterOverrides, tm, opts...); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 		if pKind != reflect.Map {
@@ -219,7 +226,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 			// fields that need to be filtered, but be sure to ignore taggable
 			// on the next recursion or will be in an infinite loop
 			opts := append(opts, withIgnoreTaggable())
-			if err := ef.filterField(ctx, payloadValue, filterOverrides, opts...); err != nil {
+			if err := ef.filterField(ctx, payloadValue, filterOverrides, tm, opts...); err != nil {
 				return nil, fmt.Errorf("%s: %w", op, err)
 			}
 		}
@@ -238,19 +245,32 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 				if f.Kind() == reflect.Ptr {
 					f = f.Elem()
 				}
-				if f.Kind() != reflect.Struct {
-					continue
+				if f.Type() == reflect.TypeOf(structpb.Struct{}) {
+					f = f.FieldByName("Fields")
 				}
-				if err := ef.filterField(ctx, f, filterOverrides, opts...); err != nil {
-					return nil, fmt.Errorf("%s: %w", op, err)
+				fkind := f.Kind()
+				switch {
+				case fkind == reflect.Map:
+					tm.trackMap(&tMap{value: f})
+				case fkind == reflect.Struct:
+					if err := ef.filterField(ctx, f, filterOverrides, tm, opts...); err != nil {
+						return nil, fmt.Errorf("%s: %w", op, err)
+					}
+				default:
+					// nothing reasonable yet...
 				}
 			}
 		}
 	case pKind == reflect.Struct:
-		if err := ef.filterField(ctx, payloadValue, filterOverrides, opts...); err != nil {
+		if err := ef.filterField(ctx, payloadValue, filterOverrides, tm, opts...); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 	}
+
+	if err := tm.processUnfiltered(ctx, ef, filterOverrides, opts...); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
 	return e, nil
 }
 
@@ -269,7 +289,7 @@ func (ef *Filter) copyFilterOperationOverrides() map[DataClassification]FilterOp
 
 // filterField will recursively iterate over all the fields for a struct value
 // and filter them based on their DataClassification
-func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverrides map[DataClassification]FilterOperation, opt ...Option) error {
+func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverrides map[DataClassification]FilterOperation, tm *trackedMaps, opt ...Option) error {
 	const op = "event.(Filter).filterField"
 	// check for nil value (prevent panics)
 	if v == reflect.ValueOf(nil) {
@@ -282,7 +302,7 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 	// taggable things and other fields.
 	if opts.withIgnoreTaggable {
 		var removeIdx int
-		for i := 0; i < len(opt)-1; i++ {
+		for i := 0; i < len(opt); i++ {
 			currentOpt := getOpts(opt[i])
 			if currentOpt.withIgnoreTaggable {
 				removeIdx = i
@@ -353,17 +373,25 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 					if f.Kind() == reflect.Ptr {
 						f = f.Elem()
 					}
-					if f.Kind() != reflect.Struct {
-						continue
+					if f.Type() == reflect.TypeOf(&structpb.Struct{}) {
+						f = f.FieldByName("Fields")
 					}
-					if err := ef.filterField(ctx, f, filterOverrides, opt...); err != nil {
-						return err
+					fkind := f.Kind()
+					switch {
+					case fkind == reflect.Map:
+						tm.trackMap(&tMap{value: f})
+					case fkind == reflect.Struct:
+						if err := ef.filterField(ctx, f, filterOverrides, tm, opt...); err != nil {
+							return err
+						}
+					default:
+						// nothing reasonable yet...
 					}
 				}
 			}
 
 		case isTaggable && !opts.withIgnoreTaggable:
-			if err := ef.filterTaggable(ctx, taggedInterface, filterOverrides, opt...); err != nil {
+			if err := ef.filterTaggable(ctx, taggedInterface, filterOverrides, tm, opt...); err != nil {
 				return fmt.Errorf("%s: %w", op, err)
 			}
 			if fkind != reflect.Map {
@@ -371,15 +399,21 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 				// fields that need to be filtered, but be sure to ignore taggable
 				// on the next recursion or will be in an infinite loop
 				opt = append(opt, withIgnoreTaggable())
-				if err := ef.filterField(ctx, field, filterOverrides, opt...); err != nil {
+				if err := ef.filterField(ctx, field, filterOverrides, tm, opt...); err != nil {
 					return fmt.Errorf("%s: %w", op, err)
 				}
 			}
 
 		// if the field is a struct
 		case fkind == reflect.Struct:
-			if err := ef.filterField(ctx, field, filterOverrides, opt...); err != nil {
+			if err := ef.filterField(ctx, field, filterOverrides, tm, opt...); err != nil {
 				return err
+			}
+
+		case fkind == reflect.Map: // this is the problem!!
+			t := &tMap{value: field}
+			if err := tm.trackMap(t); err != nil {
+				return fmt.Errorf("%s: %w", op, err)
 			}
 		}
 	}
@@ -387,7 +421,7 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 }
 
 // filterTaggable will filter data that implements the Taggable interface
-func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverrides map[DataClassification]FilterOperation, opt ...Option) error {
+func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverrides map[DataClassification]FilterOperation, tm *trackedMaps, opt ...Option) error {
 	const op = "event.(Filter).filterTaggable"
 	if t == nil {
 		return fmt.Errorf("%s: missing taggable interface: %w", op, ErrInvalidParameter)
@@ -395,6 +429,9 @@ func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverride
 	tags, err := t.Tags()
 	if err != nil {
 		return fmt.Errorf("%s: unable to get tags from taggable interface: %w", op, err)
+	}
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
 	}
 	for _, pt := range tags {
 		value, err := pointerstructure.Get(t, pt.Pointer)
@@ -407,7 +444,11 @@ func (ef *Filter) filterTaggable(ctx context.Context, t Taggable, filterOverride
 		}
 		rv := reflect.Indirect(reflect.ValueOf(value))
 		info := getClassificationFromTagString(fmt.Sprintf("%s,%s", pt.Classification, pt.Filter), withFilterOperations(filterOverrides))
-		if err = ef.filterValue(ctx, rv, info, withPointer(t, pt.Pointer)); err != nil {
+		opt = append(opt, withPointer(t, pt.Pointer))
+		if err = ef.filterValue(ctx, rv, info, opt...); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+		if err := tm.trackTaggable(t, pt.Pointer); err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
 	}
@@ -443,7 +484,7 @@ func (ef *Filter) filterSlice(ctx context.Context, classificationTag *tagInfo, s
 	}
 
 	for i := 0; i < slice.Len(); i++ {
-		if err := ef.filterValue(ctx, slice.Index(i), classificationTag); err != nil {
+		if err := ef.filterValue(ctx, slice.Index(i), classificationTag, opt...); err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
 	}
@@ -458,7 +499,6 @@ func (ef *Filter) filterValue(ctx context.Context, fv reflect.Value, classificat
 		return fmt.Errorf("%s: missing classification tag: %w", op, ErrInvalidParameter)
 	case classificationTag.Classification == PublicClassification || classificationTag.Operation == NoOperation:
 		return nil
-
 	}
 
 	// check for nil value (prevent panics)

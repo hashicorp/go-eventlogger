@@ -84,6 +84,11 @@ func TestFilter_Process(t *testing.T) {
 	b, err := structpb.NewValue([]byte("Tagged-Bytes"))
 	require.NoError(t, err)
 
+	testStructpbStruct, err := structpb.NewStruct(map[string]interface{}{
+		encrypt.TestMapField: "alice",
+	})
+	require.NoError(t, err)
+
 	testTaggable := &protopayload.WithTaggable{
 		PublicString:            "PublicString",
 		SensitiveString:         "SensitiveString",
@@ -106,6 +111,7 @@ func TestFilter_Process(t *testing.T) {
 				protopayload.TaggedStringField:   structpb.NewStringValue("Tagged"),
 				protopayload.UntaggedStringField: structpb.NewStringValue("Untagged"),
 				protopayload.TaggedBytesField:    b,
+				protopayload.IntField:            structpb.NewNumberValue(10),
 			},
 		},
 		NontaggableAttributes: &structpb.Struct{
@@ -272,14 +278,14 @@ func TestFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Payload: &encrypt.TestTaggedMap{
-					"foo": "bar",
+					encrypt.TestMapField: "bar",
 				},
 			},
 			wantEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
 				Payload: &encrypt.TestTaggedMap{
-					"foo": "<REDACTED>",
+					encrypt.TestMapField: "<REDACTED>",
 				},
 			},
 		},
@@ -290,14 +296,14 @@ func TestFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Payload: encrypt.TestTaggedMap{
-					"foo": "bar",
+					encrypt.TestMapField: "bar",
 				},
 			},
 			wantEvent: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
 				Payload: encrypt.TestTaggedMap{
-					"foo": "<REDACTED>",
+					encrypt.TestMapField: "<REDACTED>",
 				},
 			},
 		},
@@ -311,7 +317,7 @@ func TestFilter_Process(t *testing.T) {
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",
 					TaggedMap: encrypt.TestTaggedMap{
-						"foo": "bar",
+						encrypt.TestMapField: "bar",
 					},
 				},
 			},
@@ -322,7 +328,7 @@ func TestFilter_Process(t *testing.T) {
 					PublicId:          "id-12",
 					SensitiveUserName: "Alice Eve Doe",
 					TaggedMap: encrypt.TestTaggedMap{
-						"foo": "<REDACTED>",
+						encrypt.TestMapField: "<REDACTED>",
 					},
 				},
 			},
@@ -355,9 +361,13 @@ func TestFilter_Process(t *testing.T) {
 					taggable.UnclassifiedBytes = []byte(encrypt.RedactedData)
 					taggable.SecretBytesValue.Value = []byte(encrypt.RedactedData)
 					taggable.UnclassifiedBytesValue.Value = []byte(encrypt.RedactedData)
+					taggable.TaggableAttributes.Fields[protopayload.UntaggedStringField] = structpb.NewStringValue(encrypt.RedactedData)
 
 					taggable.TaggableAttributes.Fields[protopayload.TaggedStringField] = structpb.NewStringValue(encrypt.RedactedData) // overridden by Tags()
+					taggable.NontaggableAttributes.Fields[protopayload.UntaggedStringField] = structpb.NewStringValue(encrypt.RedactedData)
 					taggable.EmbeddedTaggable.ESecretString = encrypt.RedactedData
+					taggable.EmbeddedTaggable.ETaggableAttributes.Fields[protopayload.UntaggedStringField] = structpb.NewStringValue(encrypt.RedactedData)
+
 					return taggable
 				}(),
 			},
@@ -415,6 +425,37 @@ func TestFilter_Process(t *testing.T) {
 				Type:      "test",
 				CreatedAt: now,
 				Payload:   nil,
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   nil,
+			},
+		},
+		{
+			name:   "nil-ptr",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   func() interface{} { var p *testPayloadStruct; return p }(),
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   nil,
+			},
+		},
+		{
+			name:   "nil-interface",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: func() interface{} {
+					var taggable encrypt.Taggable
+					return taggable
+				}(),
 			},
 			wantEvent: &eventlogger.Event{
 				Type:      "test",
@@ -545,6 +586,30 @@ func TestFilter_Process(t *testing.T) {
 			},
 		},
 		{
+			name:   "slice-map-structpbstruct",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: func() interface{} {
+					return []*structpb.Struct{
+						testStructpbStruct,
+					}
+				}(),
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: func() interface{} {
+					tmp, err := structpb.NewStruct(map[string]interface{}{
+						encrypt.TestMapField: encrypt.RedactedData,
+					})
+					require.NoError(t, err)
+					return []*structpb.Struct{tmp}
+				}(),
+			},
+		},
+		{
 			name:   "string-ptr-payload",
 			filter: testEncryptingFilter,
 			testEvent: &eventlogger.Event{
@@ -637,11 +702,18 @@ func TestFilter_Process(t *testing.T) {
 				return
 			}
 			require.NoError(err)
+			actualJson, err := json.Marshal(got)
+			require.NoError(err)
+			t.Log(string(actualJson))
+
 			if tt.setupWantEvent != nil {
 				tt.setupWantEvent(got)
 			}
-			actualJson, err := json.Marshal(got)
+
+			actualJson, err = json.Marshal(got)
 			require.NoError(err)
+			t.Log(string(actualJson))
+
 			wantJson, err := json.Marshal(tt.wantEvent)
 			require.NoError(err)
 			assert.JSONEq(string(wantJson), string(actualJson))

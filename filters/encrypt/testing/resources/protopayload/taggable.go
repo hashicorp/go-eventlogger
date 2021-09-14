@@ -8,6 +8,7 @@ const (
 	TaggedStringField   = "tagged_string_field"
 	UntaggedStringField = "not_tagged_string"
 	TaggedBytesField    = "tagged_bytes_field"
+	IntField            = "int_field"
 )
 
 // Tags satisfy the encrypt.Taggable interface and return the "tagged"

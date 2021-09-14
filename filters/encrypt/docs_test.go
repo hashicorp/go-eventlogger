@@ -62,16 +62,17 @@ func ExampleFilter() {
 		panic(err)
 	}
 
-	p := &struct {
-		NoClassification string
-		Public           string `class:"public"`
-		Sensitive        string `class:"sensitive,redact"`
-		Secret           string `class:"secret,redact"`
-	}{
+	p := examplePayload{
 		NoClassification: "no classification",
 		Public:           "public",
 		Sensitive:        "sensitive",
 		Secret:           "secret",
+		TaggableMap: map[string]string{
+			noClassificationField: "no classification",
+			publicField:           "public",
+			sensitiveField:        "sensitive",
+			secretField:           "secret",
+		},
 	}
 
 	ctx := context.Background()
@@ -83,7 +84,30 @@ func ExampleFilter() {
 	}
 
 	// Output:
-	// {"created_at":"2009-11-17T20:34:58.651387237Z","event_type":"test-event","payload":{"NoClassification":"\u003cREDACTED\u003e","Public":"public","Sensitive":"\u003cREDACTED\u003e","Secret":"\u003cREDACTED\u003e"}}
+	// {"created_at":"2009-11-17T20:34:58.651387237Z","event_type":"test-event","payload":{"NoClassification":"no classification","Public":"public","Sensitive":"sensitive","Secret":"secret","TaggableMap":{"no-classification":"\u003cREDACTED\u003e","public":"public","secret":"\u003cREDACTED\u003e","sensitive":"\u003cREDACTED\u003e"}}}
+}
+
+const (
+	sensitiveField        = "sensitive"
+	secretField           = "secret"
+	publicField           = "public"
+	noClassificationField = "no-classification"
+)
+
+type examplePayload struct {
+	NoClassification string
+	Public           string `class:"public"`
+	Sensitive        string `class:"sensitive,redact"`
+	Secret           string `class:"secret,redact"`
+	TaggableMap      map[string]string
+}
+
+func (p examplePayload) Tags() ([]encrypt.PointerTag, error) {
+	return []encrypt.PointerTag{
+		{Pointer: "/TaggableMap/" + secretField, Classification: encrypt.SecretClassification, Filter: encrypt.RedactOperation},
+		{Pointer: "/TaggableMap/" + sensitiveField, Classification: encrypt.SensitiveClassification, Filter: encrypt.RedactOperation},
+		{Pointer: "/TaggableMap/" + publicField, Classification: encrypt.PublicClassification, Filter: encrypt.RedactOperation},
+	}, nil
 }
 
 // exampleWrapper initializes an AEAD wrapping.Wrapper for examples

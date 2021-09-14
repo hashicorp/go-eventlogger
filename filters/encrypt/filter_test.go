@@ -57,7 +57,9 @@ func TestFilter_filterTaggable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			err := tt.ef.filterTaggable(ctx, tt.t, tt.ef.copyFilterOperationOverrides(), tt.opt...)
+			tm, err := newTrackedMaps()
+			require.NoError(err)
+			err = tt.ef.filterTaggable(ctx, tt.t, tt.ef.copyFilterOperationOverrides(), tm, tt.opt...)
 			if tt.wantErrIs != nil {
 				require.Error(err)
 				assert.ErrorIs(err, tt.wantErrIs)
@@ -179,10 +181,10 @@ func TestFilter_filterValue(t *testing.T) {
 	}
 
 	testMap := TestTaggedMap{
-		"foo": "bar",
+		TestMapField: "bar",
 	}
 	testMap2 := TestTaggedMap{
-		"foo": "bar",
+		TestMapField: "bar",
 	}
 
 	wrapper := TestWrapper(t)
@@ -347,7 +349,7 @@ func TestFilter_filterValue(t *testing.T) {
 			opt:            []Option{withPointer(testMap, "/foo")},
 			classification: &tagInfo{Classification: SensitiveClassification, Operation: HmacSha256Operation},
 			wantValue: fmt.Sprintf("%s", map[string]interface{}{
-				"foo": TestHmacSha256(t, []byte("bar"), wrapper, []byte("salt"), []byte("info")),
+				TestMapField: TestHmacSha256(t, []byte("bar"), wrapper, []byte("salt"), []byte("info")),
 			}),
 		},
 		{
@@ -358,7 +360,7 @@ func TestFilter_filterValue(t *testing.T) {
 			classification: &tagInfo{Classification: SensitiveClassification, Operation: EncryptOperation},
 			decryptWrapper: wrapper,
 			wantValue: fmt.Sprintf("%s", map[string]interface{}{
-				"foo": TestHmacSha256(t, []byte("bar"), wrapper, []byte("salt"), []byte("info")),
+				TestMapField: TestHmacSha256(t, []byte("bar"), wrapper, []byte("salt"), []byte("info")),
 			}),
 		},
 		{
@@ -368,7 +370,7 @@ func TestFilter_filterValue(t *testing.T) {
 			opt:            []Option{withPointer(testMap2, "/foo")},
 			classification: &tagInfo{Classification: SensitiveClassification, Operation: RedactOperation},
 			wantValue: fmt.Sprintf("%s", map[string]interface{}{
-				"foo": RedactedData,
+				TestMapField: RedactedData,
 			}),
 		},
 		{
