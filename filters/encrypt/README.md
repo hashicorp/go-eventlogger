@@ -25,6 +25,9 @@ event payload, when they are tagged with a `class` tag:
 * `wrapperspb.StringValue`
 * `wrapperspb.BytesValue`
 
+Note: tagging a map has no affect on it's filtering.  Please see `Taggable
+interface` for information about how to filter maps.
+
 The following DataClassifications are supported:
 * PublicClassification
 * SensitiveClassification
@@ -44,6 +47,16 @@ implementing a single function `Taggable` interface, which returns a
 `[]PointerTag` for fields that must be filtered.  You may have payloads and/or
 payload fields which implement the `Taggable` interface and also contain fields
 that are tagged with the `class` tag.
+
+## Important: 
+In general, the package defaults assume that unclassified data (including map
+fields) are secrets and filters them appropriately.  This means that:
+- When a map doesn't implement `Taggable` all of it's fields will be filtered as
+  secret data.
+- If a map's `Tags(...)` function doesn't return a PointerTag for a field, that
+  field will be filtered as secret data.
+
+
 ```go
 // Taggable defines an interface for taggable maps
 type Taggable interface {
