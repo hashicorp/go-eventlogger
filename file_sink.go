@@ -46,6 +46,14 @@ type FileSink struct {
 	// Defaults to JSONFormat
 	Format string
 
+	// TimestampOnlyOnRotate specifies the file currently being written
+	// should not contain a timestamp in the name even if rotation is
+	// enabled.
+	//
+	// If false (the default) all files, including the currently written
+	// one, will contain a timestamp in the filename.
+	TimestampOnlyOnRotate bool
+
 	f *os.File
 	l sync.Mutex
 }
@@ -198,8 +206,20 @@ func (fs *FileSink) rotate() error {
 		((elapsed > fs.MaxDuration) && (fs.MaxDuration > 0)) {
 
 		fs.f.Close()
+
+		// Move current log file to a timestamped file.
+		if fs.TimestampOnlyOnRotate {
+			rotateTime := time.Now().UnixNano()
+			rotateFileName := fmt.Sprintf(fs.fileNamePattern(), strconv.FormatInt(rotateTime, 10))
+			oldPath := filepath.Join(fs.Path, fs.FileName)
+			newPath := filepath.Join(fs.Path, rotateFileName)
+			if err := os.Rename(oldPath, newPath); err != nil {
+				return fmt.Errorf("failed to rotate log file: %v", err)
+			}
+		}
+
 		if err := fs.pruneFiles(); err != nil {
-			return err
+			return fmt.Errorf("failed to prune log files: %w", err)
 		}
 		return fs.open()
 	}
@@ -245,14 +265,16 @@ func (fs *FileSink) fileNamePattern() string {
 }
 
 func (fs *FileSink) newFileName(createTime time.Time) string {
-	var newFileName string
-	if fs.rotateEnabled() {
-		pattern := fs.fileNamePattern()
-		newFileName = fmt.Sprintf(pattern, strconv.FormatInt(createTime.UnixNano(), 10))
-	} else {
-		newFileName = fs.FileName
+	if fs.TimestampOnlyOnRotate {
+		return fs.FileName
 	}
-	return newFileName
+
+	if !fs.rotateEnabled() {
+		return fs.FileName
+	}
+
+	pattern := fs.fileNamePattern()
+	return fmt.Sprintf(pattern, strconv.FormatInt(createTime.UnixNano(), 10))
 }
 
 func (fs *FileSink) rotateEnabled() bool {
