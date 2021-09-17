@@ -1,6 +1,7 @@
 package eventlogger
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"os"
@@ -147,6 +148,55 @@ func TestFileSink_TimeRotate(t *testing.T) {
 	}
 }
 
+func TestFileSink_TimestampOnlyOnRotate_TimeRotate(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fs := FileSink{
+		Path:                  tmpDir,
+		FileName:              "audit.log",
+		MaxDuration:           2 * time.Second,
+		TimestampOnlyOnRotate: true,
+	}
+	event := &Event{
+		Formatted: map[string][]byte{JSONFormat: []byte("First entry")},
+		Payload:   "First entry",
+	}
+	_, err = fs.Process(context.Background(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	event = &Event{
+		Formatted: map[string][]byte{JSONFormat: []byte("Last entry")},
+		Payload:   "Last entry",
+	}
+	_, err = fs.Process(context.Background(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := 2
+	got, _ := ioutil.ReadDir(tmpDir)
+	if len(got) != want {
+		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
+	}
+	if got[1].Name() != "audit.log" {
+		t.Errorf("Expected audit.log but found: %q", got[1].Name())
+	}
+	contents, _ := os.ReadFile(filepath.Join(tmpDir, "audit.log"))
+	if expected := []byte("Last entry"); !bytes.Equal(contents, expected) {
+		t.Errorf("Expected %q but found %q", string(expected), string(contents))
+	}
+}
+
 func TestFileSink_ByteRotate(t *testing.T) {
 	t.Parallel()
 
@@ -185,6 +235,56 @@ func TestFileSink_ByteRotate(t *testing.T) {
 	want := 2
 	if got, _ := ioutil.ReadDir(tmpDir); len(got) != want {
 		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
+	}
+}
+
+func TestFileSink_TimestampOnlyOnRotate_ByteRotate(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fs := FileSink{
+		Path:                  tmpDir,
+		FileName:              "audit.log",
+		MaxBytes:              5,
+		MaxDuration:           24 * time.Hour,
+		TimestampOnlyOnRotate: true,
+	}
+	event := &Event{
+		Formatted: map[string][]byte{JSONFormat: []byte("first entry")},
+		Payload:   "first entry",
+	}
+	_, err = fs.Process(context.Background(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	event = &Event{
+		Formatted: map[string][]byte{JSONFormat: []byte("last entry")},
+		Payload:   "last entry",
+	}
+	_, err = fs.Process(context.Background(), event)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := 2
+	got, _ := ioutil.ReadDir(tmpDir)
+	if len(got) != want {
+		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
+	}
+	if got[1].Name() != "audit.log" {
+		t.Errorf("Expected audit.log but found: %q", got[1].Name())
+	}
+	contents, _ := os.ReadFile(filepath.Join(tmpDir, "audit.log"))
+	if expected := []byte("last entry"); !bytes.Equal(contents, expected) {
+		t.Errorf("Expected %q but found %q", string(expected), string(contents))
 	}
 }
 
