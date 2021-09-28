@@ -242,6 +242,12 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		default:
 			for i := 0; i < payloadValue.Len(); i++ {
 				f := payloadValue.Index(i)
+				fieldTaggedInterface, fieldIsTaggable := f.Interface().(Taggable)
+				if fieldIsTaggable {
+					if err := ef.filterTaggable(ctx, fieldTaggedInterface, filterOverrides, tm, opts...); err != nil {
+						return nil, fmt.Errorf("%s: %w", op, err)
+					}
+				}
 				if f.Kind() == reflect.Ptr {
 					f = f.Elem()
 				}
@@ -251,7 +257,11 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 				fkind := f.Kind()
 				switch {
 				case fkind == reflect.Map:
-					tm.trackMap(&tMap{value: f})
+					// notice the use of the orig field reflect.Value
+					// before ptrs are converted via f := f.Elem()
+					// this is required to match up with the fieldIsTaggable
+					// for tracking of maps
+					tm.trackMap(&tMap{value: payloadValue.Index(i)})
 				case fkind == reflect.Struct:
 					if err := ef.filterField(ctx, f, filterOverrides, tm, opts...); err != nil {
 						return nil, fmt.Errorf("%s: %w", op, err)
@@ -370,6 +380,12 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 			default:
 				for i := 0; i < field.Len(); i++ {
 					f := field.Index(i)
+					fieldTaggedInterface, fieldIsTaggable := f.Interface().(Taggable)
+					if fieldIsTaggable && !opts.withIgnoreTaggable {
+						if err := ef.filterTaggable(ctx, fieldTaggedInterface, filterOverrides, tm, opt...); err != nil {
+							return fmt.Errorf("%s: %w", op, err)
+						}
+					}
 					if f.Kind() == reflect.Ptr {
 						f = f.Elem()
 					}
@@ -379,7 +395,11 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 					fkind := f.Kind()
 					switch {
 					case fkind == reflect.Map:
-						tm.trackMap(&tMap{value: f})
+						// notice the use of the orig field reflect.Value
+						// before ptrs are converted via f := f.Elem()
+						// this is required to match up with the fieldIsTaggable
+						// for tracking of maps
+						tm.trackMap(&tMap{value: field.Index(i)})
 					case fkind == reflect.Struct:
 						if err := ef.filterField(ctx, f, filterOverrides, tm, opt...); err != nil {
 							return err

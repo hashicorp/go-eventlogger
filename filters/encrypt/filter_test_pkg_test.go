@@ -26,6 +26,13 @@ type testPayloadStruct struct {
 	TaggedMap         encrypt.TestTaggedMap
 }
 
+type testPayloadStructWithTaggableSlice struct {
+	PublicId          string `class:"public"`
+	SensitiveUserName string `class:"sensitive"`
+	LoginTimestamp    time.Time
+	TaggedMap         []*encrypt.TestTaggedMap
+}
+
 type testPayload struct {
 	notExported       string
 	NotTagged         string
@@ -334,6 +341,66 @@ func TestFilter_Process(t *testing.T) {
 			},
 			setupWantEvent: func(e *eventlogger.Event) {
 				e.Payload.(*testPayloadStruct).SensitiveUserName = string(encrypt.TestDecryptValue(t, wrapper, []byte(e.Payload.(*testPayloadStruct).SensitiveUserName)))
+			},
+		},
+		{
+			name:   "struct-with-slice-of-taggable",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayloadStructWithTaggableSlice{
+					PublicId:          "id-12",
+					SensitiveUserName: "Alice Eve Doe",
+					TaggedMap: []*encrypt.TestTaggedMap{
+						{
+							encrypt.TestMapField:       "bar",
+							encrypt.TestPublicMapField: "public-bar",
+						},
+					},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayloadStructWithTaggableSlice{
+					PublicId:          "id-12",
+					SensitiveUserName: "Alice Eve Doe",
+					TaggedMap: []*encrypt.TestTaggedMap{
+						{
+							encrypt.TestMapField:       "<REDACTED>",
+							encrypt.TestPublicMapField: "public-bar",
+						},
+					},
+				},
+			},
+			setupWantEvent: func(e *eventlogger.Event) {
+				p := e.Payload.(*testPayloadStructWithTaggableSlice)
+				p.SensitiveUserName = string(encrypt.TestDecryptValue(t, wrapper, []byte(p.SensitiveUserName)))
+			},
+		},
+		{
+			name:   "slice-of-taggable",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: []encrypt.TestTaggedMap{
+					{
+						encrypt.TestMapField:       "bar",
+						encrypt.TestPublicMapField: "public-bar",
+					},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: []encrypt.TestTaggedMap{
+					{
+						encrypt.TestMapField:       "<REDACTED>",
+						encrypt.TestPublicMapField: "public-bar",
+					},
+				},
 			},
 		},
 		{
