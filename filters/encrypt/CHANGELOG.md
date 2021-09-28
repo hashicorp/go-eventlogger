@@ -2,6 +2,8 @@
 
 ## Next 
 ### New and Improved
+- Fix: Support slice of taggable values.
+  ([PR](https://github.com/hashicorp/go-eventlogger/pull/66)) 
 - Filter map fields which are not tagged. ([PR](https://github.com/hashicorp/go-eventlogger/pull/63))
 - Setting filters to no operation. ([PR](https://github.com/hashicorp/go-eventlogger/pull/61))
 

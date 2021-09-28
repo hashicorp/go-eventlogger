@@ -75,6 +75,8 @@ func TestHmacSha256(t *testing.T, data []byte, w wrapping.Wrapper, salt, info []
 // TestMapField defines a const for a field name used for testing TestTaggedMap
 const TestMapField = "foo"
 
+const TestPublicMapField = "public-foo"
+
 // TestTaggedMap is a map that implements the Taggable interface for testing
 type TestTaggedMap map[string]interface{}
 
@@ -85,6 +87,11 @@ func (t TestTaggedMap) Tags() ([]PointerTag, error) {
 			Pointer:        "/" + TestMapField,
 			Classification: SecretClassification,
 			Filter:         RedactOperation,
+		},
+		{
+			Pointer:        "/" + TestPublicMapField,
+			Classification: PublicClassification,
+			Filter:         NoOperation,
 		},
 	}, nil
 }
