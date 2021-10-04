@@ -1,7 +1,7 @@
 package encrypt
 
 import (
-	wrapping "github.com/hashicorp/go-kms-wrapping"
+	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
 )
 
 // getOpts - iterate the inbound Options and return a struct.

@@ -1,14 +1,15 @@
 package encrypt
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
 	"io"
 
-	wrapping "github.com/hashicorp/go-kms-wrapping"
-	"github.com/hashicorp/go-kms-wrapping/wrappers/aead"
-	"github.com/hashicorp/go-kms-wrapping/wrappers/multiwrapper"
+	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
+	"github.com/hashicorp/go-kms-wrapping/v2/multiwrapper"
+	"github.com/hashicorp/go-kms-wrapping/wrappers/aead/v2"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -64,7 +65,7 @@ type EventWrapperInfo interface {
 // NewEventWrapper is used by the Filter to derive a wrapper to use
 // for a specific event.  The event must implement the WrapperPayload interface
 // for per event wrappers to be derived.
-func NewEventWrapper(wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper, error) {
+func NewEventWrapper(ctx context.Context, wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper, error) {
 	const op = "encrypt.NewEventWrapper"
 	if wrapper == nil {
 		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
@@ -73,7 +74,11 @@ func NewEventWrapper(wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper
 		return nil, fmt.Errorf("%s: missing event id: %w", op, ErrInvalidParameter)
 	}
 
-	keyId := derivedKeyId(derivedKeyPurposeEvent, wrapper.KeyID(), eventId)
+	keyId, err := wrapper.KeyId(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s: error getting wrapping key id: %w", op, ErrInvalidParameter)
+	}
+	keyId = derivedKeyId(derivedKeyPurposeEvent, keyId, eventId)
 
 	reader, err := NewDerivedReader(wrapper, 32, []byte(eventId), nil)
 	if err != nil {
@@ -83,14 +88,9 @@ func NewEventWrapper(wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper
 	if err != nil {
 		return nil, fmt.Errorf("%s: unable to generate key: %w", op, ErrInvalidParameter)
 	}
-	derivedWrapper := aead.NewWrapper(nil)
-	if _, err := derivedWrapper.SetConfig(map[string]string{
-		"key_id": keyId,
-	}); err != nil {
+	derivedWrapper := aead.NewWrapper()
+	if _, err := derivedWrapper.SetConfig(ctx, wrapping.WithKeyId(keyId), aead.WithKey(privKey)); err != nil {
 		return nil, fmt.Errorf("%s: error setting config on aead wrapper for event id %s: %w", op, eventId, err)
-	}
-	if err := derivedWrapper.SetAESGCMKeyBytes(privKey); err != nil {
-		return nil, fmt.Errorf("%s: error setting key bytes on aead wrapper for event id %s: %w", op, eventId, err)
 	}
 	return derivedWrapper, nil
 }
@@ -118,7 +118,7 @@ func NewDerivedReader(wrapper wrapping.Wrapper, lenLimit int64, salt, info []byt
 	var aeadWrapper *aead.Wrapper
 	switch w := wrapper.(type) {
 	case *multiwrapper.MultiWrapper:
-		raw := w.WrapperForKeyID("__base__")
+		raw := w.WrapperForKeyId("__base__")
 		var ok bool
 		if aeadWrapper, ok = raw.(*aead.Wrapper); !ok {
 			return nil, fmt.Errorf("%s: unexpected wrapper type from multiwrapper base: %w", op, ErrInvalidParameter)
