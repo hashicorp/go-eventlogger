@@ -1,7 +1,10 @@
 # Changelog
 
 ## Next 
+##  filters/encrypt/v0.1.4 (2021/10/04)
 ### New and Improved
+- Update to WIP go-kms-wrapping-v2.
+  ([PR](https://github.com/hashicorp/go-eventlogger/pull/67))  
 - Fix: Support slice of taggable values.
   ([PR](https://github.com/hashicorp/go-eventlogger/pull/66)) 
 - Filter map fields which are not tagged. ([PR](https://github.com/hashicorp/go-eventlogger/pull/63))
