@@ -69,7 +69,7 @@ func TestHmacSha256(t *testing.T, data []byte, w wrapping.Wrapper, salt, info []
 
 	mac := hmac.New(sha256.New, key)
 	_, _ = mac.Write(data)
-	return "hmac-sh256:" + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return "hmac-sha256:" + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 // TestMapField defines a const for a field name used for testing TestTaggedMap
