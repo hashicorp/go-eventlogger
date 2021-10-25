@@ -1,6 +1,9 @@
 # Changelog
 
 ## Next 
+
+  - Revert WIP go-kms-wrapping-v2.
+  ([PR](https://github.com/hashicorp/go-eventlogger/pull/70))  
 ##  filters/encrypt/v0.1.4 (2021/10/04)
 ### New and Improved
 - Update to WIP go-kms-wrapping-v2.
