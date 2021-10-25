@@ -695,7 +695,7 @@ func (ef *Filter) hmacSha256(ctx context.Context, data []byte, opt ...Option) (s
 	}
 	mac := hmac.New(sha256.New, key)
 	_, _ = mac.Write(data)
-	return "hmac-sh256:" + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+	return "hmac-sha256:" + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
 func setValue(fv reflect.Value, newVal string) error {
