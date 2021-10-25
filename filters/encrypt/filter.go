@@ -59,6 +59,13 @@ type Filter struct {
 	// "class" tag settings.
 	FilterOperationOverrides map[DataClassification]FilterOperation
 
+	// IgnoreTypes provides the ability to supply optional types that will be
+	// ignored when filtering.
+	// For example: if you want all Google protobuf field masks to be ignored
+	// (never filtered), you could set IgnoreTypes to:
+	//	IgnoreTypes: []reflect.Type{reflect.TypeOf(&fieldmaskpb.FieldMask{})}
+	IgnoreTypes []reflect.Type
+
 	l sync.RWMutex
 }
 
@@ -189,6 +196,10 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	// field.
 	payloadValue := reflect.ValueOf(e.Payload)
 
+	if ef.ignore(payloadValue) {
+		return e, nil
+	}
+
 	taggedInterface, isTaggable := payloadValue.Interface().(Taggable)
 
 	switch payloadValue.Kind() {
@@ -242,6 +253,9 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 		default:
 			for i := 0; i < payloadValue.Len(); i++ {
 				f := payloadValue.Index(i)
+				if ef.ignore(f) {
+					continue
+				}
 				fieldTaggedInterface, fieldIsTaggable := f.Interface().(Taggable)
 				if fieldIsTaggable {
 					if err := ef.filterTaggable(ctx, fieldTaggedInterface, filterOverrides, tm, opts...); err != nil {
@@ -330,6 +344,9 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 		if !field.CanInterface() {
 			continue
 		}
+		if ef.ignore(field) {
+			continue
+		}
 
 		switch fkind {
 		case reflect.Ptr, reflect.Interface:
@@ -380,6 +397,9 @@ func (ef *Filter) filterField(ctx context.Context, v reflect.Value, filterOverri
 			default:
 				for i := 0; i < field.Len(); i++ {
 					f := field.Index(i)
+					if ef.ignore(f) {
+						continue
+					}
 					fieldTaggedInterface, fieldIsTaggable := f.Interface().(Taggable)
 					if fieldIsTaggable && !opts.withIgnoreTaggable {
 						if err := ef.filterTaggable(ctx, fieldTaggedInterface, filterOverrides, tm, opt...); err != nil {
@@ -719,4 +739,13 @@ func setValue(fv reflect.Value, newVal string) error {
 		return fmt.Errorf("%s: unable to set field value since is not a string or []byte: %s: %w", op, fv.String(), ErrInvalidParameter)
 	}
 	return nil
+}
+
+func (f *Filter) ignore(v reflect.Value) bool {
+	for _, t := range f.IgnoreTypes {
+		if v.Type() == t {
+			return true
+		}
+	}
+	return false
 }

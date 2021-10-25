@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -34,14 +35,20 @@ type testPayloadStructWithTaggableSlice struct {
 }
 
 type testPayload struct {
-	notExported       string
-	NotTagged         string
-	SensitiveRedacted []byte `class:"sensitive,redact"`
-	StructPtr         *testPayloadStruct
-	StructValue       testPayloadStruct
-	StructPtrSlice    []*testPayloadStruct
-	StructValueSlice  []testPayloadStruct
-	Keys              [][]byte `class:"secret"`
+	notExported        string
+	NotTagged          string
+	SensitiveRedacted  []byte `class:"sensitive,redact"`
+	StructPtr          *testPayloadStruct
+	StructValue        testPayloadStruct
+	StructPtrSlice     []*testPayloadStruct
+	StructValueSlice   []testPayloadStruct
+	Keys               [][]byte `class:"secret"`
+	NeverFiltered      *testIgnore
+	NeverFilteredSlice []*testIgnore
+}
+
+type testIgnore struct {
+	NeverFiltered string
 }
 
 type testWrapperPayload struct {
@@ -77,9 +84,10 @@ func TestFilter_Process(t *testing.T) {
 	wrapper := encrypt.TestWrapper(t)
 	now := time.Now()
 	testEncryptingFilter := &encrypt.Filter{
-		Wrapper:  wrapper,
-		HmacSalt: []byte("salt"),
-		HmacInfo: []byte("info"),
+		Wrapper:     wrapper,
+		HmacSalt:    []byte("salt"),
+		HmacInfo:    []byte("info"),
+		IgnoreTypes: []reflect.Type{reflect.TypeOf(&testIgnore{})},
 	}
 
 	testString := "test-string"
@@ -751,6 +759,66 @@ func TestFilter_Process(t *testing.T) {
 						SensitiveUserName: encrypt.RedactedData,
 					},
 				},
+			},
+		},
+		{
+			name:   "with-ignore-type",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testIgnore{
+					NeverFiltered: "never-filtered-value",
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testIgnore{
+					NeverFiltered: "never-filtered-value",
+				},
+			},
+		},
+		{
+			name:   "with-ignore-type-slice",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: []*testIgnore{
+					{NeverFiltered: "never-filtered-value"},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: []*testIgnore{
+					{NeverFiltered: "never-filtered-value"},
+				},
+			},
+		},
+		{
+			name:   "structwith-ignore-type",
+			filter: testEncryptingFilter,
+			testEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayload{
+					NeverFiltered:      &testIgnore{NeverFiltered: "never-filtered-value"},
+					NeverFilteredSlice: []*testIgnore{{NeverFiltered: "never-filtered-value"}},
+				},
+			},
+			wantEvent: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload: &testPayload{
+					NeverFiltered:      &testIgnore{NeverFiltered: "never-filtered-value"},
+					NeverFilteredSlice: []*testIgnore{{NeverFiltered: "never-filtered-value"}},
+					NotTagged:          encrypt.RedactedData,
+				},
+			},
+			setupWantEvent: func(e *eventlogger.Event) {
+				e.Payload.(*testPayload).StructValue.SensitiveUserName = string(encrypt.TestDecryptValue(t, wrapper, []byte(e.Payload.(*testPayload).StructValue.SensitiveUserName)))
 			},
 		},
 	}

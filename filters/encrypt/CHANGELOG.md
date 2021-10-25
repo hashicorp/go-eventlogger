@@ -2,6 +2,8 @@
 
 ## Next 
 
+- Feature: Add support to ignore types when filtering 
+  ([PR](https://github.com/hashicorp/go-eventlogger/pull/72))
 - Fix: Correct the prefix used for hmac-sha256 filtered data
   ([PR](https://github.com/hashicorp/go-eventlogger/pull/69))
 - Revert WIP go-kms-wrapping-v2.
