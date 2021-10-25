@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/eventlogger"
 	"github.com/hashicorp/eventlogger/filters/encrypt"
 	"github.com/hashicorp/eventlogger/filters/encrypt/testing/resources/protopayload"
-	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
+	wrapping "github.com/hashicorp/go-kms-wrapping"
 	"github.com/mitchellh/copystructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -853,7 +853,7 @@ func TestFilter_Process(t *testing.T) {
 		// assert that the node made a copy of the event before modifying it.
 		assert.NotEqual(e.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName, got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)
 
-		eventWrapper, err := encrypt.NewEventWrapper(ctx, wrapper, "event-id")
+		eventWrapper, err := encrypt.NewEventWrapper(wrapper, "event-id")
 		require.NoError(err)
 		got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName = string(encrypt.TestDecryptValue(t, eventWrapper, []byte(got.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName)))
 		assert.Equal(want, got)
@@ -898,7 +898,7 @@ func TestFilter_Process(t *testing.T) {
 		got, err := ef.Process(context.Background(), e)
 		require.NoError(err)
 		assert.NotNil(got)
-		testWrapper, err := encrypt.NewEventWrapper(ctx, wrapper, "event-id")
+		testWrapper, err := encrypt.NewEventWrapper(wrapper, "event-id")
 		require.NoError(err)
 		wantHmac.Payload.(*testEventWrapperPayload).StructValue.SensitiveUserName = encrypt.TestHmacSha256(t, []byte("Alice Eve Doe"), testWrapper, []byte("event-salt"), []byte("event-info"))
 		assert.Equal(wantHmac, got)
