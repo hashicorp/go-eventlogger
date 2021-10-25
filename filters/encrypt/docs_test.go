@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/eventlogger"
 	"github.com/hashicorp/eventlogger/filters/encrypt"
 	"github.com/hashicorp/eventlogger/sinks/writer"
-	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
-	"github.com/hashicorp/go-kms-wrapping/wrappers/aead/v2"
+	wrapping "github.com/hashicorp/go-kms-wrapping"
+	"github.com/hashicorp/go-kms-wrapping/wrappers/aead"
 )
 
 func ExampleFilter() {
@@ -120,8 +120,14 @@ func exampleWrapper() wrapping.Wrapper {
 	if n != 32 {
 		panic("unable to read 32 bytes from rand")
 	}
-	root := aead.NewWrapper()
-	_, err = root.SetConfig(context.Background(), wrapping.WithKeyId(base64.StdEncoding.EncodeToString(rootKey)), aead.WithKey(rootKey))
+	root := aead.NewWrapper(nil)
+	_, err = root.SetConfig(map[string]string{
+		"key_id": base64.StdEncoding.EncodeToString(rootKey),
+	})
+	if err != nil {
+		panic(err)
+	}
+	err = root.SetAESGCMKeyBytes(rootKey)
 	if err != nil {
 		panic(err)
 	}

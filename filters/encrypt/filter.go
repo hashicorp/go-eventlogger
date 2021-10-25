@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/eventlogger"
-	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
+	wrapping "github.com/hashicorp/go-kms-wrapping"
 	"github.com/mitchellh/copystructure"
 	"github.com/mitchellh/pointerstructure"
 	"google.golang.org/protobuf/proto"
@@ -148,7 +148,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	var optWrapper wrapping.Wrapper
 	if i, ok := e.Payload.(EventWrapperInfo); ok {
 		ef.l.RLock()
-		w, err := NewEventWrapper(ctx, ef.Wrapper, i.EventId())
+		w, err := NewEventWrapper(ef.Wrapper, i.EventId())
 		ef.l.RUnlock()
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
