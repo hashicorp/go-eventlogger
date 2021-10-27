@@ -106,7 +106,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 			wantErrContains: "missing event",
 		},
 		{
-			name: "simple-JSON",
+			name: "simple-JSON-including-non-escaped-html",
 			f: &FormatterFilter{
 				Source: testURL,
 				Schema: testURL,
@@ -115,7 +115,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 			e: &eventlogger.Event{
 				Type:      "test",
 				CreatedAt: now,
-				Payload:   "test-string",
+				Payload:   "<test-string>",
 			},
 			format: FormatJSON,
 			wantCloudEvent: &Event{
@@ -123,7 +123,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				DataSchema:      testURL.String(),
 				SpecVersion:     SpecVersion,
 				Type:            "test",
-				Data:            "test-string",
+				Data:            "<test-string>",
 				DataContentType: "application/cloudevents",
 				Time:            now,
 			},

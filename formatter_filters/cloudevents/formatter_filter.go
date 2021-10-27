@@ -163,6 +163,7 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 		ce.DataContentType = DataContentTypeCloudEvents
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
+		enc.SetEscapeHTML(false)
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as JSON: %w", op, err)
 		}
@@ -171,6 +172,7 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 		ce.DataContentType = DataContentTypeText
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
+		enc.SetEscapeHTML(false)
 		enc.SetIndent("", TextIndent)
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as text: %w", op, err)

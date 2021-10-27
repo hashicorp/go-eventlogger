@@ -23,6 +23,7 @@ var _ Node = &JSONFormatterFilter{}
 func (w *JSONFormatterFilter) Process(ctx context.Context, e *Event) (*Event, error) {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
 	err := enc.Encode(struct {
 		CreatedAt time.Time `json:"created_at"`
 		EventType `json:"event_type"`
