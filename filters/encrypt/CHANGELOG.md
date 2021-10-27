@@ -2,6 +2,11 @@
 
 ## Next 
 
+- Refactor:  Change delimiters for REDACTED data 
+  ([PR](https://github.com/hashicorp/go-eventlogger/pull/74))
+
+##  filters/encrypt/v0.1.5 (2021/10/26)
+
 - Feature: Add support to ignore types when filtering 
   ([PR](https://github.com/hashicorp/go-eventlogger/pull/72))
 - Fix: Correct the prefix used for hmac-sha256 filtered data

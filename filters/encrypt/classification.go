@@ -2,7 +2,7 @@ package encrypt
 
 const (
 	// RedactedData is the value that replaces redacted data (secrets)
-	RedactedData = "<REDACTED>"
+	RedactedData = "[REDACTED]"
 
 	// DataClassificationTagName is the tag name for classifying data into
 	// DataClassification's
