@@ -84,7 +84,7 @@ func ExampleFilter() {
 	}
 
 	// Output:
-	// {"created_at":"2009-11-17T20:34:58.651387237Z","event_type":"test-event","payload":{"NoClassification":"no classification","Public":"public","Sensitive":"sensitive","Secret":"secret","TaggableMap":{"no-classification":"\u003cREDACTED\u003e","public":"public","secret":"\u003cREDACTED\u003e","sensitive":"\u003cREDACTED\u003e"}}}
+	// {"created_at":"2009-11-17T20:34:58.651387237Z","event_type":"test-event","payload":{"NoClassification":"no classification","Public":"public","Sensitive":"sensitive","Secret":"secret","TaggableMap":{"no-classification":"[REDACTED]","public":"public","secret":"[REDACTED]","sensitive":"[REDACTED]"}}}
 }
 
 const (
