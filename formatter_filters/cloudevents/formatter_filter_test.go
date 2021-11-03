@@ -1,7 +1,9 @@
 package cloudevents
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -253,6 +255,33 @@ func TestFormatterFilter_Process(t *testing.T) {
 }
 `,
 		},
+		{
+			name: "simple-signer",
+			f: &FormatterFilter{
+				Source: testURL,
+				Schema: testURL,
+				Format: FormatJSON,
+				Signer: func(c context.Context, b []byte) (string, error) {
+					return "signature", nil
+				},
+			},
+			e: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "test-string",
+			},
+			format: FormatJSON,
+			wantCloudEvent: &Event{
+				Source:          testURL.String(),
+				DataSchema:      testURL.String(),
+				SpecVersion:     SpecVersion,
+				Type:            "test",
+				Data:            "test-string",
+				DataContentType: "application/cloudevents",
+				Time:            now,
+				SerializedHmac:  "signature",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -279,6 +308,16 @@ func TestFormatterFilter_Process(t *testing.T) {
 			if tt.wantCloudEvent.ID == "" {
 				tt.wantCloudEvent.ID = gotCloudEvent.ID
 			}
+			if gotCloudEvent.SerializedHmac != "" {
+				hmac := tt.wantCloudEvent.SerializedHmac
+				tt.wantCloudEvent.SerializedHmac = ""
+				buf := &bytes.Buffer{}
+				enc := json.NewEncoder(buf)
+				enc.Encode(tt.wantCloudEvent)
+				require.NoError(err)
+				tt.wantCloudEvent.Serialized = base64.RawURLEncoding.EncodeToString(buf.Bytes())
+				tt.wantCloudEvent.SerializedHmac = hmac
+			}
 			var wantJSON []byte
 			switch tt.format {
 			case FormatJSON:
@@ -296,7 +335,6 @@ func TestFormatterFilter_Process(t *testing.T) {
 			}
 			require.NoError(err)
 			assert.JSONEq(string(wantJSON), string(gotFormatted))
-			t.Log(string(gotFormatted))
 		})
 	}
 }
