@@ -3,6 +3,7 @@ package cloudevents
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -69,6 +70,14 @@ type Event struct {
 
 	// Time is in format RFC 3339 (the default for time.Time) and is optional
 	Time time.Time `json:"time,omitempty"`
+
+	// Serialized is optional and will contain the serialized data that was
+	// "signed" (see: FormatterFilter.Signer)
+	Serialized string `json:"serialized,omitempty"`
+
+	// SerializedHmac is optional and will contain the signature of the
+	// serialized field (see: FormatterFilter.Signer)
+	SerializedHmac string `json:"serialized_hmac,omitempty"`
 }
 
 // FormatterFilter is a Node which formats the Event as a CloudEvent in JSON
@@ -90,6 +99,13 @@ type FormatterFilter struct {
 	// *eventlogger.Event) and the interface{} parameter will be a
 	// cloudevents.Event struct.
 	Predicate func(ctx context.Context, cloudevent interface{}) (bool, error)
+
+	// Signer provides an optional signer for "signing" formatted events.  If
+	// not nil, then formatted events will be "signed" using this signer and
+	// the event's Serialized and SerializedHmac fields will be populated.
+	//	Serialized: which will contain the serialized data that was "signed"
+	//	SerializedHmac: which contains the signature of the serialized field
+	Signer Signer
 }
 
 var _ eventlogger.Node = &FormatterFilter{}
@@ -166,6 +182,7 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as JSON: %w", op, err)
 		}
+		f.sign(ctx, &ce, enc, buf)
 		e.FormattedAs(string(FormatJSON), buf.Bytes())
 	case FormatText:
 		ce.DataContentType = DataContentTypeText
@@ -175,6 +192,7 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as text: %w", op, err)
 		}
+		f.sign(ctx, &ce, enc, buf)
 		e.FormattedAs(string(FormatText), buf.Bytes())
 	default:
 		// this should be unreachable since f.validate() should catch this error
@@ -210,4 +228,44 @@ func (f *FormatterFilter) Type() eventlogger.NodeType {
 // Name returns a representation of the Formatter's name
 func (f *FormatterFilter) Name() string {
 	return NodeName
+}
+
+func (f *FormatterFilter) sign(ctx context.Context, e *Event, enc *json.Encoder, buf *bytes.Buffer) error {
+	const op = "cloudevents.(FormatterFilter).sign"
+	if e == nil {
+		return fmt.Errorf("%s: missing event: %w", op, eventlogger.ErrInvalidParameter)
+	}
+	if enc == nil {
+		return fmt.Errorf("%s: missing encoder: %w", op, eventlogger.ErrInvalidParameter)
+	}
+	if buf == nil {
+		return fmt.Errorf("%s: missing buffer: %w", op, eventlogger.ErrInvalidParameter)
+	}
+	if f.Signer != nil {
+		bufHmac, err := f.Signer(ctx, buf.Bytes())
+		if err != nil {
+			return fmt.Errorf("%s: unable to sign: %w", op, err)
+		}
+		e.Serialized = base64.RawURLEncoding.EncodeToString(buf.Bytes())
+		e.SerializedHmac = bufHmac
+		buf.Reset()
+		if err := enc.Encode(e); err != nil {
+			return fmt.Errorf("%s: error formatting as JSON: %w", op, err)
+		}
+	}
+	return nil
+}
+
+// Signer defines a function for "signing" an event
+type Signer func(context.Context, []byte) (string, error)
+
+// Rotate supports rotating the filter's signer which is used to "sign"
+// formatted events
+func (f *FormatterFilter) Rotate(s Signer) error {
+	const op = "cloudevents.(FormatterFilter).Rotate"
+	if s == nil {
+		return fmt.Errorf("%s: missing signer: %w", op, eventlogger.ErrInvalidParameter)
+	}
+	f.Signer = s
+	return nil
 }
