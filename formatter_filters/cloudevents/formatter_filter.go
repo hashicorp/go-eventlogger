@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/eventlogger"
+	"github.com/hashicorp/go-secure-stdlib/strutil"
 )
 
 const (
@@ -106,6 +107,10 @@ type FormatterFilter struct {
 	//	Serialized: which will contain the serialized data that was "signed"
 	//	SerializedHmac: which contains the signature of the serialized field
 	Signer Signer
+
+	// SignEventTypes contains a list of event types which should be signed by
+	// the Signer
+	SignEventTypes []string
 }
 
 var _ eventlogger.Node = &FormatterFilter{}
@@ -241,7 +246,7 @@ func (f *FormatterFilter) sign(ctx context.Context, e *Event, enc *json.Encoder,
 	if buf == nil {
 		return fmt.Errorf("%s: missing buffer: %w", op, eventlogger.ErrInvalidParameter)
 	}
-	if f.Signer != nil {
+	if f.Signer != nil && strutil.StrListContains(f.SignEventTypes, e.Type) {
 		bufHmac, err := f.Signer(ctx, buf.Bytes())
 		if err != nil {
 			return fmt.Errorf("%s: unable to sign: %w", op, err)
