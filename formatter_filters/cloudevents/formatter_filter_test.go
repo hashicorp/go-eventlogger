@@ -264,6 +264,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				Signer: func(c context.Context, b []byte) (string, error) {
 					return "signature", nil
 				},
+				SignEventTypes: []string{"test"},
 			},
 			e: &eventlogger.Event{
 				Type:      "test",
@@ -280,6 +281,33 @@ func TestFormatterFilter_Process(t *testing.T) {
 				DataContentType: "application/cloudevents",
 				Time:            now,
 				SerializedHmac:  "signature",
+			},
+		},
+		{
+			name: "simple-signer-without-signature",
+			f: &FormatterFilter{
+				Source: testURL,
+				Schema: testURL,
+				Format: FormatJSON,
+				Signer: func(c context.Context, b []byte) (string, error) {
+					return "signature", nil
+				},
+				SignEventTypes: []string{"not-match-type"},
+			},
+			e: &eventlogger.Event{
+				Type:      "test",
+				CreatedAt: now,
+				Payload:   "test-string",
+			},
+			format: FormatJSON,
+			wantCloudEvent: &Event{
+				Source:          testURL.String(),
+				DataSchema:      testURL.String(),
+				SpecVersion:     SpecVersion,
+				Type:            "test",
+				Data:            "test-string",
+				DataContentType: "application/cloudevents",
+				Time:            now,
 			},
 		},
 	}
@@ -335,6 +363,47 @@ func TestFormatterFilter_Process(t *testing.T) {
 			}
 			require.NoError(err)
 			assert.JSONEq(string(wantJSON), string(gotFormatted))
+		})
+	}
+}
+
+func TestFormatterFilter_Rotate(t *testing.T) {
+	tests := []struct {
+		name            string
+		f               *FormatterFilter
+		s               Signer
+		wantIsError     error
+		wantErrContains string
+	}{
+		{
+			name:            "missing-signer",
+			f:               &FormatterFilter{},
+			wantIsError:     eventlogger.ErrInvalidParameter,
+			wantErrContains: "missing signer",
+		},
+		{
+			name: "valid",
+			f:    &FormatterFilter{},
+			s: func(c context.Context, b []byte) (string, error) {
+				return "signature", nil
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			require.Nil(tt.f.Signer)
+			err := tt.f.Rotate(tt.s)
+			if tt.wantIsError != nil {
+				require.Error(err)
+				assert.ErrorIs(err, tt.wantIsError)
+				if tt.wantErrContains != "" {
+					assert.Contains(err.Error(), tt.wantErrContains)
+				}
+				return
+			}
+			require.NoError(err)
+			assert.NotNil(tt.f.Signer)
 		})
 	}
 }
