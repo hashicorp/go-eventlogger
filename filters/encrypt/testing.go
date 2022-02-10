@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	wrapping "github.com/hashicorp/go-kms-wrapping"
-	"github.com/hashicorp/go-kms-wrapping/wrappers/aead"
+	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
+	"github.com/hashicorp/go-kms-wrapping/wrappers/aead/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,13 +26,14 @@ func TestWrapper(t *testing.T) wrapping.Wrapper {
 	require.NoErrorf(err, "unable to read random data for test wrapper")
 	require.Equalf(n, 32, "random data for test wrapper is not the proper length of 32 bytes")
 
-	root := aead.NewWrapper(nil)
-	_, err = root.SetConfig(map[string]string{
-		"key_id": base64.StdEncoding.EncodeToString(rootKey),
-	})
+	root := aead.NewWrapper()
+	_, err = root.SetConfig(
+		context.Background(),
+		wrapping.WithKeyId(base64.StdEncoding.EncodeToString(rootKey)),
+	)
 	require.NoErrorf(err, "unable to encode key for wrapper")
 
-	err = root.SetAESGCMKeyBytes(rootKey)
+	err = root.SetAesGcmKeyBytes(rootKey)
 	require.NoErrorf(err, "unable to set wrapper's key bytes")
 
 	return root
@@ -45,7 +46,7 @@ func TestDecryptValue(t *testing.T, w wrapping.Wrapper, value []byte) []byte {
 	value = bytes.TrimPrefix(value, []byte("encrypted:"))
 	value, err := base64.RawURLEncoding.DecodeString(string(value))
 	require.NoError(err)
-	blobInfo := new(wrapping.EncryptedBlobInfo)
+	blobInfo := new(wrapping.BlobInfo)
 	require.NoError(proto.Unmarshal(value, blobInfo))
 
 	if blobInfo.Ciphertext == nil {

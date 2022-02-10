@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/eventlogger"
 	"github.com/hashicorp/eventlogger/filters/encrypt"
 	"github.com/hashicorp/eventlogger/filters/encrypt/testing/resources/protopayload"
-	wrapping "github.com/hashicorp/go-kms-wrapping"
+	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
 	"github.com/mitchellh/copystructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
