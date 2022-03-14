@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/eventlogger/filters/encrypt"
 	"github.com/hashicorp/eventlogger/sinks/writer"
 	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
-	"github.com/hashicorp/go-kms-wrapping/wrappers/aead/v2"
+	"github.com/hashicorp/go-kms-wrapping/v2/aead"
 )
 
 func ExampleFilter() {
