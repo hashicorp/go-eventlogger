@@ -60,7 +60,7 @@ func TestDecryptValue(t *testing.T, w wrapping.Wrapper, value []byte) []byte {
 func TestHmacSha256(t *testing.T, data []byte, w wrapping.Wrapper, salt, info []byte) string {
 	t.Helper()
 	require := require.New(t)
-	reader, err := NewDerivedReader(w, 32, salt, info)
+	reader, err := NewDerivedReader(context.Background(), w, 32, salt, info)
 	require.NoError(err)
 
 	key := make([]byte, 32)

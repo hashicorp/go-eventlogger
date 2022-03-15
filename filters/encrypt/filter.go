@@ -155,7 +155,7 @@ func (ef *Filter) Process(ctx context.Context, e *eventlogger.Event) (*eventlogg
 	var optWrapper wrapping.Wrapper
 	if i, ok := e.Payload.(EventWrapperInfo); ok {
 		ef.l.RLock()
-		w, err := NewEventWrapper(ef.Wrapper, i.EventId())
+		w, err := NewEventWrapper(ctx, ef.Wrapper, i.EventId())
 		ef.l.RUnlock()
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
@@ -701,7 +701,7 @@ func (ef *Filter) hmacSha256(ctx context.Context, data []byte, opt ...Option) (s
 		copy(info, ef.HmacInfo)
 	}
 
-	reader, err := NewDerivedReader(w, 32, salt, info)
+	reader, err := NewDerivedReader(ctx, w, 32, salt, info)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}

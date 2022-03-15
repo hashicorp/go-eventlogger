@@ -9,7 +9,7 @@ import (
 
 	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
 	"github.com/hashicorp/go-kms-wrapping/v2/aead"
-	"github.com/hashicorp/go-kms-wrapping/v2/multi"
+	"github.com/hashicorp/go-kms-wrapping/v2/extras/multi"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -65,7 +65,7 @@ type EventWrapperInfo interface {
 // NewEventWrapper is used by the Filter to derive a wrapper to use
 // for a specific event.  The event must implement the WrapperPayload interface
 // for per event wrappers to be derived.
-func NewEventWrapper(wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper, error) {
+func NewEventWrapper(ctx context.Context, wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper, error) {
 	const op = "encrypt.NewEventWrapper"
 	if wrapper == nil {
 		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
@@ -80,7 +80,7 @@ func NewEventWrapper(wrapper wrapping.Wrapper, eventId string) (wrapping.Wrapper
 	}
 	keyId := derivedKeyId(derivedKeyPurposeEvent, origKeyId, eventId)
 
-	reader, err := NewDerivedReader(wrapper, 32, []byte(eventId), nil)
+	reader, err := NewDerivedReader(ctx, wrapper, 32, []byte(eventId), nil)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -113,7 +113,7 @@ func derivedKeyId(purpose derivedKeyPurpose, wrapperKeyId, eventId string) strin
 // Example:
 //	reader, _ := NewDerivedReader(wrapper, userId, jobId)
 // 	key := ed25519.GenerateKey(reader)
-func NewDerivedReader(wrapper wrapping.Wrapper, lenLimit int64, salt, info []byte) (*io.LimitedReader, error) {
+func NewDerivedReader(ctx context.Context, wrapper wrapping.Wrapper, lenLimit int64, salt, info []byte) (*io.LimitedReader, error) {
 	const op = "encrypt.NewDerivedReader"
 	if wrapper == nil {
 		return nil, fmt.Errorf("%s: missing wrapper: %w", op, ErrInvalidParameter)
@@ -130,14 +130,20 @@ func NewDerivedReader(wrapper wrapping.Wrapper, lenLimit int64, salt, info []byt
 			return nil, fmt.Errorf("%s: unexpected wrapper type from multiwrapper base: %w", op, ErrInvalidParameter)
 		}
 	case *aead.Wrapper:
-		if w.GetKeyBytes() == nil {
-			return nil, fmt.Errorf("%s: aead wrapper missing bytes: %w", op, ErrInvalidParameter)
-		}
 		aeadWrapper = w
 	default:
 		return nil, fmt.Errorf("%s: unknown wrapper type: %w", op, ErrInvalidParameter)
 	}
-	reader := hkdf.New(sha256.New, aeadWrapper.GetKeyBytes(), salt, info)
+
+	keyBytes, err := aeadWrapper.KeyBytes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s: error reading aead key bytes: %w", op, err)
+	}
+	if keyBytes == nil {
+		return nil, fmt.Errorf("%s: aead wrapper missing bytes: %w", op, ErrInvalidParameter)
+	}
+
+	reader := hkdf.New(sha256.New, keyBytes, salt, info)
 	return &io.LimitedReader{
 		R: reader,
 		N: lenLimit,

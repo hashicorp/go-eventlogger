@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/hashicorp/eventlogger v0.1.0
-	github.com/hashicorp/go-kms-wrapping/v2 v2.0.1
+	github.com/hashicorp/go-kms-wrapping/v2 v2.0.4
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/mitchellh/pointerstructure v1.2.0
 	github.com/stretchr/testify v1.7.0

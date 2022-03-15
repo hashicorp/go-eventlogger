@@ -42,7 +42,7 @@ func Test_NewEventWrapper(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
-			got, err := NewEventWrapper(tt.wrapper, tt.eventId)
+			got, err := NewEventWrapper(context.Background(), tt.wrapper, tt.eventId)
 			if tt.wantErrIs != nil {
 				require.Error(err)
 				assert.Nil(got)
