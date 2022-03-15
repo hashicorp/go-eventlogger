@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/eventlogger"
-	wrapping "github.com/hashicorp/go-kms-wrapping"
+	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
 	"github.com/mitchellh/copystructure"
 	"github.com/mitchellh/pointerstructure"
 	"google.golang.org/protobuf/proto"

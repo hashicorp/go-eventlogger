@@ -1,9 +1,10 @@
 package encrypt
 
 import (
+	"context"
 	"testing"
 
-	wrapping "github.com/hashicorp/go-kms-wrapping"
+	wrapping "github.com/hashicorp/go-kms-wrapping/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +54,11 @@ func Test_NewEventWrapper(t *testing.T) {
 			}
 			require.NoError(err)
 			assert.NotNil(got)
-			assert.Equal(derivedKeyId(derivedKeyPurposeEvent, tt.wrapper.KeyID(), tt.eventId), got.KeyID())
+			wrapperKeyId, err := tt.wrapper.KeyId(context.Background())
+			require.NoError(err)
+			gotKeyId, err := got.KeyId(context.Background())
+			require.NoError(err)
+			assert.Equal(derivedKeyId(derivedKeyPurposeEvent, wrapperKeyId, tt.eventId), gotKeyId)
 		})
 	}
 }
