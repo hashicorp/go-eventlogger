@@ -80,4 +80,4 @@ Please note that development may require other tools; to install the set of tool
 
 Before opening a PR, please run:
 
-`make fmt` 
+`make fmt` test
