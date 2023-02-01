@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 
 # Copied with minor changes from Makego at https://github.com/bufbuild/makego/blob/master/make/go/scripts/protoc_gen_plugin.bash
 
