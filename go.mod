@@ -9,6 +9,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-secure-stdlib/base62 v0.1.1
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.1
+	github.com/hashicorp/go-uuid v1.0.2
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0

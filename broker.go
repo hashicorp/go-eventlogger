@@ -153,7 +153,7 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 
 	g, ok := b.graphs[def.EventType]
 	if !ok {
-		g = &graph{roots: make(map[PipelineID]*linkedNode)}
+		g = &graph{}
 		b.graphs[def.EventType] = g
 	}
 
@@ -175,7 +175,7 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 		return err
 	}
 
-	g.roots[def.PipelineID] = root
+	g.roots.Store(def.PipelineID, root)
 
 	return nil
 }
@@ -190,7 +190,7 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 		return fmt.Errorf("No graph for EventType %s", t)
 	}
 
-	delete(g.roots, id)
+	g.roots.Delete(id)
 	return nil
 }
 
@@ -207,7 +207,7 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 
 	g, ok := b.graphs[t]
 	if !ok {
-		g = &graph{roots: make(map[PipelineID]*linkedNode)}
+		g = &graph{}
 		b.graphs[t] = g
 	}
 

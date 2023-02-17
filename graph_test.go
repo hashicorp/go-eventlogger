@@ -38,11 +38,8 @@ func TestReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g := graph{
-		roots: map[PipelineID]*linkedNode{
-			"id": root,
-		},
-	}
+	g := graph{}
+	g.roots.Store("id", root)
 	err = g.reopen(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -120,11 +117,8 @@ func TestValidate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := graph{
-				roots: map[PipelineID]*linkedNode{
-					"id": root,
-				},
-			}
+			g := graph{}
+			g.roots.Store("id", root)
 			err = g.validate()
 			valid := err == nil
 			if valid != tc.valid {
@@ -215,12 +209,8 @@ func TestSendResult(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := graph{
-				roots: map[PipelineID]*linkedNode{
-					"id": root,
-				},
-				successThreshold: tc.threshold,
-			}
+			g := graph{successThreshold: tc.threshold}
+			g.roots.Store("id", root)
 
 			err = g.validate()
 			if err != nil {
@@ -344,12 +334,8 @@ func TestSendBlocking(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := graph{
-				roots: map[PipelineID]*linkedNode{
-					"id": root,
-				},
-				successThreshold: tc.threshold,
-			}
+			g := graph{successThreshold: tc.threshold}
+			g.roots.Store("id", root)
 
 			err = g.validate()
 			if err != nil {

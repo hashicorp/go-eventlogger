@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-test/deep"
+	"github.com/hashicorp/go-uuid"
 )
 
 func nodesToNodeIDs(t *testing.T, broker *Broker, nodes ...Node) []NodeID {
@@ -251,6 +253,67 @@ func TestPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// TestPipelineRaceCondition can't fail, but it can check if there is a race condition in iterating through, adding, or removing pipelines.
+func TestPipelineRaceCondition(t *testing.T) {
+	broker := NewBroker()
+
+	eventType := EventType("t")
+	var pipelines []PipelineID
+	var sinks []*testSink
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	// register a bunch of pipelines
+	go func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			// Construct a graph
+			f1 := &JSONFormatter{}
+			s1 := &testSink{}
+			p1 := nodesToNodeIDs(t, broker, f1, s1)
+
+			id, err := uuid.GenerateUUID()
+			if err != nil {
+				panic(err)
+			}
+
+			err = broker.RegisterPipeline(Pipeline{
+				EventType:  eventType,
+				PipelineID: PipelineID(id),
+				NodeIDs:    p1,
+			})
+			if err != nil {
+				panic(err)
+			}
+
+			pipelines = append(pipelines, PipelineID(id))
+			sinks = append(sinks, s1)
+		}
+
+		for _, id := range pipelines {
+			err := broker.RemovePipeline(eventType, id)
+			if err != nil {
+				panic(err)
+			}
+		}
+		wg.Done()
+	}(t)
+
+	go func() {
+		for i := 0; i < 100; i++ {
+			// send payloads
+			payload := map[string]interface{}{
+				"color": "red",
+				"width": 1,
+			}
+			_, _ = broker.Send(context.Background(), eventType, payload)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
 
 type testSink struct {

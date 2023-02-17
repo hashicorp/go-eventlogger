@@ -12,7 +12,7 @@ import (
 type graph struct {
 
 	// roots maps PipelineIDs to root Nodes
-	roots map[PipelineID]*linkedNode
+	roots graphMap
 
 	// successThreshold specifies how many sinks must store an event for Process
 	// to not return an error.
@@ -25,10 +25,11 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 	statusChan := make(chan Status)
 	var wg sync.WaitGroup
 	go func() {
-		for _, root := range g.roots {
+		g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
 			wg.Add(1)
 			g.doProcess(ctx, root, e, statusChan, &wg)
-		}
+			return true
+		})
 		wg.Wait()
 		close(statusChan)
 	}()
@@ -95,12 +96,13 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 func (g *graph) reopen(ctx context.Context) error {
 	var errors *multierror.Error
 
-	for _, root := range g.roots {
+	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
 		err := g.doReopen(ctx, root)
 		if err != nil {
 			errors = multierror.Append(errors, err)
 		}
-	}
+		return true
+	})
 
 	return errors.ErrorOrNil()
 }
@@ -128,12 +130,13 @@ func (g *graph) doReopen(ctx context.Context, node *linkedNode) error {
 func (g *graph) validate() error {
 	var errors *multierror.Error
 
-	for _, root := range g.roots {
+	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
 		err := g.doValidate(nil, root)
 		if err != nil {
 			errors = multierror.Append(errors, err)
 		}
-	}
+		return true
+	})
 
 	return errors.ErrorOrNil()
 }
