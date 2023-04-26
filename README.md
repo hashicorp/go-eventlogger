@@ -1,4 +1,4 @@
-# go-eventlogger   [![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/go-eventlogger.svg)](https://pkg.go.dev/github.com/hashicorp/go-eventlogger)
+# go-eventlogger   [![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/eventlogger.svg)](https://pkg.go.dev/github.com/hashicorp/eventlogger)
 
 
 `go-eventlogger` is a flexible event system libray implemented as a pub/sub model supporting middleware. 
