@@ -9,6 +9,9 @@ import (
 	"github.com/go-test/deep"
 )
 
+// TestLinkNodes ensures that we are able to create a graph of linked nodes correctly.
+// NOTE: This test should not be run in parallel as it sets a package level variable
+// on 'deep' to ensure we compare unexported fields too.
 func TestLinkNodes(t *testing.T) {
 	n1, n2, n3 := &Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"}
 	root, err := linkNodes([]Node{n1, n2, n3}, []NodeID{"1", "2", "3"})
@@ -28,6 +31,9 @@ func TestLinkNodes(t *testing.T) {
 			}},
 		}},
 	}
+
+	deep.CompareUnexportedFields = true
+	t.Cleanup(func() { deep.CompareUnexportedFields = false })
 
 	if diff := deep.Equal(root, expected); len(diff) > 0 {
 		t.Fatal(diff)

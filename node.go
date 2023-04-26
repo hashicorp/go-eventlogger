@@ -38,18 +38,20 @@ type linkedNode struct {
 	next   []*linkedNode
 }
 
-// linkNodes is a convenience function that connects Nodes together into a
-// linked list.
+// linkNodes is a convenience function that connects Nodes together into a linked list.
 func linkNodes(nodes []Node, ids []NodeID) (*linkedNode, error) {
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf("no nodes given")
 	}
+	if len(nodes) != len(ids) {
+		return nil, fmt.Errorf("number of nodes does not match number of IDs")
+	}
 
-	root := &linkedNode{node: nodes[0]}
+	root := &linkedNode{node: nodes[0], nodeID: ids[0]}
 	cur := root
 
-	for _, n := range nodes[1:] {
-		next := &linkedNode{node: n}
+	for i, n := range nodes[1:] {
+		next := &linkedNode{node: n, nodeID: ids[i+1]}
 		cur.next = []*linkedNode{next}
 		cur = next
 	}
