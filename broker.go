@@ -66,17 +66,19 @@ func (b *Broker) StopTimeAt(now time.Time) {
 
 // Status describes the result of a Send.
 type Status struct {
-	// complete lists the IDs of sinks that successfully wrote the Event.
+	// complete lists the IDs of 'filter' and 'sink' type nodes that successfully processed the Event.
 	complete []NodeID
 	// Warnings lists any non-fatal errors that occurred while sending an Event.
 	Warnings []error
 }
 
 func (s Status) getError(threshold int) error {
-	if len(s.complete) < threshold {
-		return fmt.Errorf("event not written to enough sinks")
+	switch {
+	case len(s.complete) < threshold:
+		return fmt.Errorf("event not processed by enough 'filter' and 'sink' nodes")
+	default:
+		return nil
 	}
-	return nil
 }
 
 // Send writes an event of type t to all registered pipelines concurrently and
