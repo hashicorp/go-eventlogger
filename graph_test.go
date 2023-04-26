@@ -132,82 +132,86 @@ func TestValidate(t *testing.T) {
 }
 
 func TestSendResult(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-	goodsink := NodeID("good")
-	badsink := NodeID("bad")
+	tmpDir := t.TempDir()
+	goodSink := NodeID("good")
+	badSink := NodeID("bad")
 	sinksByID := map[NodeID]Node{
-		goodsink: &FileSink{Path: tmpDir, FileName: "sink"},
-		badsink:  &FileSink{Path: "/"},
+		goodSink: &FileSink{Path: tmpDir, FileName: "sink"},
+		badSink:  &FileSink{Path: "/"},
 	}
 
-	testcases := []struct {
+	testCases := []struct {
 		name      string
 		sinkIDs   []NodeID
 		threshold int
 		warnings  int
 		sent      int
 		failure   bool
+		filter    bool
 	}{
 		{
-			"one bad no threshold",
-			[]NodeID{badsink},
-			0, 1, 0, false,
+			name:      "one bad no threshold",
+			sinkIDs:   []NodeID{badSink},
+			threshold: 0, warnings: 1, sent: 0, failure: false},
+		{
+			name:      "one good no threshold",
+			sinkIDs:   []NodeID{goodSink},
+			threshold: 0, warnings: 0, sent: 1, failure: false,
 		},
 		{
-			"one good no threshold",
-			[]NodeID{goodsink},
-			0, 0, 1, false,
+			name:      "one good one bad no threshold",
+			sinkIDs:   []NodeID{goodSink, badSink},
+			threshold: 0, warnings: 1, sent: 1, failure: false,
 		},
 		{
-			"one good one bad no threshold",
-			[]NodeID{goodsink, badsink},
-			0, 1, 1, false,
+			name:      "one bad threshold=1",
+			sinkIDs:   []NodeID{badSink},
+			threshold: 1, warnings: 1, sent: 0, failure: true,
 		},
 		{
-			"one bad threshold=1",
-			[]NodeID{badsink},
-			1, 1, 0, true,
+			name:      "one good threshold=1",
+			sinkIDs:   []NodeID{goodSink},
+			threshold: 1, warnings: 0, sent: 1, failure: false,
 		},
 		{
-			"one good threshold=1",
-			[]NodeID{goodsink},
-			1, 0, 1, false,
+			name:      "one good one bad threshold=1",
+			sinkIDs:   []NodeID{goodSink, badSink},
+			threshold: 1, warnings: 1, sent: 1, failure: false,
 		},
 		{
-			"one good one bad threshold=1",
-			[]NodeID{goodsink, badsink},
-			1, 1, 1, false,
+			name:      "two bad threshold=2",
+			sinkIDs:   []NodeID{badSink, badSink},
+			threshold: 2, warnings: 2, sent: 0, failure: true,
 		},
 		{
-			"two bad threshold=2",
-			[]NodeID{badsink, badsink},
-			2, 2, 0, true,
+			name:      "two good threshold=2",
+			sinkIDs:   []NodeID{goodSink, goodSink},
+			threshold: 2, warnings: 0, sent: 2, failure: false,
 		},
 		{
-			"two good threshold=2",
-			[]NodeID{goodsink, goodsink},
-			2, 0, 2, false,
+			name:      "one good one bad threshold=2",
+			sinkIDs:   []NodeID{goodSink, badSink},
+			threshold: 2, warnings: 1, sent: 1, failure: true,
 		},
 		{
-			"one good one bad threshold=2",
-			[]NodeID{goodsink, badsink},
-			2, 1, 1, true,
+			name:      "one bad sink with filter true threshold=1",
+			sinkIDs:   []NodeID{badSink},
+			threshold: 1, warnings: 0, sent: 1, failure: false, filter: true,
 		},
 	}
 
-	for i := range testcases {
-		tc := testcases[i]
+	for i := range testCases {
+		tc := testCases[i]
 		t.Run(tc.name, func(t *testing.T) {
-			nodes := []Node{&JSONFormatter{}}
+			predicate := func(e *Event) (bool, error) {
+				return !tc.filter, nil
+			}
+			nodes := []Node{&Filter{Predicate: predicate}, &JSONFormatter{}}
 			sinks := make([]Node, len(tc.sinkIDs))
 			for i, id := range tc.sinkIDs {
 				sinks[i] = sinksByID[id]
 			}
-			root, err := linkNodesAndSinks(nodes, sinks, []NodeID{"f1"}, tc.sinkIDs)
+			root, err := linkNodesAndSinks(nodes, sinks, []NodeID{"filter1", "formatter1"}, tc.sinkIDs)
 			if err != nil {
 				t.Fatal(err)
 			}

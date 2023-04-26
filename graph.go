@@ -55,6 +55,15 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 }
 
 // Recursively process every node in the graph.
+//
+// # No Status is sent when a request is cancelled by the context
+//
+// Status will be sent when we stop processing nodes, which can happen if:
+//   - a node.Process(...) returns an error, and Status.complete is empty
+//   - a node.Process(...) filters an event, and Status.complete contains the
+//     filter node's ID
+//   - the final node in a pipeline (a sink) finishes, and Status.complete contains
+//     the sink node's ID
 func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statusChan chan Status, wg *sync.WaitGroup) {
 	defer wg.Done()
 
