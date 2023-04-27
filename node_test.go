@@ -4,6 +4,7 @@
 package eventlogger
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -37,5 +38,60 @@ func TestLinkNodes(t *testing.T) {
 
 	if diff := deep.Equal(root, expected); len(diff) > 0 {
 		t.Fatal(diff)
+	}
+}
+
+func TestLinkNodesErrors(t *testing.T) {
+	tests := map[string]struct {
+		nodes            []Node
+		ids              []NodeID
+		wantErrorMessage string
+	}{
+		"nil-nodes": {
+			nodes:            nil,
+			ids:              []NodeID{"1", "2", "3"},
+			wantErrorMessage: "no nodes given",
+		},
+		"no-nodes": {
+			nodes:            []Node{},
+			ids:              []NodeID{"1", "2", "3"},
+			wantErrorMessage: "no nodes given",
+		},
+		"nil-ids": {
+			nodes: []Node{
+				&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
+			},
+			ids:              nil,
+			wantErrorMessage: "no ids given",
+		},
+		"no-ids": {
+			nodes: []Node{
+				&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
+			},
+			ids:              []NodeID{},
+			wantErrorMessage: "no ids given",
+		},
+		"more-nodes-than-ids": {
+			nodes: []Node{
+				&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
+			},
+			ids:              []NodeID{"1", "2"},
+			wantErrorMessage: "number of nodes does not match number of IDs",
+		},
+		"less-nodes-than-ids": {
+			nodes: []Node{
+				&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
+			},
+			ids:              []NodeID{"1", "2", "3", "4"},
+			wantErrorMessage: "number of nodes does not match number of IDs",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := linkNodes(tc.nodes, tc.ids)
+			require.Error(t, err)
+			require.EqualError(t, err, tc.wantErrorMessage)
+		})
 	}
 }

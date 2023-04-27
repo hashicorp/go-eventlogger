@@ -40,10 +40,12 @@ type linkedNode struct {
 
 // linkNodes is a convenience function that connects Nodes together into a linked list.
 func linkNodes(nodes []Node, ids []NodeID) (*linkedNode, error) {
-	if len(nodes) == 0 {
+	switch {
+	case len(nodes) == 0:
 		return nil, fmt.Errorf("no nodes given")
-	}
-	if len(nodes) != len(ids) {
+	case len(ids) == 0:
+		return nil, fmt.Errorf("no ids given")
+	case len(nodes) != len(ids):
 		return nil, fmt.Errorf("number of nodes does not match number of IDs")
 	}
 
