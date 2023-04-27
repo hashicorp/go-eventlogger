@@ -44,7 +44,7 @@ func linkNodes(nodes []Node, ids []NodeID) (*linkedNode, error) {
 	case len(nodes) == 0:
 		return nil, fmt.Errorf("no nodes given")
 	case len(ids) == 0:
-		return nil, fmt.Errorf("no ids given")
+		return nil, fmt.Errorf("no IDs given")
 	case len(nodes) != len(ids):
 		return nil, fmt.Errorf("number of nodes does not match number of IDs")
 	}

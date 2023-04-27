@@ -62,14 +62,14 @@ func TestLinkNodesErrors(t *testing.T) {
 				&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
 			},
 			ids:              nil,
-			wantErrorMessage: "no ids given",
+			wantErrorMessage: "no IDs given",
 		},
 		"no-ids": {
 			nodes: []Node{
 				&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
 			},
 			ids:              []NodeID{},
-			wantErrorMessage: "no ids given",
+			wantErrorMessage: "no IDs given",
 		},
 		"more-nodes-than-ids": {
 			nodes: []Node{
