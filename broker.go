@@ -68,14 +68,18 @@ func (b *Broker) StopTimeAt(now time.Time) {
 type Status struct {
 	// complete lists the IDs of 'filter' and 'sink' type nodes that successfully processed the Event.
 	complete []NodeID
+	// complete lists the IDs of 'sink' type nodes that successfully processed the Event.
+	completeSinks []NodeID
 	// Warnings lists any non-fatal errors that occurred while sending an Event.
 	Warnings []error
 }
 
-func (s Status) getError(threshold int) error {
+func (s Status) getError(threshold, thresholdSinks int) error {
 	switch {
 	case len(s.complete) < threshold:
 		return fmt.Errorf("event not processed by enough 'filter' and 'sink' nodes")
+	case len(s.completeSinks) < thresholdSinks:
+		return fmt.Errorf("event not processed by enough 'sink' nodes")
 	default:
 		return nil
 	}
@@ -201,7 +205,11 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 
 // SetSuccessThreshold sets the success threshold per eventType.  For the
 // overall processing of a given event to be considered a success, at least as
-// many sinks as the threshold value must successfully process the event.
+// many pipelines as the threshold value must successfully process the event.
+// This means that a filter could of course filter an event before it reaches
+// the pipeline's sink, but it would still count as success when it comes to
+// meeting this threshold.  Use this when you want to allow the filtering of
+// events without causing an error because an event was filtered.
 func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -217,5 +225,26 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 	}
 
 	g.successThreshold = successThreshold
+	return nil
+}
+
+// SetSuccessThresholdSinks sets the success threshold per eventType.  For the
+// overall processing of a given event to be considered a success, at least as
+// many sinks as the threshold value must successfully process the event.
+func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if successThresholdSinks < 0 {
+		return fmt.Errorf("successThresholdSinks must be 0 or greater")
+	}
+
+	g, ok := b.graphs[t]
+	if !ok {
+		g = &graph{}
+		b.graphs[t] = g
+	}
+
+	g.successThresholdSinks = successThresholdSinks
 	return nil
 }
