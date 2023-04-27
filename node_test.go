@@ -41,6 +41,8 @@ func TestLinkNodes(t *testing.T) {
 	}
 }
 
+// TestLinkNodesErrors attempts to exercise the linkNodes func such that we hit
+// the early return error checking on the incoming parameters.
 func TestLinkNodesErrors(t *testing.T) {
 	tests := map[string]struct {
 		nodes            []Node
