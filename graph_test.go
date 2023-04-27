@@ -141,62 +141,69 @@ func TestSendResult(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name      string
-		sinkIDs   []NodeID
-		threshold int
-		warnings  int
-		sent      int
-		failure   bool
-		filter    bool
+		name           string
+		sinkIDs        []NodeID
+		threshold      int
+		thresholdSinks int
+		warnings       int
+		sent           int
+		completeSinks  int
+		failure        bool
+		filter         bool
 	}{
 		{
-			name:      "one bad no threshold",
+			name:      "one bad no threshold/thresholdSinks",
 			sinkIDs:   []NodeID{badSink},
-			threshold: 0, warnings: 1, sent: 0, failure: false},
+			threshold: 0, thresholdSinks: 0, warnings: 1, sent: 0, completeSinks: 0, failure: false},
 		{
-			name:      "one good no threshold",
+			name:      "one good no threshold/thresholdSinks",
 			sinkIDs:   []NodeID{goodSink},
-			threshold: 0, warnings: 0, sent: 1, failure: false,
+			threshold: 0, thresholdSinks: 0, warnings: 0, sent: 1, completeSinks: 1, failure: false,
 		},
 		{
-			name:      "one good one bad no threshold",
+			name:      "one good one bad no threshold/thresholdSinks",
 			sinkIDs:   []NodeID{goodSink, badSink},
-			threshold: 0, warnings: 1, sent: 1, failure: false,
+			threshold: 0, thresholdSinks: 0, warnings: 1, sent: 1, completeSinks: 1, failure: false,
 		},
 		{
-			name:      "one bad threshold=1",
+			name:      "one bad threshold=1 thresholdSinks=1",
 			sinkIDs:   []NodeID{badSink},
-			threshold: 1, warnings: 1, sent: 0, failure: true,
+			threshold: 1, thresholdSinks: 1, warnings: 1, sent: 0, completeSinks: 0, failure: true,
 		},
 		{
-			name:      "one good threshold=1",
+			name:      "one good threshold=1 thresholdSinks=0",
 			sinkIDs:   []NodeID{goodSink},
-			threshold: 1, warnings: 0, sent: 1, failure: false,
+			threshold: 1, thresholdSinks: 0, warnings: 0, sent: 1, completeSinks: 1, failure: false,
 		},
 		{
-			name:      "one good one bad threshold=1",
+			name:      "one good one bad threshold=1 thresholdSinks=1",
 			sinkIDs:   []NodeID{goodSink, badSink},
-			threshold: 1, warnings: 1, sent: 1, failure: false,
+			threshold: 1, thresholdSinks: 1, warnings: 1, sent: 1, completeSinks: 1, failure: false,
 		},
 		{
-			name:      "two bad threshold=2",
+			name:      "two bad threshold=2 thresholdSinks=2",
 			sinkIDs:   []NodeID{badSink, badSink},
-			threshold: 2, warnings: 2, sent: 0, failure: true,
+			threshold: 2, thresholdSinks: 2, warnings: 2, sent: 0, completeSinks: 0, failure: true,
 		},
 		{
-			name:      "two good threshold=2",
+			name:      "two good threshold=2 thresholdSinks=2",
 			sinkIDs:   []NodeID{goodSink, goodSink},
-			threshold: 2, warnings: 0, sent: 2, failure: false,
+			threshold: 2, thresholdSinks: 2, warnings: 0, sent: 2, completeSinks: 2, failure: false,
 		},
 		{
-			name:      "one good one bad threshold=2",
+			name:      "one good one bad threshold=2 thresholdSinks=2",
 			sinkIDs:   []NodeID{goodSink, badSink},
-			threshold: 2, warnings: 1, sent: 1, failure: true,
+			threshold: 2, thresholdSinks: 2, warnings: 1, sent: 1, completeSinks: 1, failure: true,
 		},
 		{
-			name:      "one bad sink with filter true threshold=1",
+			name:      "one bad sink with filter threshold=1 thresholdSink=0",
 			sinkIDs:   []NodeID{badSink},
-			threshold: 1, warnings: 0, sent: 1, failure: false, filter: true,
+			threshold: 1, thresholdSinks: 0, warnings: 0, sent: 1, completeSinks: 0, failure: false, filter: true,
+		},
+		{
+			name:      "one bad sink with filter threshold=1 thresholdSinks=1",
+			sinkIDs:   []NodeID{badSink},
+			threshold: 1, thresholdSinks: 1, warnings: 0, sent: 1, completeSinks: 0, failure: true, filter: true,
 		},
 	}
 
@@ -216,7 +223,7 @@ func TestSendResult(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			g := graph{successThreshold: tc.threshold}
+			g := graph{successThreshold: tc.threshold, successThresholdSinks: tc.thresholdSinks}
 			g.roots.Store("id", root)
 
 			err = g.validate()
@@ -235,6 +242,10 @@ func TestSendResult(t *testing.T) {
 
 			if len(status.complete) != tc.sent {
 				t.Fatalf("got=%d, expected=%d", len(status.complete), tc.sent)
+			}
+
+			if len(status.completeSinks) != tc.completeSinks {
+				t.Fatalf("completeSinks: got=%d, expected=%d", len(status.completeSinks), tc.completeSinks)
 			}
 
 			if len(status.Warnings) != tc.warnings {

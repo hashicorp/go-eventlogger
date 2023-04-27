@@ -354,11 +354,32 @@ func TestSuccessThreshold(t *testing.T) {
 		t.Fatalf("expected graph for eventType")
 	}
 	if g.successThreshold != 2 {
-		t.Fatalf("expected successThreshold %d, not %d", g.successThreshold, 2)
+		t.Fatalf("expected successThreshold %d, got %d", 2, g.successThreshold)
 	}
 
 	err = b.SetSuccessThreshold("t", -1)
 	if err == nil || err.Error() != "successThreshold must be 0 or greater" {
 		t.Fatalf("expected successThreshold error")
+	}
+}
+
+func TestSuccessThresholdSinks(t *testing.T) {
+	b := NewBroker()
+
+	err := b.SetSuccessThresholdSinks("t", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, ok := b.graphs["t"]
+	if !ok {
+		t.Fatalf("expected graph for eventType")
+	}
+	if g.successThresholdSinks != 2 {
+		t.Fatalf("expected successThresholdSinks %d, got %d", 2, g.successThresholdSinks)
+	}
+
+	err = b.SetSuccessThresholdSinks("t", -1)
+	if err == nil || err.Error() != "successThresholdSinks must be 0 or greater" {
+		t.Fatalf("expected successThresholdSinks error")
 	}
 }

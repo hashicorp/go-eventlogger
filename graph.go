@@ -17,9 +17,15 @@ type graph struct {
 	// roots maps PipelineIDs to root Nodes
 	roots graphMap
 
-	// successThreshold specifies how many sinks must store an event for Process
-	// to not return an error.
+	// successThreshold specifies how many pipelines must successfully process
+	// an event for Process to not return an error.  This means that a filter
+	// could of course filter an event before it reaches the pipeline's sink,
+	// but it would still count as success when it comes to meeting this threshold
 	successThreshold int
+
+	// successThresholdSinks specifies how many sinks must successfully process
+	// an event for Process to not return an error.
+	successThresholdSinks int
 }
 
 // Process the Event by routing it through all of the graph's nodes,
@@ -46,12 +52,13 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 			if ok {
 				status.Warnings = append(status.Warnings, s.Warnings...)
 				status.complete = append(status.complete, s.complete...)
+				status.completeSinks = append(status.completeSinks, s.completeSinks...)
 			} else {
 				done = true
 			}
 		}
 	}
-	return status, status.getError(g.successThreshold)
+	return status, status.getError(g.successThreshold, g.successThresholdSinks)
 }
 
 // Recursively process every node in the graph.
@@ -76,11 +83,17 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 		}
 		return
 	}
+
+	completeStatus := Status{complete: []NodeID{node.nodeID}}
+	if node.node.Type() == NodeTypeSink {
+		completeStatus.completeSinks = []NodeID{node.nodeID}
+	}
+
 	// If the Event is nil, it has been filtered out and we are done.
 	if e == nil {
 		select {
 		case <-ctx.Done():
-		case statusChan <- Status{complete: []NodeID{node.nodeID}}:
+		case statusChan <- completeStatus:
 		}
 		return
 	}
@@ -100,7 +113,7 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 	} else {
 		select {
 		case <-ctx.Done():
-		case statusChan <- Status{complete: []NodeID{node.nodeID}}:
+		case statusChan <- completeStatus:
 		}
 	}
 }
