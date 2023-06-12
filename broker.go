@@ -225,7 +225,7 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 
 	nodes, err := g.roots.Nodes(id)
 	if err != nil {
-		// TODO: error getting flattened nodes for our pipeline.
+		return fmt.Errorf("unable to retrieve all nodes referenced by pipeline ID %q: %w", id, err)
 	}
 
 	err = b.RemovePipeline(t, id)
