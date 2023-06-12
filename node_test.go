@@ -97,3 +97,17 @@ func TestLinkNodesErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestFlattenNodes(t *testing.T) {
+	ids := []NodeID{"1", "2", "3"}
+	nodes := []Node{
+		&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
+	}
+
+	linkedNodes, err := linkNodes(nodes, ids)
+	require.NoError(t, err)
+
+	flatNodes := linkedNodes.flatten(nil)
+	require.Contains(t, flatNodes, NodeID("1"))
+
+}

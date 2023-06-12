@@ -3,7 +3,10 @@
 
 package eventlogger
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // TODO: remove this if Go ever introduces sync.Map with generics
 
@@ -27,4 +30,23 @@ func (g *graphMap) Store(id PipelineID, root *linkedNode) {
 // Delete calls sync.Map.Delete
 func (g *graphMap) Delete(id PipelineID) {
 	g.m.Delete(id)
+}
+
+// Nodes returns all the nodes referenced by the specified Pipeline
+func (g *graphMap) Nodes(id PipelineID) ([]NodeID, error) {
+	root, ok := g.m.Load(id)
+	if !ok {
+		return nil, fmt.Errorf("unable to load root node from underlying data store")
+	}
+
+	ln, ok := root.(*linkedNode)
+	if !ok {
+		return nil, fmt.Errorf("unable to retrieve linked nodes from underyling data store")
+	}
+	nodes := ln.flatten(nil)
+	result := make([]NodeID, len(nodes))
+	for k := range nodes {
+		result = append(result, k)
+	}
+	return result, nil
 }

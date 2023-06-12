@@ -82,3 +82,24 @@ func linkNodesAndSinks(inner, sinks []Node, nodeIDs, sinkIDs []NodeID) (*linkedN
 
 	return root, nil
 }
+
+// flatten will attempt to visit every linked node and flatten the overall set of node IDs.
+func (l *linkedNode) flatten(visited map[NodeID]struct{}) map[NodeID]struct{} {
+	if visited == nil {
+		visited = map[NodeID]struct{}{}
+	}
+
+	if len(l.next) == 0 {
+		return visited
+	}
+
+	visited[l.nodeID] = struct{}{}
+
+	for _, ln := range l.next {
+		for k := range ln.flatten(visited) {
+			visited[k] = struct{}{}
+		}
+	}
+
+	return visited
+}

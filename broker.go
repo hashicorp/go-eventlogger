@@ -30,17 +30,24 @@ import (
 //
 // A Node can be shared across multiple pipelines.
 type Broker struct {
-	nodes  map[NodeID]Node
+	//nodes  map[NodeID]Node
+	nodes  map[NodeID]nodeRegistration
 	graphs map[EventType]*graph
 	lock   sync.RWMutex
 
 	*clock
 }
 
+// nodeRegistration tracks how many times a Node is referenced during registration of a Pipeline.
+type nodeRegistration struct {
+	node   Node
+	usages int
+}
+
 // NewBroker creates a new Broker.
 func NewBroker() *Broker {
 	return &Broker{
-		nodes:  make(map[NodeID]Node),
+		nodes:  make(map[NodeID]nodeRegistration),
 		graphs: make(map[EventType]*graph),
 	}
 }
@@ -135,7 +142,8 @@ func (b *Broker) RegisterNode(id NodeID, node Node) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.nodes[id] = node
+	b.nodes[id] = nodeRegistration{node: node, usages: 0}
+
 	return nil
 }
 
@@ -168,11 +176,12 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 
 	nodes := make([]Node, len(def.NodeIDs))
 	for i, n := range def.NodeIDs {
-		node, ok := b.nodes[n]
+		registration, ok := b.nodes[n]
 		if !ok {
 			return fmt.Errorf("nodeID %q not registered", n)
 		}
-		nodes[i] = node
+		nodes[i] = registration.node
+		registration.usages++ // TODO: PW: this operation isn't idempotent at all, could lead to unstable state
 	}
 	root, err := linkNodes(nodes, def.NodeIDs)
 	if err != nil {
@@ -196,10 +205,52 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 
 	g, ok := b.graphs[t]
 	if !ok {
-		return fmt.Errorf("No graph for EventType %s", t)
+		return fmt.Errorf("no graph for EventType %s", t)
 	}
 
 	g.roots.Delete(id)
+	return nil
+}
+
+// RemovePipelineAndNodes will attempt to remove all nodes referenced by the pipeline.
+// Any nodes that are referenced by other pipelines will not be removed.
+func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	g, ok := b.graphs[t]
+	if !ok {
+		return fmt.Errorf("no graph for EventType %s", t)
+	}
+
+	nodes, err := g.roots.Nodes(id)
+	if err != nil {
+		// TODO: error getting flattened nodes for our pipeline.
+	}
+
+	err = b.RemovePipeline(t, id)
+	if err != nil {
+		// Error removing the actual pipeline, so probably a good idea to leave the node registrations alone..
+		return fmt.Errorf("unable to remove pipeline ID: %q and linked nodes: %w", err)
+	}
+
+	for _, nodeID := range nodes {
+		instance, ok := b.nodes[nodeID]
+		if !ok {
+			return fmt.Errorf("pipeline ID: %q, node ID %q is not registered", id, nodeID)
+		}
+
+		switch instance.usages {
+		case 0, 1:
+			// Node is not currently in use
+			// or
+			// Node was only being used by this pipeline
+			delete(b.nodes, nodeID)
+		default:
+			instance.usages--
+		}
+	}
+
 	return nil
 }
 
