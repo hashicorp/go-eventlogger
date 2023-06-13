@@ -380,6 +380,8 @@ func TestSuccessThresholdSinks(t *testing.T) {
 	}
 }
 
+// TestRemovePipelineAndNodes exercises the behavior that removes a pipeline and
+// any nodes associated with that pipeline, if they are not referenced by other pipelines.
 func TestRemovePipelineAndNodes(t *testing.T) {
 	broker := NewBroker()
 

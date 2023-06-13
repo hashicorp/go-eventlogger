@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// TestNodes_ListNodes_UnregisteredPipeline checks that we get the right error
+// when attempting to get the linked nodes for an unregistered pipeline.
 func TestNodes_ListNodes_UnregisteredPipeline(t *testing.T) {
 	g := &graphMap{}
 	ids, err := g.Nodes(PipelineID("31"))
@@ -13,6 +15,8 @@ func TestNodes_ListNodes_UnregisteredPipeline(t *testing.T) {
 	require.Nil(t, ids)
 }
 
+// TestNodes_ListNodes_RegisteredPipeline checks that we can retrieve all registered
+// nodes referenced by a registered pipeline.
 func TestNodes_ListNodes_RegisteredPipeline(t *testing.T) {
 	g := &graphMap{}
 

@@ -30,7 +30,6 @@ import (
 //
 // A Node can be shared across multiple pipelines.
 type Broker struct {
-	//nodes  map[NodeID]Node
 	nodes  map[NodeID]*nodeUsage
 	graphs map[EventType]*graph
 	lock   sync.RWMutex
@@ -38,7 +37,7 @@ type Broker struct {
 	*clock
 }
 
-// nodeUsage tracks how many times a Node is referenced during registration of a Pipeline.
+// nodeUsage tracks how many times a Node is referenced by registered pipelines.
 type nodeUsage struct {
 	node       Node
 	references int
@@ -202,7 +201,7 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 		return err
 	}
 
-	// Store the pipeline and then update the usage count of the nodes in that pipeline.
+	// Store the pipeline and then update the reference count of the nodes in that pipeline.
 	g.roots.Store(def.PipelineID, root)
 	for _, id := range def.NodeIDs {
 		nodeUsage, ok := b.nodes[id]
@@ -255,9 +254,7 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 
 		switch nodeUsage.references {
 		case 0, 1:
-			// Node is not currently in use
-			// or
-			// Node was only being used by this pipeline
+			// Node is not currently in use, or was only being used by this pipeline
 			delete(b.nodes, nodeID)
 		default:
 			nodeUsage.references--

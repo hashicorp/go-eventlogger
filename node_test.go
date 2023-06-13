@@ -116,6 +116,8 @@ func TestFlattenNodes_LinkNodes(t *testing.T) {
 	require.Equal(t, 3, len(flatNodes))
 }
 
+// TestFlattenNodes_LinkNodesAndSinks tests that given a more complex set of linked
+// nodes we can still get the right set of registered nodes.
 func TestFlattenNodes_LinkNodesAndSinks(t *testing.T) {
 	ids := []NodeID{"1", "2"}
 	nodes := []Node{
