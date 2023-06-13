@@ -6,7 +6,6 @@ package eventlogger
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -69,11 +68,7 @@ func TestBroker(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", tt.name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			// Send to FileSink
 			sink := &FileSink{Path: tmpDir, FileName: "file.log"}
@@ -82,7 +77,7 @@ func TestBroker(t *testing.T) {
 			// Register the graph with the broker
 			et := EventType("Foo")
 			nodeIDs := nodesToNodeIDs(t, broker, tt.nodes...)
-			err = broker.RegisterPipeline(Pipeline{
+			err := broker.RegisterPipeline(Pipeline{
 				EventType:  et,
 				PipelineID: "id",
 				NodeIDs:    nodeIDs,
@@ -124,15 +119,15 @@ func TestBroker(t *testing.T) {
 			}
 
 			// Check the contents of the log
-			files, err := ioutil.ReadDir(tmpDir)
+			dirEntry, err := os.ReadDir(tmpDir)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(files) > 1 {
-				t.Errorf("Expected 1 log file, got %d", len(files))
+			if len(dirEntry) > 1 {
+				t.Errorf("Expected 1 log file, got %d", len(dirEntry))
 			}
 
-			dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+			dat, err := os.ReadFile(filepath.Join(tmpDir, dirEntry[0].Name()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -329,7 +324,7 @@ func (ts *testSink) Type() NodeType {
 	return NodeTypeSink
 }
 
-func (ts *testSink) Process(ctx context.Context, e *Event) (*Event, error) {
+func (ts *testSink) Process(_ context.Context, _ *Event) (*Event, error) {
 	ts.count++
 	return nil, nil
 }

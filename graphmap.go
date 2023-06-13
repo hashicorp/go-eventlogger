@@ -45,8 +45,10 @@ func (g *graphMap) Nodes(id PipelineID) ([]NodeID, error) {
 	}
 	nodes := ln.flatten(nil)
 	result := make([]NodeID, len(nodes))
+	i := 0
 	for k := range nodes {
-		result = append(result, k)
+		result[i] = k
+		i++
 	}
 	return result, nil
 }
