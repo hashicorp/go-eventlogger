@@ -31,23 +31,23 @@ import (
 // A Node can be shared across multiple pipelines.
 type Broker struct {
 	//nodes  map[NodeID]Node
-	nodes  map[NodeID]nodeRegistration
+	nodes  map[NodeID]*nodeUsage
 	graphs map[EventType]*graph
 	lock   sync.RWMutex
 
 	*clock
 }
 
-// nodeRegistration tracks how many times a Node is referenced during registration of a Pipeline.
-type nodeRegistration struct {
-	node   Node
-	usages int
+// nodeUsage tracks how many times a Node is referenced during registration of a Pipeline.
+type nodeUsage struct {
+	node       Node
+	references int
 }
 
 // NewBroker creates a new Broker.
 func NewBroker() *Broker {
 	return &Broker{
-		nodes:  make(map[NodeID]nodeRegistration),
+		nodes:  make(map[NodeID]*nodeUsage),
 		graphs: make(map[EventType]*graph),
 	}
 }
@@ -101,7 +101,7 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 	b.lock.RUnlock()
 
 	if !ok {
-		return Status{}, fmt.Errorf("No graph for EventType %s", t)
+		return Status{}, fmt.Errorf("no graph for EventType %s", t)
 	}
 
 	e := &Event{
@@ -142,7 +142,15 @@ func (b *Broker) RegisterNode(id NodeID, node Node) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.nodes[id] = nodeRegistration{node: node, usages: 0}
+	nr := &nodeUsage{node: node, references: 0}
+
+	// Check if this node is already registered, if so maintain reference count
+	r, exists := b.nodes[id]
+	if exists {
+		nr.references = r.references
+	}
+
+	b.nodes[id] = nr
 
 	return nil
 }
@@ -177,11 +185,11 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 	// Gather the registered nodes, so they can be referenced for this pipeline.
 	nodes := make([]Node, len(def.NodeIDs))
 	for i, n := range def.NodeIDs {
-		registration, ok := b.nodes[n]
+		nodeUsage, ok := b.nodes[n]
 		if !ok {
 			return fmt.Errorf("nodeID %q not registered", n)
 		}
-		nodes[i] = registration.node
+		nodes[i] = nodeUsage.node
 	}
 
 	root, err := linkNodes(nodes, def.NodeIDs)
@@ -197,10 +205,10 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 	// Store the pipeline and then update the usage count of the nodes in that pipeline.
 	g.roots.Store(def.PipelineID, root)
 	for _, id := range def.NodeIDs {
-		registration, ok := b.nodes[id]
+		nodeUsage, ok := b.nodes[id]
 		// We can be optimistic about this as we would have already errored above.
 		if ok {
-			registration.usages++
+			nodeUsage.references++
 		}
 	}
 
@@ -237,26 +245,22 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 		return fmt.Errorf("unable to retrieve all nodes referenced by pipeline ID %q: %w", id, err)
 	}
 
-	err = b.RemovePipeline(t, id)
-	if err != nil {
-		// Don't continue and delete nodes if we cannot remove the pipeline.
-		return fmt.Errorf("unable to remove pipeline ID %q and linked nodes: %w", id, err)
-	}
+	g.roots.Delete(id)
 
 	for _, nodeID := range nodes {
-		instance, ok := b.nodes[nodeID]
+		nodeUsage, ok := b.nodes[nodeID]
 		if !ok {
 			return fmt.Errorf("pipeline ID %q: node ID %q is not registered", id, nodeID)
 		}
 
-		switch instance.usages {
+		switch nodeUsage.references {
 		case 0, 1:
 			// Node is not currently in use
 			// or
 			// Node was only being used by this pipeline
 			delete(b.nodes, nodeID)
 		default:
-			instance.usages--
+			nodeUsage.references--
 		}
 	}
 

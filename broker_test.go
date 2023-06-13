@@ -6,6 +6,7 @@ package eventlogger
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"sync"
@@ -377,4 +378,56 @@ func TestSuccessThresholdSinks(t *testing.T) {
 	if err == nil || err.Error() != "successThresholdSinks must be 0 or greater" {
 		t.Fatalf("expected successThresholdSinks error")
 	}
+}
+
+func TestRemovePipelineAndNodes(t *testing.T) {
+	broker := NewBroker()
+
+	// Construct a graph
+	f1 := &JSONFormatter{}
+	s1 := &testSink{}
+	nodeIDs := nodesToNodeIDs(t, broker, f1, s1)
+
+	// Register single pipeline
+	err := broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p1",
+		NodeIDs:    nodeIDs,
+	})
+	require.NoError(t, err)
+
+	// Deregister the only pipeline we have
+	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	require.NoError(t, err)
+	require.Empty(t, broker.nodes)
+
+	// Attempt to register 2nd pipeline which references now deleted nodes
+	err = broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p2",
+		NodeIDs:    nodeIDs,
+	})
+	require.Error(t, err)
+	require.EqualError(t, err, "nodeID \"node-0\" not registered")
+
+	// Re-register nodes and 2 pipelines
+	nodeIDs = nodesToNodeIDs(t, broker, f1, s1)
+	err = broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p1",
+		NodeIDs:    nodeIDs,
+	})
+	require.NoError(t, err)
+	err = broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p2",
+		NodeIDs:    nodeIDs,
+	})
+	require.NoError(t, err)
+
+	// Deregister pipeline p1, leave pipeline p2 alone
+	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	require.NoError(t, err)
+	require.NotEmpty(t, broker.nodes)
+	require.Equal(t, 2, len(broker.nodes))
 }
