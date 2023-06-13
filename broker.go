@@ -174,6 +174,7 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 		b.graphs[def.EventType] = g
 	}
 
+	// Gather the registered nodes, so they can be referenced for this pipeline.
 	nodes := make([]Node, len(def.NodeIDs))
 	for i, n := range def.NodeIDs {
 		registration, ok := b.nodes[n]
@@ -181,8 +182,8 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 			return fmt.Errorf("nodeID %q not registered", n)
 		}
 		nodes[i] = registration.node
-		registration.usages++ // TODO: PW: this operation isn't idempotent at all, could lead to unstable state
 	}
+
 	root, err := linkNodes(nodes, def.NodeIDs)
 	if err != nil {
 		return err
@@ -193,7 +194,15 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 		return err
 	}
 
+	// Store the pipeline and then update the usage count of the nodes in that pipeline.
 	g.roots.Store(def.PipelineID, root)
+	for _, id := range def.NodeIDs {
+		registration, ok := b.nodes[id]
+		// We can be optimistic about this as we would have already errored above.
+		if ok {
+			registration.usages++
+		}
+	}
 
 	return nil
 }
