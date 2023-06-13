@@ -89,17 +89,17 @@ func (l *linkedNode) flatten(visited map[NodeID]struct{}) map[NodeID]struct{} {
 		visited = map[NodeID]struct{}{}
 	}
 
-	if len(l.next) == 0 {
-		return visited
-	}
-
 	visited[l.nodeID] = struct{}{}
 
-	for _, ln := range l.next {
-		for k := range ln.flatten(visited) {
-			visited[k] = struct{}{}
+	switch len(l.next) {
+	case 0:
+		return visited
+	default:
+		for _, ln := range l.next {
+			for k := range ln.flatten(visited) {
+				visited[k] = struct{}{}
+			}
 		}
+		return visited
 	}
-
-	return visited
 }

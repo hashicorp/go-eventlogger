@@ -239,14 +239,14 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 
 	err = b.RemovePipeline(t, id)
 	if err != nil {
-		// Error removing the actual pipeline, so probably a good idea to leave the node registrations alone..
-		return fmt.Errorf("unable to remove pipeline ID: %q and linked nodes: %w", err)
+		// Don't continue and delete nodes if we cannot remove the pipeline.
+		return fmt.Errorf("unable to remove pipeline ID %q and linked nodes: %w", id, err)
 	}
 
 	for _, nodeID := range nodes {
 		instance, ok := b.nodes[nodeID]
 		if !ok {
-			return fmt.Errorf("pipeline ID: %q, node ID %q is not registered", id, nodeID)
+			return fmt.Errorf("pipeline ID %q: node ID %q is not registered", id, nodeID)
 		}
 
 		switch instance.usages {

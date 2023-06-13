@@ -98,6 +98,8 @@ func TestLinkNodesErrors(t *testing.T) {
 	}
 }
 
+// TestFlattenNodes tests that given a 'root' node we can correctly flatten it
+// out to retrieve the NodeIDs of linked nodes.
 func TestFlattenNodes(t *testing.T) {
 	ids := []NodeID{"1", "2", "3"}
 	nodes := []Node{
