@@ -39,8 +39,8 @@ type Broker struct {
 
 // nodeUsage tracks how many times a Node is referenced by registered pipelines.
 type nodeUsage struct {
-	node       Node
-	references int
+	node           Node
+	referenceCount int
 }
 
 // NewBroker creates a new Broker.
@@ -141,12 +141,12 @@ func (b *Broker) RegisterNode(id NodeID, node Node) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	nr := &nodeUsage{node: node, references: 0}
+	nr := &nodeUsage{node: node, referenceCount: 0}
 
 	// Check if this node is already registered, if so maintain reference count
 	r, exists := b.nodes[id]
 	if exists {
-		nr.references = r.references
+		nr.referenceCount = r.referenceCount
 	}
 
 	b.nodes[id] = nr
@@ -207,7 +207,7 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 		nodeUsage, ok := b.nodes[id]
 		// We can be optimistic about this as we would have already errored above.
 		if ok {
-			nodeUsage.references++
+			nodeUsage.referenceCount++
 		}
 	}
 
@@ -252,12 +252,12 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 			return fmt.Errorf("pipeline ID %q: node ID %q is not registered", id, nodeID)
 		}
 
-		switch nodeUsage.references {
+		switch nodeUsage.referenceCount {
 		case 0, 1:
 			// Node is not currently in use, or was only being used by this pipeline
 			delete(b.nodes, nodeID)
 		default:
-			nodeUsage.references--
+			nodeUsage.referenceCount--
 		}
 	}
 
