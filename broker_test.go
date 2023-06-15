@@ -383,6 +383,8 @@ func TestSuccessThresholdSinks(t *testing.T) {
 
 // TestRemovePipelineAndNodes exercises the behavior that removes a pipeline and
 // any nodes associated with that pipeline, if they are not referenced by other pipelines.
+// The test is relatively long as it is focused on the state of the broker across
+// multiple operations.
 func TestRemovePipelineAndNodes(t *testing.T) {
 	broker := NewBroker()
 
@@ -421,6 +423,7 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 		NodeIDs:    nodeIDs,
 	})
 	require.NoError(t, err)
+
 	err = broker.RegisterPipeline(Pipeline{
 		EventType:  "t",
 		PipelineID: "p2",
@@ -434,21 +437,6 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.NotEmpty(t, broker.nodes)
 	require.Equal(t, 2, len(broker.nodes))
 
-	// Try to remove pipeline but wrong event type
-	err = broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
-	require.Error(t, err)
-	require.EqualError(t, err, "no graph for EventType foo")
-
-	// Try to remove pipeline but with empty event type
-	err = broker.RemovePipelineAndNodes(EventType(""), PipelineID("p2"))
-	require.Error(t, err)
-	require.EqualError(t, err, "event type cannot be empty")
-
-	// Try to remove pipeline but with empty pipeline ID
-	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID(""))
-	require.Error(t, err)
-	require.EqualError(t, err, "pipeline ID cannot be empty")
-
 	// Whip the nodes out from underneath a pipeline and then try to deregister it
 	broker.nodes = nil
 	err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
@@ -457,6 +445,39 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.True(t, ok)
 	require.EqualError(t, me.Unwrap(), "node not found: \"node-0\"")
 	require.Equal(t, 2, me.Len())
+}
+
+func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
+	tests := map[string]struct {
+		pipelineID string
+		eventType  string
+		error      string
+	}{
+		"no-pipelineID": {
+			pipelineID: "",
+			eventType:  "t",
+			error:      "pipeline ID cannot be empty",
+		},
+		"no-eventType": {
+			pipelineID: "1",
+			eventType:  "",
+			error:      "event type cannot be empty",
+		},
+		"wrong-eventType": {
+			pipelineID: "1",
+			eventType:  "foo",
+			error:      "no graph for EventType foo",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			broker := NewBroker()
+			err := broker.RemovePipelineAndNodes(EventType(tc.eventType), PipelineID(tc.pipelineID))
+			require.Error(t, err)
+			require.EqualError(t, err, tc.error)
+		})
+	}
 }
 
 // TestPipelineValidate tests that given a Pipeline in various states we can assert
