@@ -6,6 +6,7 @@ package eventlogger
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
@@ -412,7 +413,7 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.Error(t, err)
 	require.EqualError(t, err, "nodeID \"node-0\" not registered")
 
-	// Re-register nodes and 2 pipelines
+	// Re-register nodes and 2 pipelines which use the same nodes
 	nodeIDs = nodesToNodeIDs(t, broker, f1, s1)
 	err = broker.RegisterPipeline(Pipeline{
 		EventType:  "t",
@@ -427,9 +428,101 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Deregister pipeline p1, leave pipeline p2 alone
+	// Deregister pipeline p1, leave pipeline p2 in place
 	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
 	require.NoError(t, err)
 	require.NotEmpty(t, broker.nodes)
 	require.Equal(t, 2, len(broker.nodes))
+
+	// Try to remove pipeline but wrong event type
+	err = broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
+	require.Error(t, err)
+	require.EqualError(t, err, "no graph for EventType foo")
+
+	// Try to remove pipeline but with empty event type
+	err = broker.RemovePipelineAndNodes(EventType(""), PipelineID("p2"))
+	require.Error(t, err)
+	require.EqualError(t, err, "event type cannot be empty")
+
+	// Try to remove pipeline but with empty pipeline ID
+	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID(""))
+	require.Error(t, err)
+	require.EqualError(t, err, "pipeline ID cannot be empty")
+}
+
+// TestPipelineValidate tests that given a Pipeline in various states we can assert
+// that the Pipeline is valid or invalid.
+func TestPipelineValidate(t *testing.T) {
+	tests := map[string]struct {
+		pipelineID       string
+		eventType        string
+		nodes            []NodeID
+		expectValid      bool
+		expectErrorCount int
+	}{
+		"valid": {
+			pipelineID:  "1",
+			eventType:   "t",
+			nodes:       []NodeID{"a", "b"},
+			expectValid: true,
+		},
+		"no-pipelineID": {
+			pipelineID:       "",
+			eventType:        "t",
+			nodes:            []NodeID{"a", "b"},
+			expectValid:      false,
+			expectErrorCount: 1,
+		},
+		"no-event-type": {
+			pipelineID:       "1",
+			eventType:        "",
+			nodes:            []NodeID{"a", "b"},
+			expectValid:      false,
+			expectErrorCount: 1,
+		},
+		"empty-nodes": {
+			pipelineID:       "1",
+			eventType:        "t",
+			nodes:            []NodeID{},
+			expectValid:      false,
+			expectErrorCount: 1,
+		},
+		"fully-invalid": {
+			pipelineID:       "",
+			eventType:        "",
+			nodes:            []NodeID{},
+			expectValid:      false,
+			expectErrorCount: 3,
+		},
+		"fully-invalid-no-nodeIDs": {
+			pipelineID:       "",
+			eventType:        "",
+			nodes:            []NodeID{"", ""},
+			expectValid:      false,
+			expectErrorCount: 3,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := Pipeline{
+				PipelineID: PipelineID(tc.pipelineID),
+				EventType:  EventType(tc.eventType),
+				NodeIDs:    tc.nodes,
+			}
+
+			valid, err := p.validate()
+			switch tc.expectValid {
+			case true:
+				require.NoError(t, err)
+				require.True(t, valid)
+			default:
+				require.Error(t, err)
+				require.False(t, valid)
+				me, ok := err.(*multierror.Error)
+				require.True(t, ok)
+				require.Equal(t, tc.expectErrorCount, me.Len())
+			}
+		})
+	}
 }

@@ -5,7 +5,9 @@ package eventlogger
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"sync"
 	"time"
 )
@@ -138,6 +140,10 @@ type NodeID string
 // may be a filter, formatter or sink (see NodeType). Nodes can be shared across
 // multiple pipelines.
 func (b *Broker) RegisterNode(id NodeID, node Node) error {
+	if id == "" {
+		return errors.New("unable to register node, node ID cannot be empty")
+	}
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -172,6 +178,11 @@ type Pipeline struct {
 
 // RegisterPipeline adds a pipeline to the broker.
 func (b *Broker) RegisterPipeline(def Pipeline) error {
+	ok, err := def.validate()
+	if err != nil {
+		return err
+	}
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -216,6 +227,13 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 
 // RemovePipeline removes a pipeline from the broker.
 func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
+	if t == "" {
+		return errors.New("event type cannot be empty")
+	}
+	if id == "" {
+		return errors.New("pipeline ID cannot be empty")
+	}
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -231,6 +249,13 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 // RemovePipelineAndNodes will attempt to remove all nodes referenced by the pipeline.
 // Any nodes that are referenced by other pipelines will not be removed.
 func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
+	if t == "" {
+		return errors.New("event type cannot be empty")
+	}
+	if id == "" {
+		return errors.New("pipeline ID cannot be empty")
+	}
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -272,12 +297,15 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 // meeting this threshold.  Use this when you want to allow the filtering of
 // events without causing an error because an event was filtered.
 func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
+	if t == "" {
+		return errors.New("event type cannot be empty")
+	}
 	if successThreshold < 0 {
 		return fmt.Errorf("successThreshold must be 0 or greater")
 	}
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
@@ -293,12 +321,15 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 // overall processing of a given event to be considered a success, at least as
 // many sinks as the threshold value must successfully process the event.
 func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
+	if t == "" {
+		return errors.New("event type cannot be empty")
+	}
 	if successThresholdSinks < 0 {
 		return fmt.Errorf("successThresholdSinks must be 0 or greater")
 	}
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
@@ -308,4 +339,31 @@ func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int
 
 	g.successThresholdSinks = successThresholdSinks
 	return nil
+}
+
+// validate ensures that the Pipeline has the required configuration to allow
+// registration, removal or usage, without issue.
+func (p Pipeline) validate() (bool, error) {
+	var err error
+
+	if p.PipelineID == "" {
+		err = multierror.Append(err, errors.New("pipeline ID is required"))
+	}
+
+	if p.EventType == "" {
+		err = multierror.Append(err, errors.New("event type is required"))
+	}
+
+	if len(p.NodeIDs) == 0 {
+		err = multierror.Append(err, errors.New("node IDs are required"))
+	}
+
+	for _, n := range p.NodeIDs {
+		if n == "" {
+			err = multierror.Append(err, errors.New("node ID cannot be empty"))
+			break
+		}
+	}
+
+	return err == nil, err
 }
