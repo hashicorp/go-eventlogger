@@ -178,7 +178,7 @@ type Pipeline struct {
 
 // RegisterPipeline adds a pipeline to the broker.
 func (b *Broker) RegisterPipeline(def Pipeline) error {
-	ok, err := def.validate()
+	err := def.validate()
 	if err != nil {
 		return err
 	}
@@ -343,7 +343,7 @@ func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int
 
 // validate ensures that the Pipeline has the required configuration to allow
 // registration, removal or usage, without issue.
-func (p Pipeline) validate() (bool, error) {
+func (p Pipeline) validate() error {
 	var err error
 
 	if p.PipelineID == "" {
@@ -365,5 +365,5 @@ func (p Pipeline) validate() (bool, error) {
 		}
 	}
 
-	return err == nil, err
+	return err
 }
