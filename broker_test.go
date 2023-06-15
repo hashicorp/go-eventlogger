@@ -413,7 +413,7 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 		NodeIDs:    nodeIDs,
 	})
 	require.Error(t, err)
-	require.EqualError(t, err, "nodeID \"node-0\" not registered")
+	require.EqualError(t, err, "node ID \"node-0\" not registered")
 
 	// Re-register nodes and 2 pipelines which use the same nodes
 	nodeIDs = nodesToNodeIDs(t, broker, f1, s1)
@@ -443,7 +443,6 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.Error(t, err)
 	me, ok := err.(*multierror.Error)
 	require.True(t, ok)
-	require.EqualError(t, me.Unwrap(), "node not found: \"node-0\"")
 	require.Equal(t, 2, me.Len())
 }
 

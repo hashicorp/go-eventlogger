@@ -12,6 +12,15 @@ import (
 	"time"
 )
 
+// RegistrationPolicy is used to specify what kind of policy should apply when
+// registering components (e.g. Pipeline, Node) with the Broker
+type RegistrationPolicy string
+
+const (
+	AllowOverwrite RegistrationPolicy = "AllowOverwrite"
+	DenyOverwrite  RegistrationPolicy = "DenyOverwrite"
+)
+
 // Broker is the top-level entity used in the library for configuring the system
 // and for sending events.
 //
@@ -36,6 +45,9 @@ type Broker struct {
 	graphs map[EventType]*graph
 	lock   sync.RWMutex
 
+	pipelineRegistrationPolicy RegistrationPolicy
+	nodeRegistrationPolicy     RegistrationPolicy
+
 	*clock
 }
 
@@ -45,11 +57,84 @@ type nodeUsage struct {
 	referenceCount int
 }
 
-// NewBroker creates a new Broker.
-func NewBroker() *Broker {
-	return &Broker{
+// Option allows options to be passed as arguments.
+type Option func(*options)
+
+// options are used to represent configuration for the broker.
+type options struct {
+	withPipelineRegistrationPolicy RegistrationPolicy
+	withNodeRegistrationPolicy     RegistrationPolicy
+}
+
+// getDefaultOptions returns a set of default options
+func getDefaultOptions() options {
+	return options{
+		withPipelineRegistrationPolicy: AllowOverwrite,
+		withNodeRegistrationPolicy:     AllowOverwrite,
+	}
+}
+
+// getOpts iterates the inbound Options and returns a struct.
+func getOpts(opt ...Option) options {
+	opts := getDefaultOptions()
+	for _, o := range opt {
+		if o != nil {
+			o(&opts)
+		}
+	}
+	return opts
+}
+
+// WithPipelineRegistrationPolicy configures the option that determines the pipeline registration policy.
+func WithPipelineRegistrationPolicy(mode RegistrationPolicy) Option {
+	return func(o *options) {
+		o.withPipelineRegistrationPolicy = mode
+	}
+}
+
+// WithNodeRegistrationPolicy configures the option that determines the node registration policy.
+func WithNodeRegistrationPolicy(mode RegistrationPolicy) Option {
+	return func(o *options) {
+		o.withNodeRegistrationPolicy = mode
+	}
+}
+
+// NewBroker creates a new Broker applying any supplied options.
+func NewBroker(opt ...Option) *Broker {
+	opts := getOpts(opt...)
+	b := &Broker{
 		nodes:  make(map[NodeID]*nodeUsage),
 		graphs: make(map[EventType]*graph),
+	}
+	if opts.withPipelineRegistrationPolicy != "" {
+		b.pipelineRegistrationPolicy = opts.withPipelineRegistrationPolicy
+	}
+	if opts.withNodeRegistrationPolicy != "" {
+		b.nodeRegistrationPolicy = opts.withNodeRegistrationPolicy
+	}
+	return b
+}
+
+// validate ensures that the broker has been configured with correct values.
+func (b *Broker) validate() error {
+	if err := b.pipelineRegistrationPolicy.validate(); err != nil {
+		return fmt.Errorf("invalid pipeline registration policy: %w", err)
+	}
+
+	if err := b.nodeRegistrationPolicy.validate(); err != nil {
+		return fmt.Errorf("invalid node registration policy: %w", err)
+	}
+
+	return nil
+}
+
+// validate ensures that the RegistrationPolicy is one of the expected values.
+func (m RegistrationPolicy) validate() error {
+	switch m {
+	case AllowOverwrite, DenyOverwrite:
+		return nil
+	default:
+		return fmt.Errorf("'%s' is not a valid registration policy: %w", m, ErrInvalidParameter)
 	}
 }
 
@@ -152,7 +237,12 @@ func (b *Broker) RegisterNode(id NodeID, node Node) error {
 	// Check if this node is already registered, if so maintain reference count
 	r, exists := b.nodes[id]
 	if exists {
-		nr.referenceCount = r.referenceCount
+		switch b.nodeRegistrationPolicy {
+		case AllowOverwrite:
+			nr.referenceCount = r.referenceCount
+		case DenyOverwrite:
+			return fmt.Errorf("node ID %q is already registered, configured policy prevents overwriting", id)
+		}
 	}
 
 	b.nodes[id] = nr
@@ -186,10 +276,12 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	g, ok := b.graphs[def.EventType]
-	if !ok {
+	g, exists := b.graphs[def.EventType]
+	if !exists {
 		g = &graph{}
 		b.graphs[def.EventType] = g
+	} else if b.pipelineRegistrationPolicy == DenyOverwrite {
+		return fmt.Errorf("pipeline ID %q is already registered, configured policy prevents overwriting", def.PipelineID)
 	}
 
 	// Gather the registered nodes, so they can be referenced for this pipeline.
@@ -197,7 +289,7 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 	for i, n := range def.NodeIDs {
 		nodeUsage, ok := b.nodes[n]
 		if !ok {
-			return fmt.Errorf("nodeID %q not registered", n)
+			return fmt.Errorf("node ID %q not registered", n)
 		}
 		nodes[i] = nodeUsage.node
 	}
