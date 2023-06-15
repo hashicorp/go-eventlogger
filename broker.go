@@ -271,10 +271,14 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 
 	g.roots.Delete(id)
 
+	var nodeErr error
+
 	for _, nodeID := range nodes {
 		nodeUsage, ok := b.nodes[nodeID]
 		if !ok {
-			return fmt.Errorf("pipeline ID %q: node ID %q is not registered", id, nodeID)
+			// We might get multiple nodes which cannot be found
+			nodeErr = multierror.Append(nodeErr, fmt.Errorf("node not found: %q", nodeID))
+			continue
 		}
 
 		switch nodeUsage.referenceCount {
@@ -286,7 +290,7 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 		}
 	}
 
-	return nil
+	return nodeErr
 }
 
 // SetSuccessThreshold sets the success threshold per eventType.  For the

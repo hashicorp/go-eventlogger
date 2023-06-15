@@ -448,6 +448,15 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID(""))
 	require.Error(t, err)
 	require.EqualError(t, err, "pipeline ID cannot be empty")
+
+	// Whip the nodes out from underneath a pipeline and then try to deregister it
+	broker.nodes = nil
+	err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
+	require.Error(t, err)
+	me, ok := err.(*multierror.Error)
+	require.True(t, ok)
+	require.EqualError(t, me.Unwrap(), "node not found: \"node-0\"")
+	require.Equal(t, 2, me.Len())
 }
 
 // TestPipelineValidate tests that given a Pipeline in various states we can assert
