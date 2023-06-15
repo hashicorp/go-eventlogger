@@ -511,14 +511,12 @@ func TestPipelineValidate(t *testing.T) {
 				NodeIDs:    tc.nodes,
 			}
 
-			valid, err := p.validate()
+			err := p.validate()
 			switch tc.expectValid {
 			case true:
 				require.NoError(t, err)
-				require.True(t, valid)
 			default:
 				require.Error(t, err)
-				require.False(t, valid)
 				me, ok := err.(*multierror.Error)
 				require.True(t, ok)
 				require.Equal(t, tc.expectErrorCount, me.Len())
