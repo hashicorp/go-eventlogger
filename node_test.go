@@ -97,3 +97,46 @@ func TestLinkNodesErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestFlattenNodes tests that given a 'root' node we can correctly flatten it
+// out to retrieve the NodeIDs of linked nodes.
+func TestFlattenNodes_LinkNodes(t *testing.T) {
+	ids := []NodeID{"1", "2", "3"}
+	nodes := []Node{
+		&Filter{Predicate: nil}, &JSONFormatter{}, &FileSink{Path: "test.log"},
+	}
+
+	linkedNodes, err := linkNodes(nodes, ids)
+	require.NoError(t, err)
+
+	flatNodes := linkedNodes.flatten(nil)
+	require.Contains(t, flatNodes, NodeID("1"))
+	require.Contains(t, flatNodes, NodeID("2"))
+	require.Contains(t, flatNodes, NodeID("3"))
+	require.Equal(t, 3, len(flatNodes))
+}
+
+// TestFlattenNodes_LinkNodesAndSinks tests that given a more complex set of linked
+// nodes we can still get the right set of registered nodes.
+func TestFlattenNodes_LinkNodesAndSinks(t *testing.T) {
+	ids := []NodeID{"1", "2"}
+	nodes := []Node{
+		&Filter{Predicate: nil}, &JSONFormatter{},
+	}
+
+	sinkIds := []NodeID{"x", "y", "z"}
+	sinkNodes := []Node{
+		&FileSink{Path: "test.log"}, &FileSink{Path: "foo.log"}, &FileSink{Path: "bar.log"},
+	}
+
+	linkedNodes, err := linkNodesAndSinks(nodes, sinkNodes, ids, sinkIds)
+	require.NoError(t, err)
+
+	flatNodes := linkedNodes.flatten(nil)
+	require.Contains(t, flatNodes, NodeID("1"))
+	require.Contains(t, flatNodes, NodeID("2"))
+	require.Contains(t, flatNodes, NodeID("x"))
+	require.Contains(t, flatNodes, NodeID("y"))
+	require.Contains(t, flatNodes, NodeID("z"))
+	require.Equal(t, 5, len(flatNodes))
+}

@@ -5,9 +5,20 @@ package eventlogger
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"sync"
 	"time"
+)
+
+// RegistrationPolicy is used to specify what kind of policy should apply when
+// registering components (e.g. Pipeline, Node) with the Broker
+type RegistrationPolicy string
+
+const (
+	AllowOverwrite RegistrationPolicy = "AllowOverwrite"
+	DenyOverwrite  RegistrationPolicy = "DenyOverwrite"
 )
 
 // Broker is the top-level entity used in the library for configuring the system
@@ -30,19 +41,106 @@ import (
 //
 // A Node can be shared across multiple pipelines.
 type Broker struct {
-	nodes  map[NodeID]Node
+	nodes  map[NodeID]*nodeUsage
 	graphs map[EventType]*graph
 	lock   sync.RWMutex
+
+	pipelineRegistrationPolicy RegistrationPolicy
+	nodeRegistrationPolicy     RegistrationPolicy
 
 	*clock
 }
 
-// NewBroker creates a new Broker.
-func NewBroker() *Broker {
-	return &Broker{
-		nodes:  make(map[NodeID]Node),
+// nodeUsage tracks how many times a Node is referenced by registered pipelines.
+type nodeUsage struct {
+	node           Node
+	referenceCount int
+}
+
+// Option allows options to be passed as arguments.
+type Option func(*options) error
+
+// options are used to represent configuration for the broker.
+type options struct {
+	withPipelineRegistrationPolicy RegistrationPolicy
+	withNodeRegistrationPolicy     RegistrationPolicy
+}
+
+// getDefaultOptions returns a set of default options
+func getDefaultOptions() options {
+	return options{
+		withPipelineRegistrationPolicy: AllowOverwrite,
+		withNodeRegistrationPolicy:     AllowOverwrite,
+	}
+}
+
+// getOpts iterates the inbound Options and returns a struct.
+// Each Option is applied in the order it appears in the argument list, so it is
+// possible to supply the same Option numerous times and the 'last write wins'.
+func getOpts(opt ...Option) (options, error) {
+	opts := getDefaultOptions()
+	for _, o := range opt {
+		if o == nil {
+			continue
+		}
+		if err := o(&opts); err != nil {
+			return options{}, err
+		}
+	}
+	return opts, nil
+}
+
+// WithPipelineRegistrationPolicy configures the option that determines the pipeline registration policy.
+func WithPipelineRegistrationPolicy(policy RegistrationPolicy) Option {
+	return func(o *options) error {
+		var err error
+
+		switch policy {
+		case AllowOverwrite, DenyOverwrite:
+			o.withPipelineRegistrationPolicy = policy
+		default:
+			err = fmt.Errorf("'%s' is not a valid pipeline registration policy: %w", policy, ErrInvalidParameter)
+		}
+
+		return err
+	}
+}
+
+// WithNodeRegistrationPolicy configures the option that determines the node registration policy.
+func WithNodeRegistrationPolicy(policy RegistrationPolicy) Option {
+	return func(o *options) error {
+		var err error
+
+		switch policy {
+		case AllowOverwrite, DenyOverwrite:
+			o.withNodeRegistrationPolicy = policy
+		default:
+			err = fmt.Errorf("'%s' is not a valid node registration policy: %w", policy, ErrInvalidParameter)
+		}
+
+		return err
+	}
+}
+
+// NewBroker creates a new Broker applying any supplied options.
+func NewBroker(opt ...Option) (*Broker, error) {
+	opts, err := getOpts(opt...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create broker: %w", err)
+	}
+
+	b := &Broker{
+		nodes:  make(map[NodeID]*nodeUsage),
 		graphs: make(map[EventType]*graph),
 	}
+	if opts.withPipelineRegistrationPolicy != "" {
+		b.pipelineRegistrationPolicy = opts.withPipelineRegistrationPolicy
+	}
+	if opts.withNodeRegistrationPolicy != "" {
+		b.nodeRegistrationPolicy = opts.withNodeRegistrationPolicy
+	}
+
+	return b, nil
 }
 
 // clock only exists to make testing simpler.
@@ -94,7 +192,7 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 	b.lock.RUnlock()
 
 	if !ok {
-		return Status{}, fmt.Errorf("No graph for EventType %s", t)
+		return Status{}, fmt.Errorf("no graph for EventType %s", t)
 	}
 
 	e := &Event{
@@ -132,10 +230,28 @@ type NodeID string
 // may be a filter, formatter or sink (see NodeType). Nodes can be shared across
 // multiple pipelines.
 func (b *Broker) RegisterNode(id NodeID, node Node) error {
+	if id == "" {
+		return errors.New("unable to register node, node ID cannot be empty")
+	}
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.nodes[id] = node
+	nr := &nodeUsage{node: node, referenceCount: 0}
+
+	// Check if this node is already registered, if so maintain reference count
+	r, exists := b.nodes[id]
+	if exists {
+		switch b.nodeRegistrationPolicy {
+		case AllowOverwrite:
+			nr.referenceCount = r.referenceCount
+		case DenyOverwrite:
+			return fmt.Errorf("node ID %q is already registered, configured policy prevents overwriting", id)
+		}
+	}
+
+	b.nodes[id] = nr
+
 	return nil
 }
 
@@ -157,23 +273,32 @@ type Pipeline struct {
 
 // RegisterPipeline adds a pipeline to the broker.
 func (b *Broker) RegisterPipeline(def Pipeline) error {
+	err := def.validate()
+	if err != nil {
+		return err
+	}
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	g, ok := b.graphs[def.EventType]
-	if !ok {
+	g, exists := b.graphs[def.EventType]
+	if !exists {
 		g = &graph{}
 		b.graphs[def.EventType] = g
+	} else if b.pipelineRegistrationPolicy == DenyOverwrite {
+		return fmt.Errorf("pipeline ID %q is already registered, configured policy prevents overwriting", def.PipelineID)
 	}
 
+	// Gather the registered nodes, so they can be referenced for this pipeline.
 	nodes := make([]Node, len(def.NodeIDs))
 	for i, n := range def.NodeIDs {
-		node, ok := b.nodes[n]
+		nodeUsage, ok := b.nodes[n]
 		if !ok {
-			return fmt.Errorf("nodeID %q not registered", n)
+			return fmt.Errorf("node ID %q not registered", n)
 		}
-		nodes[i] = node
+		nodes[i] = nodeUsage.node
 	}
+
 	root, err := linkNodes(nodes, def.NodeIDs)
 	if err != nil {
 		return err
@@ -184,23 +309,85 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 		return err
 	}
 
+	// Store the pipeline and then update the reference count of the nodes in that pipeline.
 	g.roots.Store(def.PipelineID, root)
+	for _, id := range def.NodeIDs {
+		nodeUsage, ok := b.nodes[id]
+		// We can be optimistic about this as we would have already errored above.
+		if ok {
+			nodeUsage.referenceCount++
+		}
+	}
 
 	return nil
 }
 
 // RemovePipeline removes a pipeline from the broker.
 func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
+	switch {
+	case t == "":
+		return errors.New("event type cannot be empty")
+	case id == "":
+		return errors.New("pipeline ID cannot be empty")
+	}
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
-		return fmt.Errorf("No graph for EventType %s", t)
+		return fmt.Errorf("no graph for EventType %s", t)
 	}
 
 	g.roots.Delete(id)
 	return nil
+}
+
+// RemovePipelineAndNodes will attempt to remove all nodes referenced by the pipeline.
+// Any nodes that are referenced by other pipelines will not be removed.
+func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
+	switch {
+	case t == "":
+		return errors.New("event type cannot be empty")
+	case id == "":
+		return errors.New("pipeline ID cannot be empty")
+	}
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	g, ok := b.graphs[t]
+	if !ok {
+		return fmt.Errorf("no graph for EventType %s", t)
+	}
+
+	nodes, err := g.roots.Nodes(id)
+	if err != nil {
+		return fmt.Errorf("unable to retrieve all nodes referenced by pipeline ID %q: %w", id, err)
+	}
+
+	g.roots.Delete(id)
+
+	var nodeErr error
+
+	for _, nodeID := range nodes {
+		nodeUsage, ok := b.nodes[nodeID]
+		if !ok {
+			// We might get multiple nodes which cannot be found
+			nodeErr = multierror.Append(nodeErr, fmt.Errorf("node not found: %q", nodeID))
+			continue
+		}
+
+		switch nodeUsage.referenceCount {
+		case 0, 1:
+			// Node is not currently in use, or was only being used by this pipeline
+			delete(b.nodes, nodeID)
+		default:
+			nodeUsage.referenceCount--
+		}
+	}
+
+	return nodeErr
 }
 
 // SetSuccessThreshold sets the success threshold per eventType.  For the
@@ -211,12 +398,15 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 // meeting this threshold.  Use this when you want to allow the filtering of
 // events without causing an error because an event was filtered.
 func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	if successThreshold < 0 {
+	switch {
+	case t == "":
+		return errors.New("event type cannot be empty")
+	case successThreshold < 0:
 		return fmt.Errorf("successThreshold must be 0 or greater")
 	}
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
@@ -232,12 +422,15 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 // overall processing of a given event to be considered a success, at least as
 // many sinks as the threshold value must successfully process the event.
 func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	if successThresholdSinks < 0 {
+	switch {
+	case t == "":
+		return errors.New("event type cannot be empty")
+	case successThresholdSinks < 0:
 		return fmt.Errorf("successThresholdSinks must be 0 or greater")
 	}
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
@@ -247,4 +440,31 @@ func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int
 
 	g.successThresholdSinks = successThresholdSinks
 	return nil
+}
+
+// validate ensures that the Pipeline has the required configuration to allow
+// registration, removal or usage, without issue.
+func (p Pipeline) validate() error {
+	var err error
+
+	if p.PipelineID == "" {
+		err = multierror.Append(err, errors.New("pipeline ID is required"))
+	}
+
+	if p.EventType == "" {
+		err = multierror.Append(err, errors.New("event type is required"))
+	}
+
+	if len(p.NodeIDs) == 0 {
+		err = multierror.Append(err, errors.New("node IDs are required"))
+	}
+
+	for _, n := range p.NodeIDs {
+		if n == "" {
+			err = multierror.Append(err, errors.New("node ID cannot be empty"))
+			break
+		}
+	}
+
+	return err
 }

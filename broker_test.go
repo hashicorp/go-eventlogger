@@ -6,7 +6,8 @@ package eventlogger
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"github.com/hashicorp/go-multierror"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,6 +18,8 @@ import (
 	"github.com/hashicorp/go-uuid"
 )
 
+// nodesToNodeIDs takes the supplied nodes and registers them with a corresponding,
+// generated ID which follows the format 'node-{argument_index}' starting from 0.
 func nodesToNodeIDs(t *testing.T, broker *Broker, nodes ...Node) []NodeID {
 	t.Helper()
 	nodeIDs := make([]NodeID, len(nodes))
@@ -50,7 +53,8 @@ func TestBroker(t *testing.T) {
 	}
 
 	// Create a broker
-	broker := NewBroker()
+	broker, err := NewBroker()
+	require.NoError(t, err)
 	now := time.Now()
 	broker.clock = &clock{now}
 
@@ -69,11 +73,7 @@ func TestBroker(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", tt.name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			// Send to FileSink
 			sink := &FileSink{Path: tmpDir, FileName: "file.log"}
@@ -82,7 +82,7 @@ func TestBroker(t *testing.T) {
 			// Register the graph with the broker
 			et := EventType("Foo")
 			nodeIDs := nodesToNodeIDs(t, broker, tt.nodes...)
-			err = broker.RegisterPipeline(Pipeline{
+			err := broker.RegisterPipeline(Pipeline{
 				EventType:  et,
 				PipelineID: "id",
 				NodeIDs:    nodeIDs,
@@ -124,15 +124,15 @@ func TestBroker(t *testing.T) {
 			}
 
 			// Check the contents of the log
-			files, err := ioutil.ReadDir(tmpDir)
+			dirEntry, err := os.ReadDir(tmpDir)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(files) > 1 {
-				t.Errorf("Expected 1 log file, got %d", len(files))
+			if len(dirEntry) > 1 {
+				t.Errorf("Expected 1 log file, got %d", len(dirEntry))
 			}
 
-			dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+			dat, err := os.ReadFile(filepath.Join(tmpDir, dirEntry[0].Name()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -151,18 +151,18 @@ func TestBroker(t *testing.T) {
 }
 
 func TestPipeline(t *testing.T) {
-	broker := NewBroker()
+	broker, err := NewBroker()
+	require.NoError(t, err)
 
 	// invalid pipeline
 	nodeIDs := nodesToNodeIDs(t, broker, &Filter{Predicate: nil})
-	err := broker.RegisterPipeline(Pipeline{
+	err = broker.RegisterPipeline(Pipeline{
 		EventType:  "t",
 		PipelineID: "id",
 		NodeIDs:    nodeIDs,
 	})
-	if err == nil {
-		t.Fatal(err)
-	}
+	require.Error(t, err)
+
 	if diff := deep.Equal("non-sink node has no children", err.Error()); diff != nil {
 		t.Fatal(diff)
 	}
@@ -176,9 +176,7 @@ func TestPipeline(t *testing.T) {
 		PipelineID: "s1",
 		NodeIDs:    p1,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// register again
 	err = broker.RegisterPipeline(Pipeline{
@@ -186,9 +184,7 @@ func TestPipeline(t *testing.T) {
 		PipelineID: "s1",
 		NodeIDs:    p1,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// send a payload
 	payload := map[string]interface{}{
@@ -196,12 +192,8 @@ func TestPipeline(t *testing.T) {
 		"width": 1,
 	}
 	_, err = broker.Send(context.Background(), "t", payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s1.count != 1 {
-		t.Fatalf("expected count %d, not %d", s1.count, 1)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 1, s1.count)
 
 	// Construct another graph
 	s2 := &testSink{}
@@ -211,56 +203,37 @@ func TestPipeline(t *testing.T) {
 		PipelineID: "s2",
 		NodeIDs:    p2,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// send a payload
 	_, err = broker.Send(context.Background(), "t", payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s1.count != 2 {
-		t.Fatalf("expected count %d, not %d", s1.count, 2)
-	}
-	if s2.count != 1 {
-		t.Fatalf("expected count %d, not %d", s2.count, 1)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 2, s1.count)
+	require.Equal(t, 1, s2.count)
 
 	// remove second graph
 	err = broker.RemovePipeline("t", "s2")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// send a payload
 	_, err = broker.Send(context.Background(), "t", payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s1.count != 3 {
-		t.Fatalf("expected count %d, not %d", s1.count, 3)
-	}
-	if s2.count != 1 {
-		t.Fatalf("expected count %d, not %d", s2.count, 1)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 3, s1.count)
+	require.Equal(t, 1, s2.count)
 
 	// remove
 	err = broker.RemovePipeline("t", "s1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// remove again
 	err = broker.RemovePipeline("t", "s1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 }
 
 // TestPipelineRaceCondition can't fail, but it can check if there is a race condition in iterating through, adding, or removing pipelines.
 func TestPipelineRaceCondition(t *testing.T) {
-	broker := NewBroker()
+	broker, err := NewBroker()
+	require.NoError(t, err)
 
 	eventType := EventType("t")
 	var pipelines []PipelineID
@@ -329,7 +302,7 @@ func (ts *testSink) Type() NodeType {
 	return NodeTypeSink
 }
 
-func (ts *testSink) Process(ctx context.Context, e *Event) (*Event, error) {
+func (ts *testSink) Process(_ context.Context, _ *Event) (*Event, error) {
 	ts.count++
 	return nil, nil
 }
@@ -342,44 +315,446 @@ func (ts *testSink) Name() string {
 	return "testSink"
 }
 
+// TestSuccessThreshold tests that we can set the required success threshold for
+// a specific event type in the graph.
 func TestSuccessThreshold(t *testing.T) {
-	b := NewBroker()
+	threshold := 2
+	b, err := NewBroker()
+	require.NoError(t, err)
 
-	err := b.SetSuccessThreshold("t", 2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = b.SetSuccessThreshold("", threshold)
+	require.Error(t, err)
+	require.EqualError(t, err, "event type cannot be empty")
+
+	err = b.SetSuccessThreshold("t", threshold)
+	require.NoError(t, err)
+
 	g, ok := b.graphs["t"]
-	if !ok {
-		t.Fatalf("expected graph for eventType")
-	}
-	if g.successThreshold != 2 {
-		t.Fatalf("expected successThreshold %d, got %d", 2, g.successThreshold)
-	}
+	require.True(t, ok)
+	require.Equal(t, threshold, g.successThreshold)
 
 	err = b.SetSuccessThreshold("t", -1)
-	if err == nil || err.Error() != "successThreshold must be 0 or greater" {
-		t.Fatalf("expected successThreshold error")
+	require.Error(t, err)
+	require.EqualError(t, err, "successThreshold must be 0 or greater")
+}
+
+// TestSuccessThresholdSinks tests that we can set the required sink success
+// threshold for a specific event type in the graph.
+func TestSuccessThresholdSinks(t *testing.T) {
+	threshold := 2
+	b, err := NewBroker()
+	require.NoError(t, err)
+
+	err = b.SetSuccessThresholdSinks("", threshold)
+	require.Error(t, err)
+	require.EqualError(t, err, "event type cannot be empty")
+
+	err = b.SetSuccessThresholdSinks("t", threshold)
+	require.NoError(t, err)
+
+	g, ok := b.graphs["t"]
+	require.True(t, ok)
+	require.Equal(t, threshold, g.successThresholdSinks)
+
+	err = b.SetSuccessThresholdSinks("t", -1)
+	require.Error(t, err)
+	require.EqualError(t, err, "successThresholdSinks must be 0 or greater")
+}
+
+// TestRemovePipelineAndNodes exercises the behavior that removes a pipeline and
+// any nodes associated with that pipeline, if they are not referenced by other pipelines.
+// The test is relatively long as it is focused on the state of the broker across
+// multiple operations.
+func TestRemovePipelineAndNodes(t *testing.T) {
+	broker, err := NewBroker()
+	require.NoError(t, err)
+
+	// Construct a graph
+	f1 := &JSONFormatter{}
+	s1 := &testSink{}
+	nodeIDs := nodesToNodeIDs(t, broker, f1, s1)
+
+	// Register single pipeline
+	err = broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p1",
+		NodeIDs:    nodeIDs,
+	})
+	require.NoError(t, err)
+
+	// Deregister the only pipeline we have
+	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	require.NoError(t, err)
+	require.Empty(t, broker.nodes)
+
+	// Attempt to register 2nd pipeline which references now deleted nodes
+	err = broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p2",
+		NodeIDs:    nodeIDs,
+	})
+	require.Error(t, err)
+	require.EqualError(t, err, "node ID \"node-0\" not registered")
+
+	// Re-register nodes and 2 pipelines which use the same nodes
+	nodeIDs = nodesToNodeIDs(t, broker, f1, s1)
+	err = broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p1",
+		NodeIDs:    nodeIDs,
+	})
+	require.NoError(t, err)
+
+	err = broker.RegisterPipeline(Pipeline{
+		EventType:  "t",
+		PipelineID: "p2",
+		NodeIDs:    nodeIDs,
+	})
+	require.NoError(t, err)
+
+	// Deregister pipeline p1, leave pipeline p2 in place
+	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	require.NoError(t, err)
+	require.NotEmpty(t, broker.nodes)
+	require.Equal(t, 2, len(broker.nodes))
+
+	// Whip the nodes out from underneath a pipeline and then try to deregister it
+	broker.nodes = nil
+	err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
+	require.Error(t, err)
+	me, ok := err.(*multierror.Error)
+	require.True(t, ok)
+	require.Equal(t, 2, me.Len())
+}
+
+// TestRemovePipelineAndNodes_BadEventType tests attempting to remove a pipeline
+// with an event type we haven't previously registered.
+func TestRemovePipelineAndNodes_BadEventType(t *testing.T) {
+	broker, err := NewBroker()
+	err = broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
+	require.Error(t, err)
+	require.EqualError(t, err, "no graph for EventType foo")
+}
+
+// TestRegisterPipeline_BadParameters ensures that we perform sanity checking
+// on the parameters passed in when we attempt to register a pipeline.
+func TestRegisterPipeline_BadParameters(t *testing.T) {
+	tests := map[string]struct {
+		pipelineID string
+		eventType  string
+		nodes      []NodeID
+		error      string
+	}{
+		"no-pipelineID": {
+			pipelineID: "",
+			eventType:  "t",
+			nodes:      []NodeID{"1", "2", "3"},
+			error:      "pipeline ID is required",
+		},
+		"no-eventType": {
+			pipelineID: "1",
+			eventType:  "",
+			nodes:      []NodeID{"1", "2", "3"},
+			error:      "event type is required",
+		},
+		"nil-nodes": {
+			pipelineID: "1",
+			eventType:  "t",
+			nodes:      nil,
+			error:      "node IDs are required",
+		},
+		"empty-nodes": {
+			pipelineID: "1",
+			eventType:  "t",
+			nodes:      []NodeID{},
+			error:      "node IDs are required",
+		},
+		"bad-nodes": {
+			pipelineID: "1",
+			eventType:  "t",
+			nodes:      []NodeID{"", ""},
+			error:      "node ID cannot be empty",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			broker, err := NewBroker()
+			require.NoError(t, err)
+
+			// Register some nodes so they exist (1, 2, 3 should appear in the test cases)
+			node := &JSONFormatter{}
+			err = broker.RegisterNode("1", node)
+			require.NoError(t, err)
+			err = broker.RegisterNode("2", node)
+			require.NoError(t, err)
+			err = broker.RegisterNode("3", node)
+			require.NoError(t, err)
+
+			err = broker.RegisterPipeline(Pipeline{
+				PipelineID: PipelineID(tc.pipelineID),
+				EventType:  EventType(tc.eventType),
+				NodeIDs:    tc.nodes,
+			})
+
+			require.Error(t, err)
+			me, ok := err.(*multierror.Error)
+			require.True(t, ok)
+			require.EqualError(t, me.Unwrap(), tc.error)
+		})
 	}
 }
 
-func TestSuccessThresholdSinks(t *testing.T) {
-	b := NewBroker()
+// TestRemovePipelineAndNodes_BadParameters ensures that we perform sanity checking
+// on the parameters passed in when we attempt to remove both individual pipelines
+// and also pipelines and nodes together.
+func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
+	tests := map[string]struct {
+		pipelineID string
+		eventType  string
+		error      string
+	}{
+		"no-pipelineID": {
+			pipelineID: "",
+			eventType:  "t",
+			error:      "pipeline ID cannot be empty",
+		},
+		"no-eventType": {
+			pipelineID: "1",
+			eventType:  "",
+			error:      "event type cannot be empty",
+		},
+		"wrong-eventType": {
+			pipelineID: "1",
+			eventType:  "foo",
+			error:      "no graph for EventType foo",
+		},
+	}
 
-	err := b.SetSuccessThresholdSinks("t", 2)
-	if err != nil {
-		t.Fatal(err)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			broker, err := NewBroker()
+			require.NoError(t, err)
+
+			// Test removing the pipeline and nodes
+			err = broker.RemovePipelineAndNodes(EventType(tc.eventType), PipelineID(tc.pipelineID))
+			require.Error(t, err)
+			require.EqualError(t, err, tc.error)
+			// Test removing just the pipeline
+			err = broker.RemovePipeline(EventType(tc.eventType), PipelineID(tc.pipelineID))
+			require.Error(t, err)
+			require.EqualError(t, err, tc.error)
+		})
 	}
-	g, ok := b.graphs["t"]
-	if !ok {
-		t.Fatalf("expected graph for eventType")
-	}
-	if g.successThresholdSinks != 2 {
-		t.Fatalf("expected successThresholdSinks %d, got %d", 2, g.successThresholdSinks)
+}
+
+// TestPipelineValidate tests that given a Pipeline in various states we can assert
+// that the Pipeline is valid or invalid.
+func TestPipelineValidate(t *testing.T) {
+	tests := map[string]struct {
+		pipelineID       string
+		eventType        string
+		nodes            []NodeID
+		expectValid      bool
+		expectErrorCount int
+	}{
+		"valid": {
+			pipelineID:  "1",
+			eventType:   "t",
+			nodes:       []NodeID{"a", "b"},
+			expectValid: true,
+		},
+		"no-pipelineID": {
+			pipelineID:       "",
+			eventType:        "t",
+			nodes:            []NodeID{"a", "b"},
+			expectValid:      false,
+			expectErrorCount: 1,
+		},
+		"no-event-type": {
+			pipelineID:       "1",
+			eventType:        "",
+			nodes:            []NodeID{"a", "b"},
+			expectValid:      false,
+			expectErrorCount: 1,
+		},
+		"empty-nodes": {
+			pipelineID:       "1",
+			eventType:        "t",
+			nodes:            []NodeID{},
+			expectValid:      false,
+			expectErrorCount: 1,
+		},
+		"fully-invalid": {
+			pipelineID:       "",
+			eventType:        "",
+			nodes:            []NodeID{},
+			expectValid:      false,
+			expectErrorCount: 3,
+		},
+		"fully-invalid-no-nodeIDs": {
+			pipelineID:       "",
+			eventType:        "",
+			nodes:            []NodeID{"", ""},
+			expectValid:      false,
+			expectErrorCount: 3,
+		},
 	}
 
-	err = b.SetSuccessThresholdSinks("t", -1)
-	if err == nil || err.Error() != "successThresholdSinks must be 0 or greater" {
-		t.Fatalf("expected successThresholdSinks error")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := Pipeline{
+				PipelineID: PipelineID(tc.pipelineID),
+				EventType:  EventType(tc.eventType),
+				NodeIDs:    tc.nodes,
+			}
+
+			err := p.validate()
+			switch tc.expectValid {
+			case true:
+				require.NoError(t, err)
+			default:
+				require.Error(t, err)
+				me, ok := err.(*multierror.Error)
+				require.True(t, ok)
+				require.Equal(t, tc.expectErrorCount, me.Len())
+			}
+		})
 	}
+}
+
+// TestRegisterNode_NoID ensures we cannot register a Node with an empty ID.
+func TestRegisterNode_NoID(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("", &JSONFormatter{})
+	require.Error(t, err)
+	require.EqualError(t, err, "unable to register node, node ID cannot be empty")
+}
+
+// TestBroker_RegisterNode_AllowOverwrite_Implicit is used to prove that nodes can be
+// overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
+// This is the default in order to maintain pre-existing behavior.
+func TestBroker_RegisterNode_AllowOverwrite_Implicit(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &FileSink{})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterNode_AllowOverwrite_Explicit is used to prove that nodes can be
+// overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
+func TestBroker_RegisterNode_AllowOverwrite_Explicit(t *testing.T) {
+	b, err := NewBroker(WithNodeRegistrationPolicy(AllowOverwrite))
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &FileSink{})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterNode_DenyOverwrite is used to prove that nodes can't be
+// overwritten when a Broker has been configured with the DenyOverwrite policy.
+func TestBroker_RegisterNode_DenyOverwrite(t *testing.T) {
+	b, err := NewBroker(WithNodeRegistrationPolicy(DenyOverwrite))
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &FileSink{})
+	require.Error(t, err)
+	require.EqualError(t, err, "node ID \"n1\" is already registered, configured policy prevents overwriting")
+}
+
+// TestBroker_RegisterPipeline_AllowOverwrite_Implicit is used to prove that pipelines can be
+// overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
+// This is the default in order to maintain pre-existing behavior.
+func TestBroker_RegisterPipeline_AllowOverwrite_Implicit(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f2", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "s1"},
+	})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f2", "s1"},
+	})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterPipeline_AllowOverwrite_Explicit is used to prove that pipelines can be
+// overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
+func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
+	b, err := NewBroker(WithPipelineRegistrationPolicy(AllowOverwrite))
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f2", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "s1"},
+	})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f2", "s1"},
+	})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterPipeline_DenyOverwrite is used to prove that pipelines can't
+// // be overwritten when a Broker has been configured with the DenyOverwrite policy.
+func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
+	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f2", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "s1"},
+	})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f2", "s1"},
+	})
+	require.Error(t, err)
+	require.EqualError(t, err, "pipeline ID \"p1\" is already registered, configured policy prevents overwriting")
 }

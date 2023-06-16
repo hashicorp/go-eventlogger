@@ -484,7 +484,8 @@ func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) 
 	})
 
 	// Create a broker
-	b := eventlogger.NewBroker()
+	b, err := eventlogger.NewBroker()
+	require.NoError(err)
 
 	gf := &gated.Filter{
 		Broker: b,
