@@ -18,6 +18,8 @@ import (
 	"github.com/hashicorp/go-uuid"
 )
 
+// nodesToNodeIDs takes the supplied nodes and registers them with a corresponding,
+// generated ID which follows the format 'node-{argument_index}' starting from 0.
 func nodesToNodeIDs(t *testing.T, broker *Broker, nodes ...Node) []NodeID {
 	t.Helper()
 	nodeIDs := make([]NodeID, len(nodes))
@@ -159,9 +161,8 @@ func TestPipeline(t *testing.T) {
 		PipelineID: "id",
 		NodeIDs:    nodeIDs,
 	})
-	if err == nil {
-		t.Fatal(err)
-	}
+	require.Error(t, err)
+
 	if diff := deep.Equal("non-sink node has no children", err.Error()); diff != nil {
 		t.Fatal(diff)
 	}
@@ -175,9 +176,7 @@ func TestPipeline(t *testing.T) {
 		PipelineID: "s1",
 		NodeIDs:    p1,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// register again
 	err = broker.RegisterPipeline(Pipeline{
@@ -185,9 +184,7 @@ func TestPipeline(t *testing.T) {
 		PipelineID: "s1",
 		NodeIDs:    p1,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// send a payload
 	payload := map[string]interface{}{
@@ -195,12 +192,8 @@ func TestPipeline(t *testing.T) {
 		"width": 1,
 	}
 	_, err = broker.Send(context.Background(), "t", payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s1.count != 1 {
-		t.Fatalf("expected count %d, not %d", s1.count, 1)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 1, s1.count)
 
 	// Construct another graph
 	s2 := &testSink{}
@@ -210,51 +203,31 @@ func TestPipeline(t *testing.T) {
 		PipelineID: "s2",
 		NodeIDs:    p2,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// send a payload
 	_, err = broker.Send(context.Background(), "t", payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s1.count != 2 {
-		t.Fatalf("expected count %d, not %d", s1.count, 2)
-	}
-	if s2.count != 1 {
-		t.Fatalf("expected count %d, not %d", s2.count, 1)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 2, s1.count)
+	require.Equal(t, 1, s2.count)
 
 	// remove second graph
 	err = broker.RemovePipeline("t", "s2")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// send a payload
 	_, err = broker.Send(context.Background(), "t", payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s1.count != 3 {
-		t.Fatalf("expected count %d, not %d", s1.count, 3)
-	}
-	if s2.count != 1 {
-		t.Fatalf("expected count %d, not %d", s2.count, 1)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 3, s1.count)
+	require.Equal(t, 1, s2.count)
 
 	// remove
 	err = broker.RemovePipeline("t", "s1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// remove again
 	err = broker.RemovePipeline("t", "s1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 }
 
 // TestPipelineRaceCondition can't fail, but it can check if there is a race condition in iterating through, adding, or removing pipelines.
@@ -342,48 +315,50 @@ func (ts *testSink) Name() string {
 	return "testSink"
 }
 
+// TestSuccessThreshold tests that we can set the required success threshold for
+// a specific event type in the graph.
 func TestSuccessThreshold(t *testing.T) {
+	threshold := 2
 	b, err := NewBroker()
 	require.NoError(t, err)
 
-	err = b.SetSuccessThreshold("t", 2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = b.SetSuccessThreshold("", threshold)
+	require.Error(t, err)
+	require.EqualError(t, err, "event type cannot be empty")
+
+	err = b.SetSuccessThreshold("t", threshold)
+	require.NoError(t, err)
+
 	g, ok := b.graphs["t"]
-	if !ok {
-		t.Fatalf("expected graph for eventType")
-	}
-	if g.successThreshold != 2 {
-		t.Fatalf("expected successThreshold %d, got %d", 2, g.successThreshold)
-	}
+	require.True(t, ok)
+	require.Equal(t, threshold, g.successThreshold)
 
 	err = b.SetSuccessThreshold("t", -1)
-	if err == nil || err.Error() != "successThreshold must be 0 or greater" {
-		t.Fatalf("expected successThreshold error")
-	}
+	require.Error(t, err)
+	require.EqualError(t, err, "successThreshold must be 0 or greater")
 }
 
+// TestSuccessThresholdSinks tests that we can set the required sink success
+// threshold for a specific event type in the graph.
 func TestSuccessThresholdSinks(t *testing.T) {
+	threshold := 2
 	b, err := NewBroker()
 	require.NoError(t, err)
 
-	err = b.SetSuccessThresholdSinks("t", 2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = b.SetSuccessThresholdSinks("", threshold)
+	require.Error(t, err)
+	require.EqualError(t, err, "event type cannot be empty")
+
+	err = b.SetSuccessThresholdSinks("t", threshold)
+	require.NoError(t, err)
+
 	g, ok := b.graphs["t"]
-	if !ok {
-		t.Fatalf("expected graph for eventType")
-	}
-	if g.successThresholdSinks != 2 {
-		t.Fatalf("expected successThresholdSinks %d, got %d", 2, g.successThresholdSinks)
-	}
+	require.True(t, ok)
+	require.Equal(t, threshold, g.successThresholdSinks)
 
 	err = b.SetSuccessThresholdSinks("t", -1)
-	if err == nil || err.Error() != "successThresholdSinks must be 0 or greater" {
-		t.Fatalf("expected successThresholdSinks error")
-	}
+	require.Error(t, err)
+	require.EqualError(t, err, "successThresholdSinks must be 0 or greater")
 }
 
 // TestRemovePipelineAndNodes exercises the behavior that removes a pipeline and
@@ -443,13 +418,6 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.NotEmpty(t, broker.nodes)
 	require.Equal(t, 2, len(broker.nodes))
 
-	// Attempt to deregister a pipeline with the wrong event type
-	err = broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
-	require.Error(t, err)
-	require.EqualError(t, err, "no graph for EventType foo")
-	require.NotEmpty(t, broker.nodes)
-	require.Equal(t, 2, len(broker.nodes))
-
 	// Whip the nodes out from underneath a pipeline and then try to deregister it
 	broker.nodes = nil
 	err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
@@ -457,6 +425,15 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	me, ok := err.(*multierror.Error)
 	require.True(t, ok)
 	require.Equal(t, 2, me.Len())
+}
+
+// TestRemovePipelineAndNodes_BadEventType tests attempting to remove a pipeline
+// with an event type we haven't previously registered.
+func TestRemovePipelineAndNodes_BadEventType(t *testing.T) {
+	broker, err := NewBroker()
+	err = broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
+	require.Error(t, err)
+	require.EqualError(t, err, "no graph for EventType foo")
 }
 
 // TestRegisterPipeline_BadParameters ensures that we perform sanity checking
