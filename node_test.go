@@ -4,9 +4,12 @@
 package eventlogger
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/go-test/deep"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -139,4 +142,90 @@ func TestFlattenNodes_LinkNodesAndSinks(t *testing.T) {
 	require.Contains(t, flatNodes, NodeID("y"))
 	require.Contains(t, flatNodes, NodeID("z"))
 	require.Equal(t, 5, len(flatNodes))
+}
+
+func TestNodeController(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		node            Node
+		wantClosed      bool
+		wantErrContains string
+	}{
+		{
+			name: "closer",
+			node: &mockCloser{},
+		},
+		{
+			name:            "closer-with-error",
+			node:            &mockCloser{closeErr: errors.New("closer error")},
+			wantErrContains: "closer error",
+		},
+		{
+			name: "unwrapped",
+			node: &mockCloserWithWrapper{
+				n: &mockCloser{},
+			},
+			wantClosed: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nc := NewNodeController(tc.node)
+			err := nc.Close()
+			if tc.wantErrContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrContains)
+				return
+			}
+			require.NoError(t, err)
+			if tc.wantClosed {
+				switch tp := tc.node.(type) {
+				case *mockCloser:
+					assert.True(t, tp.closed)
+				case *mockCloserWithWrapper:
+					assert.True(t, tp.n.closed)
+				default:
+					t.Errorf("unexpected type: %t", tc.node)
+				}
+			}
+		})
+	}
+}
+
+type mockCloser struct {
+	Node
+	closeErr error
+	closed   bool
+}
+
+func (m *mockCloser) Close() error {
+	switch {
+	case m.closeErr != nil:
+		return m.closeErr
+	default:
+		m.closed = true
+		return nil
+	}
+}
+
+type mockCloserWithWrapper struct {
+	n *mockCloser
+}
+
+func (m *mockCloserWithWrapper) Unwrap() Node {
+	return m.n
+}
+
+func (m *mockCloserWithWrapper) Process(ctx context.Context, e *Event) (*Event, error) {
+	panic("unimplemented")
+}
+
+func (m *mockCloserWithWrapper) Reopen() error {
+	panic("unimplemented")
+}
+
+func (m *mockCloserWithWrapper) Type() NodeType {
+	return NodeTypeSink
 }

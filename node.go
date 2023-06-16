@@ -32,6 +32,53 @@ type Node interface {
 	Type() NodeType
 }
 
+// A NodeController is used by a Broker to attempt additional control of a given node.
+// For instance, when a Node supports being closed via the Closer interface.
+type NodeController struct {
+	n Node
+}
+
+// NewNodeController creates a new NodeController for a given Node. The Node
+// should be the original value registered with the broker, or have an Unwrap
+// method returning the original Node (see NodeUnwrapper interface).
+//
+// If the Node implements any of the following methods, the NodeController will
+// call them as appropriate/needed:
+//
+//	Close() error
+func NewNodeController(n Node) *NodeController {
+	// intentionally not checking the Node for nil.. the caller must ensure it's
+	// valid and the docs make that clear.
+	return &NodeController{n}
+}
+
+// NodeUnwrapper will unwrap a node, returning the original value (see
+// NewNodeController docs)
+type NodeUnwrapper interface {
+	Unwrap() Node
+}
+
+// Closer will close without error
+type Closer interface {
+	Close() error
+}
+
+// Close the Node if it implements the Closer interface, and if required use the
+// NodeUnwrapper interface to unwrap it before closing it.
+func (nc *NodeController) Close() error {
+	n := nc.n
+	for {
+		switch t := n.(type) {
+		case Closer:
+			return t.Close()
+		case NodeUnwrapper:
+			n = t.Unwrap()
+		default:
+			return nil
+		}
+	}
+}
+
 type linkedNode struct {
 	node   Node
 	nodeID NodeID

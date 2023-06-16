@@ -5,14 +5,17 @@ package eventlogger
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/go-multierror"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-test/deep"
 	"github.com/hashicorp/go-uuid"
@@ -383,8 +386,9 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deregister the only pipeline we have
-	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	ok, err := broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
 	require.NoError(t, err)
+	require.True(t, ok)
 	require.Empty(t, broker.nodes)
 
 	// Attempt to register 2nd pipeline which references now deleted nodes
@@ -413,15 +417,17 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deregister pipeline p1, leave pipeline p2 in place
-	err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	ok, err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
 	require.NoError(t, err)
+	require.True(t, ok)
 	require.NotEmpty(t, broker.nodes)
 	require.Equal(t, 2, len(broker.nodes))
 
 	// Whip the nodes out from underneath a pipeline and then try to deregister it
 	broker.nodes = nil
-	err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
+	ok, err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
 	require.Error(t, err)
+	require.True(t, ok)
 	me, ok := err.(*multierror.Error)
 	require.True(t, ok)
 	require.Equal(t, 2, me.Len())
@@ -431,8 +437,10 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 // with an event type we haven't previously registered.
 func TestRemovePipelineAndNodes_BadEventType(t *testing.T) {
 	broker, err := NewBroker()
-	err = broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
+	require.NoError(t, err)
+	ok, err := broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
 	require.Error(t, err)
+	require.False(t, ok)
 	require.EqualError(t, err, "no graph for EventType foo")
 }
 
@@ -537,8 +545,9 @@ func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
 			require.NoError(t, err)
 
 			// Test removing the pipeline and nodes
-			err = broker.RemovePipelineAndNodes(EventType(tc.eventType), PipelineID(tc.pipelineID))
+			ok, err := broker.RemovePipelineAndNodes(EventType(tc.eventType), PipelineID(tc.pipelineID))
 			require.Error(t, err)
+			require.False(t, ok)
 			require.EqualError(t, err, tc.error)
 			// Test removing just the pipeline
 			err = broker.RemovePipeline(EventType(tc.eventType), PipelineID(tc.pipelineID))
@@ -757,4 +766,55 @@ func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.EqualError(t, err, "pipeline ID \"p1\" is already registered, configured policy prevents overwriting")
+}
+
+func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
+	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+	require.NoError(t, err)
+
+	mc := &mockCloserWithWrapper{n: &mockCloser{}}
+	err = b.RegisterNode("mc1", mc)
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "mc1"},
+	})
+	require.NoError(t, err)
+
+	ok, err := b.RemovePipelineAndNodes("t", "p1")
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	assert.True(t, mc.n.closed)
+}
+
+func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
+	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+	require.NoError(t, err)
+
+	mc := &mockCloserWithWrapper{n: &mockCloser{closeErr: errors.New("close error")}}
+	err = b.RegisterNode("mc1", mc)
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "mc1"},
+	})
+	require.NoError(t, err)
+
+	ok, err := b.RemovePipelineAndNodes("t", "p1")
+	require.Error(t, err)
+	require.True(t, ok)
+
+	assert.Contains(t, err.Error(), "close error")
+	assert.False(t, mc.n.closed)
 }
