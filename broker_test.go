@@ -443,6 +443,13 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.NotEmpty(t, broker.nodes)
 	require.Equal(t, 2, len(broker.nodes))
 
+	// Attempt to deregister a pipeline with the wrong event type
+	err = broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
+	require.Error(t, err)
+	require.EqualError(t, err, "no graph for EventType foo")
+	require.NotEmpty(t, broker.nodes)
+	require.Equal(t, 2, len(broker.nodes))
+
 	// Whip the nodes out from underneath a pipeline and then try to deregister it
 	broker.nodes = nil
 	err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
