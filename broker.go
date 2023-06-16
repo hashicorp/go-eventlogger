@@ -58,7 +58,7 @@ type nodeUsage struct {
 }
 
 // Option allows options to be passed as arguments.
-type Option func(*options)
+type Option func(*options) error
 
 // options are used to represent configuration for the broker.
 type options struct {
@@ -77,33 +77,58 @@ func getDefaultOptions() options {
 // getOpts iterates the inbound Options and returns a struct.
 // Each Option is applied in the order it appears in the argument list, so it is
 // possible to supply the same Option numerous times and the 'last write wins'.
-func getOpts(opt ...Option) options {
+func getOpts(opt ...Option) (options, error) {
 	opts := getDefaultOptions()
 	for _, o := range opt {
-		if o != nil {
-			o(&opts)
+		if o == nil {
+			continue
+		}
+		if err := o(&opts); err != nil {
+			return options{}, err
 		}
 	}
-	return opts
+	return opts, nil
 }
 
 // WithPipelineRegistrationPolicy configures the option that determines the pipeline registration policy.
 func WithPipelineRegistrationPolicy(policy RegistrationPolicy) Option {
-	return func(o *options) {
-		o.withPipelineRegistrationPolicy = policy
+	return func(o *options) error {
+		var err error
+
+		switch policy {
+		case AllowOverwrite, DenyOverwrite:
+			o.withPipelineRegistrationPolicy = policy
+		default:
+			err = fmt.Errorf("'%s' is not a valid pipeline registration policy: %w", policy, ErrInvalidParameter)
+		}
+
+		return err
 	}
 }
 
 // WithNodeRegistrationPolicy configures the option that determines the node registration policy.
 func WithNodeRegistrationPolicy(policy RegistrationPolicy) Option {
-	return func(o *options) {
-		o.withNodeRegistrationPolicy = policy
+	return func(o *options) error {
+		var err error
+
+		switch policy {
+		case AllowOverwrite, DenyOverwrite:
+			o.withNodeRegistrationPolicy = policy
+		default:
+			err = fmt.Errorf("'%s' is not a valid node registration policy: %w", policy, ErrInvalidParameter)
+		}
+
+		return err
 	}
 }
 
 // NewBroker creates a new Broker applying any supplied options.
-func NewBroker(opt ...Option) *Broker {
-	opts := getOpts(opt...)
+func NewBroker(opt ...Option) (*Broker, error) {
+	opts, err := getOpts(opt...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create broker: %w", err)
+	}
+
 	b := &Broker{
 		nodes:  make(map[NodeID]*nodeUsage),
 		graphs: make(map[EventType]*graph),
@@ -114,30 +139,8 @@ func NewBroker(opt ...Option) *Broker {
 	if opts.withNodeRegistrationPolicy != "" {
 		b.nodeRegistrationPolicy = opts.withNodeRegistrationPolicy
 	}
-	return b
-}
 
-// validate ensures that the broker has been configured with correct values.
-func (b *Broker) validate() error {
-	if err := b.pipelineRegistrationPolicy.validate(); err != nil {
-		return fmt.Errorf("invalid pipeline registration policy: %w", err)
-	}
-
-	if err := b.nodeRegistrationPolicy.validate(); err != nil {
-		return fmt.Errorf("invalid node registration policy: %w", err)
-	}
-
-	return nil
-}
-
-// validate ensures that the RegistrationPolicy is one of the expected values.
-func (m RegistrationPolicy) validate() error {
-	switch m {
-	case AllowOverwrite, DenyOverwrite:
-		return nil
-	default:
-		return fmt.Errorf("'%s' is not a valid registration policy: %w", m, ErrInvalidParameter)
-	}
+	return b, nil
 }
 
 // clock only exists to make testing simpler.
