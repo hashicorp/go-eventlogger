@@ -19,7 +19,7 @@ func ExampleFormatter() {
 	then := time.Date(
 		2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
 	// Create a broker
-	b := eventlogger.NewBroker()
+	b, _ := eventlogger.NewBroker()
 
 	b.StopTimeAt(then) // setting this so the output timestamps are predictable for testing.
 
