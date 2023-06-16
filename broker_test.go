@@ -452,8 +452,78 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.Equal(t, 2, me.Len())
 }
 
+// TestRegisterPipeline_BadParameters ensures that we perform sanity checking
+// on the parameters passed in when we attempt to register a pipeline.
+func TestRegisterPipeline_BadParameters(t *testing.T) {
+	tests := map[string]struct {
+		pipelineID string
+		eventType  string
+		nodes      []NodeID
+		error      string
+	}{
+		"no-pipelineID": {
+			pipelineID: "",
+			eventType:  "t",
+			nodes:      []NodeID{"1", "2", "3"},
+			error:      "pipeline ID is required",
+		},
+		"no-eventType": {
+			pipelineID: "1",
+			eventType:  "",
+			nodes:      []NodeID{"1", "2", "3"},
+			error:      "event type is required",
+		},
+		"nil-nodes": {
+			pipelineID: "1",
+			eventType:  "t",
+			nodes:      nil,
+			error:      "node IDs are required",
+		},
+		"empty-nodes": {
+			pipelineID: "1",
+			eventType:  "t",
+			nodes:      []NodeID{},
+			error:      "node IDs are required",
+		},
+		"bad-nodes": {
+			pipelineID: "1",
+			eventType:  "t",
+			nodes:      []NodeID{"", ""},
+			error:      "node ID cannot be empty",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			broker, err := NewBroker()
+			require.NoError(t, err)
+
+			// Register some nodes so they exist (1, 2, 3 should appear in the test cases)
+			node := &JSONFormatter{}
+			err = broker.RegisterNode("1", node)
+			require.NoError(t, err)
+			err = broker.RegisterNode("2", node)
+			require.NoError(t, err)
+			err = broker.RegisterNode("3", node)
+			require.NoError(t, err)
+
+			err = broker.RegisterPipeline(Pipeline{
+				PipelineID: PipelineID(tc.pipelineID),
+				EventType:  EventType(tc.eventType),
+				NodeIDs:    tc.nodes,
+			})
+
+			require.Error(t, err)
+			me, ok := err.(*multierror.Error)
+			require.True(t, ok)
+			require.EqualError(t, me.Unwrap(), tc.error)
+		})
+	}
+}
+
 // TestRemovePipelineAndNodes_BadParameters ensures that we perform sanity checking
-// on the parameters passed in when we attempt to remove pipelines and nodes together.
+// on the parameters passed in when we attempt to remove both individual pipelines
+// and also pipelines and nodes together.
 func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
 	tests := map[string]struct {
 		pipelineID string
@@ -481,7 +551,13 @@ func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			broker, err := NewBroker()
 			require.NoError(t, err)
+
+			// Test removing the pipeline and nodes
 			err = broker.RemovePipelineAndNodes(EventType(tc.eventType), PipelineID(tc.pipelineID))
+			require.Error(t, err)
+			require.EqualError(t, err, tc.error)
+			// Test removing just the pipeline
+			err = broker.RemovePipeline(EventType(tc.eventType), PipelineID(tc.pipelineID))
 			require.Error(t, err)
 			require.EqualError(t, err, tc.error)
 		})
