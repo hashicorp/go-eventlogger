@@ -563,6 +563,15 @@ func TestPipelineValidate(t *testing.T) {
 	}
 }
 
+// TestRegisterNode_NoID ensures we cannot register a Node with an empty ID.
+func TestRegisterNode_NoID(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("", &JSONFormatter{})
+	require.Error(t, err)
+	require.EqualError(t, err, "unable to register node, node ID cannot be empty")
+}
+
 // TestBroker_RegisterNode_AllowOverwrite_Implicit is used to prove that nodes can be
 // overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
 // This is the default in order to maintain pre-existing behavior.
