@@ -324,10 +324,10 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 
 // RemovePipeline removes a pipeline from the broker.
 func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
-	if t == "" {
+	switch {
+	case t == "":
 		return errors.New("event type cannot be empty")
-	}
-	if id == "" {
+	case id == "":
 		return errors.New("pipeline ID cannot be empty")
 	}
 
@@ -346,10 +346,10 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 // RemovePipelineAndNodes will attempt to remove all nodes referenced by the pipeline.
 // Any nodes that are referenced by other pipelines will not be removed.
 func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
-	if t == "" {
+	switch {
+	case t == "":
 		return errors.New("event type cannot be empty")
-	}
-	if id == "" {
+	case id == "":
 		return errors.New("pipeline ID cannot be empty")
 	}
 
@@ -398,10 +398,10 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 // meeting this threshold.  Use this when you want to allow the filtering of
 // events without causing an error because an event was filtered.
 func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
-	if t == "" {
+	switch {
+	case t == "":
 		return errors.New("event type cannot be empty")
-	}
-	if successThreshold < 0 {
+	case successThreshold < 0:
 		return fmt.Errorf("successThreshold must be 0 or greater")
 	}
 
@@ -422,10 +422,10 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 // overall processing of a given event to be considered a success, at least as
 // many sinks as the threshold value must successfully process the event.
 func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int) error {
-	if t == "" {
+	switch {
+	case t == "":
 		return errors.New("event type cannot be empty")
-	}
-	if successThresholdSinks < 0 {
+	case successThresholdSinks < 0:
 		return fmt.Errorf("successThresholdSinks must be 0 or greater")
 	}
 
