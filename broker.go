@@ -86,16 +86,16 @@ func getOpts(opt ...Option) options {
 }
 
 // WithPipelineRegistrationPolicy configures the option that determines the pipeline registration policy.
-func WithPipelineRegistrationPolicy(mode RegistrationPolicy) Option {
+func WithPipelineRegistrationPolicy(policy RegistrationPolicy) Option {
 	return func(o *options) {
-		o.withPipelineRegistrationPolicy = mode
+		o.withPipelineRegistrationPolicy = policy
 	}
 }
 
 // WithNodeRegistrationPolicy configures the option that determines the node registration policy.
-func WithNodeRegistrationPolicy(mode RegistrationPolicy) Option {
+func WithNodeRegistrationPolicy(policy RegistrationPolicy) Option {
 	return func(o *options) {
-		o.withNodeRegistrationPolicy = mode
+		o.withNodeRegistrationPolicy = policy
 	}
 }
 

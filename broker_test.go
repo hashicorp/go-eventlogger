@@ -446,6 +446,8 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.Equal(t, 2, me.Len())
 }
 
+// TestRemovePipelineAndNodes_BadParameters ensures that we perform sanity checking
+// on the parameters passed in when we attempt to remove pipelines and nodes together.
 func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
 	tests := map[string]struct {
 		pipelineID string
@@ -552,4 +554,125 @@ func TestPipelineValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestBroker_RegisterNode_AllowOverwrite_Implicit is used to prove that nodes can be
+// overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
+// This is the default in order to maintain pre-existing behavior.
+func TestBroker_RegisterNode_AllowOverwrite_Implicit(t *testing.T) {
+	b := NewBroker()
+	err := b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &FileSink{})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterNode_AllowOverwrite_Explicit is used to prove that nodes can be
+// overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
+func TestBroker_RegisterNode_AllowOverwrite_Explicit(t *testing.T) {
+	b := NewBroker(WithNodeRegistrationPolicy(AllowOverwrite))
+	err := b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &FileSink{})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterNode_DenyOverwrite is used to prove that nodes can't be
+// overwritten when a Broker has been configured with the DenyOverwrite policy.
+func TestBroker_RegisterNode_DenyOverwrite(t *testing.T) {
+	b := NewBroker(WithNodeRegistrationPolicy(DenyOverwrite))
+	err := b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &FileSink{})
+	require.Error(t, err)
+	require.EqualError(t, err, "node ID \"n1\" is already registered, configured policy prevents overwriting")
+}
+
+// TestBroker_RegisterPipeline_AllowOverwrite_Implicit is used to prove that pipelines can be
+// overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
+// This is the default in order to maintain pre-existing behavior.
+func TestBroker_RegisterPipeline_AllowOverwrite_Implicit(t *testing.T) {
+	b := NewBroker()
+
+	err := b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f2", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "s1"},
+	})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f2", "s1"},
+	})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterPipeline_AllowOverwrite_Explicit is used to prove that pipelines can be
+// overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
+func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
+	b := NewBroker(WithPipelineRegistrationPolicy(AllowOverwrite))
+
+	err := b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f2", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "s1"},
+	})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f2", "s1"},
+	})
+	require.NoError(t, err)
+}
+
+// TestBroker_RegisterPipeline_DenyOverwrite is used to prove that pipelines can't
+// // be overwritten when a Broker has been configured with the DenyOverwrite policy.
+func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
+	b := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+
+	err := b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f2", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "s1"},
+	})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f2", "s1"},
+	})
+	require.Error(t, err)
+	require.EqualError(t, err, "pipeline ID \"p1\" is already registered, configured policy prevents overwriting")
 }
