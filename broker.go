@@ -75,6 +75,8 @@ func getDefaultOptions() options {
 }
 
 // getOpts iterates the inbound Options and returns a struct.
+// Each Option is applied in the order it appears in the argument list, so it is
+// possible to supply the same Option numerous times and the 'last write wins'.
 func getOpts(opt ...Option) options {
 	opts := getDefaultOptions()
 	for _, o := range opt {
