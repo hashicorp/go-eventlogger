@@ -7,9 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/go-multierror"
 )
 
 // RegistrationPolicy is used to specify what kind of policy should apply when
@@ -345,12 +346,18 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 
 // RemovePipelineAndNodes will attempt to remove all nodes referenced by the pipeline.
 // Any nodes that are referenced by other pipelines will not be removed.
-func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
+//
+// Failed preconditions will result in a return of false with an error and
+// neither the pipeline or nodes will be deleted.
+//
+// Once we start deleting nodes, we will continue until completion, but we'll
+// return false with an error.
+func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) (bool, error) {
 	switch {
 	case t == "":
-		return errors.New("event type cannot be empty")
+		return false, errors.New("event type cannot be empty")
 	case id == "":
-		return errors.New("pipeline ID cannot be empty")
+		return false, errors.New("pipeline ID cannot be empty")
 	}
 
 	b.lock.Lock()
@@ -358,12 +365,12 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 
 	g, ok := b.graphs[t]
 	if !ok {
-		return fmt.Errorf("no graph for EventType %s", t)
+		return false, fmt.Errorf("no graph for EventType %s", t)
 	}
 
 	nodes, err := g.roots.Nodes(id)
 	if err != nil {
-		return fmt.Errorf("unable to retrieve all nodes referenced by pipeline ID %q: %w", id, err)
+		return false, fmt.Errorf("unable to retrieve all nodes referenced by pipeline ID %q: %w", id, err)
 	}
 
 	g.roots.Delete(id)
@@ -380,6 +387,10 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 
 		switch nodeUsage.referenceCount {
 		case 0, 1:
+			nc := NewNodeController(nodeUsage.node)
+			if err := nc.Close(); err != nil {
+				nodeErr = multierror.Append(nodeErr, fmt.Errorf("unable to close node ID %q: %w", nodeID, err))
+			}
 			// Node is not currently in use, or was only being used by this pipeline
 			delete(b.nodes, nodeID)
 		default:
@@ -387,7 +398,7 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) error {
 		}
 	}
 
-	return nodeErr
+	return true, nodeErr
 }
 
 // SetSuccessThreshold sets the success threshold per eventType.  For the
