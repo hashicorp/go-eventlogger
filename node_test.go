@@ -4,10 +4,10 @@
 package eventlogger
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/go-test/deep"
+	"github.com/stretchr/testify/require"
 )
 
 // TestLinkNodes ensures that we are able to create a graph of linked nodes correctly.
@@ -109,7 +109,7 @@ func TestFlattenNodes_LinkNodes(t *testing.T) {
 	linkedNodes, err := linkNodes(nodes, ids)
 	require.NoError(t, err)
 
-	flatNodes := linkedNodes.flatten(nil)
+	flatNodes := linkedNodes.flatten()
 	require.Contains(t, flatNodes, NodeID("1"))
 	require.Contains(t, flatNodes, NodeID("2"))
 	require.Contains(t, flatNodes, NodeID("3"))
@@ -132,7 +132,7 @@ func TestFlattenNodes_LinkNodesAndSinks(t *testing.T) {
 	linkedNodes, err := linkNodesAndSinks(nodes, sinkNodes, ids, sinkIds)
 	require.NoError(t, err)
 
-	flatNodes := linkedNodes.flatten(nil)
+	flatNodes := linkedNodes.flatten()
 	require.Contains(t, flatNodes, NodeID("1"))
 	require.Contains(t, flatNodes, NodeID("2"))
 	require.Contains(t, flatNodes, NodeID("x"))
