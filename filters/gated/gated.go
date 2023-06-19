@@ -101,7 +101,10 @@ type Filter struct {
 	l           sync.RWMutex
 }
 
-var _ eventlogger.Node = &Filter{}
+var (
+	_ eventlogger.Node   = (*Filter)(nil)
+	_ eventlogger.Closer = (*Filter)(nil)
+)
 
 // Process will determine if an Event is Gateable.  Events that are not not
 // Gateable are immediately returned. If the Event is Gateable, it's added to a
@@ -218,6 +221,12 @@ func (w *Filter) processExpiredEvents(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// Close implements eventlogger.Closer interface so the gated.Filter will call
+// FlushAll() when asked to close.
+func (w *Filter) Close(ctx context.Context) error {
+	return w.FlushAll(ctx)
 }
 
 // FlushAll will flush all events that have been gated and is useful for

@@ -516,3 +516,78 @@ func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) 
 	require.NoError(err)
 	return b, gf, tmpDir
 }
+
+func TestGatedFilter_Close(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+
+	type loggedEvent struct {
+		CreatedAt string `json:"created_at"`
+		EventType string `json:"event_type"`
+		Payload   gated.EventPayload
+	}
+
+	payload := &gated.Payload{
+		ID: "event-1",
+		Header: map[string]interface{}{
+			"user": "alice",
+			"tmz":  "EST",
+		},
+		Detail: map[string]interface{}{
+			"file_name":   "file1.txt",
+			"total_bytes": 1024,
+		},
+	}
+
+	wantEvent := &loggedEvent{
+		EventType: "test",
+		Payload: gated.EventPayload{
+			ID: "event-1",
+			Header: map[string]interface{}{
+				"tmz":  "EST",
+				"user": "alice",
+			},
+			Details: []gated.EventPayloadDetails{
+				{
+					Type:      "test",
+					CreatedAt: now.String(),
+					Payload: map[string]interface{}{
+						"file_name":   "file1.txt",
+						"total_bytes": float64(1024),
+					},
+				},
+			},
+		},
+	}
+
+	assert, require := assert.New(t), require.New(t)
+	ctx := context.Background()
+	b, gf, tmpDir := testBrokerWithGatedFilter(t, "closed", "test")
+	gf.Expiration = 100 * time.Minute // Note: be very careful setting the exp to something so large
+	gf.NowFunc = func() time.Time { return now }
+
+	_, err := b.Send(ctx, eventlogger.EventType("test"), payload)
+	require.NoError(err)
+
+	err = gf.Close(ctx)
+	require.NoError(err)
+
+	// Check the contents of the log
+	files, err := ioutil.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) > 1 {
+		t.Errorf("Expected 1 log file, got %d", len(files))
+	}
+
+	require.Len(files, 1)
+	dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+	require.NoError(err)
+
+	gotEvent := &loggedEvent{}
+	require.NoError(json.Unmarshal(dat, gotEvent))
+	wantEvent.CreatedAt = gotEvent.CreatedAt
+	wantEvent.Payload.Details[0].CreatedAt = gotEvent.Payload.Details[0].CreatedAt
+	assert.Equal(wantEvent, gotEvent)
+}
