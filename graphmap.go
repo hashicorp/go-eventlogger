@@ -43,7 +43,7 @@ func (g *graphMap) Nodes(id PipelineID) ([]NodeID, error) {
 	if !ok {
 		return nil, fmt.Errorf("unable to retrieve linked nodes from underlying data store")
 	}
-	nodes := ln.flatten(nil)
+	nodes := ln.flatten()
 	result := make([]NodeID, len(nodes))
 	i := 0
 	for k := range nodes {
