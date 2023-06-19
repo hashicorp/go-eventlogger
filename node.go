@@ -60,17 +60,17 @@ type NodeUnwrapper interface {
 
 // Closer will close without error
 type Closer interface {
-	Close() error
+	Close(ctx context.Context) error
 }
 
 // Close the Node if it implements the Closer interface, and if required use the
 // NodeUnwrapper interface to unwrap it before closing it.
-func (nc *NodeController) Close() error {
+func (nc *NodeController) Close(ctx context.Context) error {
 	n := nc.n
 	for {
 		switch t := n.(type) {
 		case Closer:
-			return t.Close()
+			return t.Close(ctx)
 		case NodeUnwrapper:
 			n = t.Unwrap()
 		default:

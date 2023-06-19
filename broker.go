@@ -352,7 +352,7 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 //
 // Once we start deleting nodes, we will continue until completion, but we'll
 // return false with an error.
-func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) (bool, error) {
+func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id PipelineID) (bool, error) {
 	switch {
 	case t == "":
 		return false, errors.New("event type cannot be empty")
@@ -388,7 +388,7 @@ func (b *Broker) RemovePipelineAndNodes(t EventType, id PipelineID) (bool, error
 		switch nodeUsage.referenceCount {
 		case 0, 1:
 			nc := NewNodeController(nodeUsage.node)
-			if err := nc.Close(); err != nil {
+			if err := nc.Close(ctx); err != nil {
 				nodeErr = multierror.Append(nodeErr, fmt.Errorf("unable to close node ID %q: %w", nodeID, err))
 			}
 			// Node is not currently in use, or was only being used by this pipeline
