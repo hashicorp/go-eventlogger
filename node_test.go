@@ -147,6 +147,7 @@ func TestFlattenNodes_LinkNodesAndSinks(t *testing.T) {
 func TestNodeController(t *testing.T) {
 	t.Parallel()
 
+	ctx := context.Background()
 	tests := []struct {
 		name            string
 		node            Node
@@ -173,7 +174,7 @@ func TestNodeController(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			nc := NewNodeController(tc.node)
-			err := nc.Close()
+			err := nc.Close(ctx)
 			if tc.wantErrContains != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErrContains)
@@ -194,13 +195,18 @@ func TestNodeController(t *testing.T) {
 	}
 }
 
+var (
+	_ Closer        = (*mockCloser)(nil)
+	_ NodeUnwrapper = (*mockCloserWithWrapper)(nil)
+)
+
 type mockCloser struct {
 	Node
 	closeErr error
 	closed   bool
 }
 
-func (m *mockCloser) Close() error {
+func (m *mockCloser) Close(ctx context.Context) error {
 	switch {
 	case m.closeErr != nil:
 		return m.closeErr

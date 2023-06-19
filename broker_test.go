@@ -369,6 +369,7 @@ func TestSuccessThresholdSinks(t *testing.T) {
 // The test is relatively long as it is focused on the state of the broker across
 // multiple operations.
 func TestRemovePipelineAndNodes(t *testing.T) {
+	ctx := context.Background()
 	broker, err := NewBroker()
 	require.NoError(t, err)
 
@@ -386,7 +387,7 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deregister the only pipeline we have
-	ok, err := broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	ok, err := broker.RemovePipelineAndNodes(ctx, EventType("t"), PipelineID("p1"))
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Empty(t, broker.nodes)
@@ -417,7 +418,7 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deregister pipeline p1, leave pipeline p2 in place
-	ok, err = broker.RemovePipelineAndNodes(EventType("t"), PipelineID("p1"))
+	ok, err = broker.RemovePipelineAndNodes(ctx, EventType("t"), PipelineID("p1"))
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.NotEmpty(t, broker.nodes)
@@ -425,7 +426,7 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 
 	// Whip the nodes out from underneath a pipeline and then try to deregister it
 	broker.nodes = nil
-	ok, err = broker.RemovePipelineAndNodes(EventType("t"), "p2")
+	ok, err = broker.RemovePipelineAndNodes(ctx, EventType("t"), "p2")
 	require.Error(t, err)
 	require.True(t, ok)
 	me, ok := err.(*multierror.Error)
@@ -436,9 +437,10 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 // TestRemovePipelineAndNodes_BadEventType tests attempting to remove a pipeline
 // with an event type we haven't previously registered.
 func TestRemovePipelineAndNodes_BadEventType(t *testing.T) {
+	ctx := context.Background()
 	broker, err := NewBroker()
 	require.NoError(t, err)
-	ok, err := broker.RemovePipelineAndNodes(EventType("foo"), PipelineID("p2"))
+	ok, err := broker.RemovePipelineAndNodes(ctx, EventType("foo"), PipelineID("p2"))
 	require.Error(t, err)
 	require.False(t, ok)
 	require.EqualError(t, err, "no graph for EventType foo")
@@ -517,6 +519,7 @@ func TestRegisterPipeline_BadParameters(t *testing.T) {
 // on the parameters passed in when we attempt to remove both individual pipelines
 // and also pipelines and nodes together.
 func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
+	ctx := context.Background()
 	tests := map[string]struct {
 		pipelineID string
 		eventType  string
@@ -545,7 +548,7 @@ func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
 			require.NoError(t, err)
 
 			// Test removing the pipeline and nodes
-			ok, err := broker.RemovePipelineAndNodes(EventType(tc.eventType), PipelineID(tc.pipelineID))
+			ok, err := broker.RemovePipelineAndNodes(ctx, EventType(tc.eventType), PipelineID(tc.pipelineID))
 			require.Error(t, err)
 			require.False(t, ok)
 			require.EqualError(t, err, tc.error)
@@ -769,6 +772,7 @@ func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
 }
 
 func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
+	ctx := context.Background()
 	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
 	require.NoError(t, err)
 
@@ -786,7 +790,7 @@ func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ok, err := b.RemovePipelineAndNodes("t", "p1")
+	ok, err := b.RemovePipelineAndNodes(ctx, "t", "p1")
 	require.NoError(t, err)
 	require.True(t, ok)
 
@@ -794,6 +798,7 @@ func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
 }
 
 func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
+	ctx := context.Background()
 	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
 	require.NoError(t, err)
 
@@ -811,7 +816,7 @@ func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ok, err := b.RemovePipelineAndNodes("t", "p1")
+	ok, err := b.RemovePipelineAndNodes(ctx, "t", "p1")
 	require.Error(t, err)
 	require.True(t, ok)
 
