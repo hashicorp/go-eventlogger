@@ -351,7 +351,7 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 // neither the pipeline nor nodes will be deleted.
 //
 // Once we start deleting the pipeline and nodes, we will continue until completion,
-// but we'll return true with an error.
+// but we'll return true along with any errors encountered (as multierror.Error).
 func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id PipelineID) (bool, error) {
 	switch {
 	case t == "":
