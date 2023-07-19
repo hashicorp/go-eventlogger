@@ -81,7 +81,7 @@ func (fs *FileSink) Type() NodeType {
 
 // Process writes the []byte representation of an Event to a file
 // as a string.
-func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
+func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 	// '/dev/null' should early return success.
 	if fs.Path == devnull {
 		return nil, nil
