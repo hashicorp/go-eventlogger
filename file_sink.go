@@ -123,11 +123,6 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 
 // Reopen will close, rotate and reopen the Sink's file.
 func (fs *FileSink) Reopen() error {
-	switch fs.Path {
-	case "discard":
-		return nil
-	}
-
 	fs.l.Lock()
 	defer fs.l.Unlock()
 
