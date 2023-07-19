@@ -18,6 +18,12 @@ import (
 	"time"
 )
 
+const (
+	stdout  = "/dev/stdout"
+	stderr  = "/dev/stderr"
+	devnull = "/dev/devnull"
+)
+
 // FileSink writes the []byte representation of an Event to a file
 // as a string.
 type FileSink struct {
@@ -76,6 +82,11 @@ func (fs *FileSink) Type() NodeType {
 // Process writes the []byte representation of an Event to a file
 // as a string.
 func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
+	// '/dev/null' should early return success.
+	if fs.Path == devnull {
+		return nil, nil
+	}
+
 	format := fs.Format
 	if format == "" {
 		format = JSONFormat
@@ -84,27 +95,35 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	if !ok {
 		return nil, errors.New("event was not marshaled")
 	}
+
 	reader := bytes.NewReader(val)
+	var writer io.Writer
 
-	fs.l.Lock()
-	defer fs.l.Unlock()
-
-	if fs.f == nil {
-		err := fs.open()
-		if err != nil {
+	switch {
+	case fs.Path == stdout:
+		writer = os.Stdout
+	case fs.Path == stderr:
+		writer = os.Stderr
+	default:
+		fs.l.Lock()
+		defer fs.l.Unlock()
+		if fs.f == nil {
+			err := fs.open()
+			if err != nil {
+				return nil, err
+			}
+		}
+		// Check for last contact, rotate if necessary and able
+		if err := fs.rotate(); err != nil {
 			return nil, err
 		}
+		writer = fs.f
 	}
 
-	// Check for last contact, rotate if necessary and able
-	if err := fs.rotate(); err != nil {
-		return nil, err
-	}
-
-	if n, err := reader.WriteTo(fs.f); err == nil {
+	if n, err := reader.WriteTo(writer); err == nil {
 		// Sinks are leafs, so do not return the event, since nothing more can
 		// happen to it downstream.
-		fs.BytesWritten += int64(n)
+		fs.BytesWritten += n
 		return nil, nil
 	}
 
@@ -123,6 +142,15 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 
 // Reopen will close, rotate and reopen the Sink's file.
 func (fs *FileSink) Reopen() error {
+	switch {
+	case fs.Path == stdout:
+		return nil
+	case fs.Path == stderr:
+		return nil
+	case fs.Path == devnull:
+		return nil
+	}
+
 	fs.l.Lock()
 	defer fs.l.Unlock()
 
@@ -180,9 +208,9 @@ func (fs *FileSink) open() error {
 	// Change the file mode in case the log file already existed. We special
 	// case a few paths since we can't chmod them, and bypass if the mode is zero
 	switch newfilePath {
-	case "/dev/null":
-	case "/dev/stderr":
-	case "/dev/stdout":
+	case devnull:
+	case stderr:
+	case stdout:
 	default:
 		if fs.Mode != 0 {
 			err = os.Chmod(newfilePath, fs.Mode)
