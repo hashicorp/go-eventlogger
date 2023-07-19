@@ -96,6 +96,9 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 		return nil, errors.New("event was not marshaled")
 	}
 
+	fs.l.Lock()
+	defer fs.l.Unlock()
+
 	reader := bytes.NewReader(val)
 	var writer io.Writer
 
@@ -105,8 +108,6 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 	case fs.Path == stderr:
 		writer = os.Stderr
 	default:
-		fs.l.Lock()
-		defer fs.l.Unlock()
 		if fs.f == nil {
 			err := fs.open()
 			if err != nil {
