@@ -96,12 +96,12 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 		return nil, errors.New("event was not marshaled")
 	}
 
+	reader := bytes.NewReader(val)
+
 	fs.l.Lock()
 	defer fs.l.Unlock()
 
-	reader := bytes.NewReader(val)
 	var writer io.Writer
-
 	switch {
 	case fs.Path == stdout:
 		writer = os.Stdout
