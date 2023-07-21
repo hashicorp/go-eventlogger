@@ -44,47 +44,98 @@ func TestFileSink_NewDir(t *testing.T) {
 }
 
 func TestFileSink_Reopen(t *testing.T) {
-	t.Parallel()
-	tmpDir := t.TempDir()
-	fs := FileSink{
-		Path:     tmpDir,
-		FileName: "audit.log",
-	}
-	event := &Event{
-		Formatted: map[string][]byte{JSONFormat: []byte("first")},
-		Payload:   "First entry",
-	}
-	_, err := fs.Process(context.Background(), event)
-	require.NoError(t, err)
+	tests := map[string]struct {
+		Path string
+	}{
+		"stdout": {
 
-	// delete file
-	err = os.Remove(filepath.Join(tmpDir, "audit.log"))
-	require.NoError(t, err)
+			Path: stdout,
+		},
+		"stderr": {
 
-	// reopen
-	err = fs.Reopen()
-	require.NoError(t, err)
+			Path: stderr,
+		},
+		"dev/null": {
 
-	event = &Event{
-		Formatted: map[string][]byte{JSONFormat: []byte("second")},
-		Payload:   "Second entry",
-	}
-	_, err = fs.Process(context.Background(), event)
-	require.NoError(t, err)
-
-	// Ensure process re-created the file
-	dat, err := os.ReadFile(filepath.Join(tmpDir, "audit.log"))
-	require.NoError(t, err)
-
-	got := string(dat)
-	want := "second"
-	if got != "second" {
-		t.Errorf("Expected file content to be %s, got %s", want, got)
+			Path: devnull,
+		},
+		"default-file": {},
 	}
 
-	files := 1
-	if got, _ := os.ReadDir(tmpDir); len(got) != files {
-		t.Errorf("Expected %d files, got %v file(s)", files, len(got))
+	isSpecialPath := func(path string) bool {
+		switch path {
+		case stdout, stderr, devnull:
+			return true
+		default:
+			return false
+		}
+	}
+
+	for name, tc := range tests {
+		name := name
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			isSpecial := isSpecialPath(tc.Path)
+
+			var path string
+			switch {
+			case isSpecial:
+				// Use the path 'as is' since it will be a special type
+				path = tc.Path
+			default:
+				path = t.TempDir()
+			}
+
+			fs := FileSink{
+				Path:     path,
+				FileName: "audit.log",
+			}
+
+			event := &Event{
+				Formatted: map[string][]byte{JSONFormat: []byte("first")},
+				Payload:   "First entry",
+			}
+
+			_, err := fs.Process(context.Background(), event)
+			require.NoError(t, err)
+
+			if !isSpecial {
+				// delete file
+				err = os.Remove(filepath.Join(path, "audit.log"))
+				require.NoError(t, err)
+			}
+
+			// reopen
+			err = fs.Reopen()
+			require.NoError(t, err)
+
+			event = &Event{
+				Formatted: map[string][]byte{JSONFormat: []byte("second")},
+				Payload:   "Second entry",
+			}
+
+			_, err = fs.Process(context.Background(), event)
+			require.NoError(t, err)
+
+			if !isSpecial {
+				// Ensure process re-created the file
+				dat, err := os.ReadFile(filepath.Join(path, "audit.log"))
+				require.NoError(t, err)
+
+				got := string(dat)
+				want := "second"
+				if got != "second" {
+					t.Errorf("Expected file content to be %s, got %s", want, got)
+				}
+
+				files := 1
+				if got, _ := os.ReadDir(path); len(got) != files {
+					t.Errorf("Expected %d files, got %v file(s)", files, len(got))
+				}
+			}
+		})
 	}
 }
 
