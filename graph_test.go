@@ -5,6 +5,7 @@ package eventlogger
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -384,4 +385,22 @@ func TestSendBlocking(t *testing.T) {
 	// Sleep long enough that the 1s sleep in fileSinkDelayed completes, to
 	// satisfy the go leak detector in TestMain.
 	time.Sleep(700 * time.Millisecond)
+}
+
+// TestGraph_HasRegistrations ensures that hasRegistrations performs as expected.
+// If anything has been stored against the roots then we should expect true,
+// otherwise false.
+func TestGraph_HasRegistrations(t *testing.T) {
+	g := graph{}
+
+	// No registrations to begin with.
+	require.False(t, g.hasRegistrations())
+
+	// Store something and ensure we have registrations.
+	g.roots.Store("abc", nil)
+	require.True(t, g.hasRegistrations())
+
+	// Delete the stored entry and ensure we have no registrations.
+	g.roots.Delete("abc")
+	require.False(t, g.hasRegistrations())
 }

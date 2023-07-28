@@ -190,3 +190,15 @@ func (g *graph) doValidate(parent, node *linkedNode) error {
 
 	return nil
 }
+
+// hasRegistrations can be used to determine if a graph has any pipelines registered.
+func (g *graph) hasRegistrations() bool {
+	var registered bool
+
+	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
+		registered = true
+		return false
+	})
+
+	return registered
+}

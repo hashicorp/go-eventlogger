@@ -286,7 +286,7 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 	if !exists {
 		g = &graph{}
 		b.graphs[def.EventType] = g
-	} else if b.pipelineRegistrationPolicy == DenyOverwrite {
+	} else if b.pipelineRegistrationPolicy == DenyOverwrite && g.hasRegistrations() {
 		return fmt.Errorf("pipeline ID %q is already registered, configured policy prevents overwriting", def.PipelineID)
 	}
 

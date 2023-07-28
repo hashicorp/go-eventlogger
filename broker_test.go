@@ -741,9 +741,16 @@ func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
 }
 
 // TestBroker_RegisterPipeline_DenyOverwrite is used to prove that pipelines can't
-// // be overwritten when a Broker has been configured with the DenyOverwrite policy.
+// be overwritten when a Broker has been configured with the DenyOverwrite policy.
 func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
 	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+	require.NoError(t, err)
+	require.NotNil(t, b)
+
+	// Ensure no side effects from setting thresholds before we have registered a pipeline
+	err = b.SetSuccessThreshold("t", 1)
+	require.NoError(t, err)
+	err = b.SetSuccessThresholdSinks("t", 1)
 	require.NoError(t, err)
 
 	err = b.RegisterNode("f1", &JSONFormatter{})
