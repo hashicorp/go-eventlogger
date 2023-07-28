@@ -34,9 +34,9 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 	statusChan := make(chan Status)
 	var wg sync.WaitGroup
 	go func() {
-		g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
+		g.roots.Range(func(_ PipelineID, pipeline *pipelineRegistration) bool {
 			wg.Add(1)
-			g.doProcess(ctx, root, e, statusChan, &wg)
+			g.doProcess(ctx, pipeline.rootNode, e, statusChan, &wg)
 			return true
 		})
 		wg.Wait()
@@ -121,8 +121,8 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 func (g *graph) reopen(ctx context.Context) error {
 	var errors *multierror.Error
 
-	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
-		err := g.doReopen(ctx, root)
+	g.roots.Range(func(_ PipelineID, pipeline *pipelineRegistration) bool {
+		err := g.doReopen(ctx, pipeline.rootNode)
 		if err != nil {
 			errors = multierror.Append(errors, err)
 		}
@@ -155,8 +155,8 @@ func (g *graph) doReopen(ctx context.Context, node *linkedNode) error {
 func (g *graph) validate() error {
 	var errors *multierror.Error
 
-	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
-		err := g.doValidate(nil, root)
+	g.roots.Range(func(_ PipelineID, pipeline *pipelineRegistration) bool {
+		err := g.doValidate(nil, pipeline.rootNode)
 		if err != nil {
 			errors = multierror.Append(errors, err)
 		}
@@ -189,16 +189,4 @@ func (g *graph) doValidate(parent, node *linkedNode) error {
 	}
 
 	return nil
-}
-
-// hasRegistrations can be used to determine if a graph has any pipelines registered.
-func (g *graph) hasRegistrations() bool {
-	var registered bool
-
-	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
-		registered = true
-		return false
-	})
-
-	return registered
 }

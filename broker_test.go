@@ -659,9 +659,9 @@ func TestBroker_RegisterNode_AllowOverwrite_Implicit(t *testing.T) {
 // TestBroker_RegisterNode_AllowOverwrite_Explicit is used to prove that nodes can be
 // overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
 func TestBroker_RegisterNode_AllowOverwrite_Explicit(t *testing.T) {
-	b, err := NewBroker(WithNodeRegistrationPolicy(AllowOverwrite))
+	b, err := NewBroker()
 	require.NoError(t, err)
-	err = b.RegisterNode("n1", &JSONFormatter{})
+	err = b.RegisterNode("n1", &JSONFormatter{}, WithNodeRegistrationPolicy(AllowOverwrite))
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &FileSink{})
 	require.NoError(t, err)
@@ -670,9 +670,9 @@ func TestBroker_RegisterNode_AllowOverwrite_Explicit(t *testing.T) {
 // TestBroker_RegisterNode_DenyOverwrite is used to prove that nodes can't be
 // overwritten when a Broker has been configured with the DenyOverwrite policy.
 func TestBroker_RegisterNode_DenyOverwrite(t *testing.T) {
-	b, err := NewBroker(WithNodeRegistrationPolicy(DenyOverwrite))
+	b, err := NewBroker()
 	require.NoError(t, err)
-	err = b.RegisterNode("n1", &JSONFormatter{})
+	err = b.RegisterNode("n1", &JSONFormatter{}, WithNodeRegistrationPolicy(DenyOverwrite))
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &FileSink{})
 	require.Error(t, err)
@@ -713,7 +713,7 @@ func TestBroker_RegisterPipeline_AllowOverwrite_Implicit(t *testing.T) {
 // TestBroker_RegisterPipeline_AllowOverwrite_Explicit is used to prove that pipelines can be
 // overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
 func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
-	b, err := NewBroker(WithPipelineRegistrationPolicy(AllowOverwrite))
+	b, err := NewBroker()
 	require.NoError(t, err)
 
 	err = b.RegisterNode("f1", &JSONFormatter{})
@@ -729,7 +729,7 @@ func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
 		PipelineID: "p1",
 		EventType:  "t",
 		NodeIDs:    []NodeID{"f1", "s1"},
-	})
+	}, WithPipelineRegistrationPolicy(AllowOverwrite))
 	require.NoError(t, err)
 
 	err = b.RegisterPipeline(Pipeline{
@@ -743,7 +743,7 @@ func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
 // TestBroker_RegisterPipeline_DenyOverwrite is used to prove that pipelines can't
 // be overwritten when a Broker has been configured with the DenyOverwrite policy.
 func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
-	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+	b, err := NewBroker()
 	require.NoError(t, err)
 	require.NotNil(t, b)
 
@@ -766,7 +766,7 @@ func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
 		PipelineID: "p1",
 		EventType:  "t",
 		NodeIDs:    []NodeID{"f1", "s1"},
-	})
+	}, WithPipelineRegistrationPolicy(DenyOverwrite))
 	require.NoError(t, err)
 
 	err = b.RegisterPipeline(Pipeline{
@@ -780,7 +780,7 @@ func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
 
 func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
 	ctx := context.Background()
-	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+	b, err := NewBroker()
 	require.NoError(t, err)
 
 	mc := &mockCloserWithWrapper{n: &mockCloser{}}
@@ -806,7 +806,7 @@ func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
 
 func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
 	ctx := context.Background()
-	b, err := NewBroker(WithPipelineRegistrationPolicy(DenyOverwrite))
+	b, err := NewBroker()
 	require.NoError(t, err)
 
 	mc := &mockCloserWithWrapper{n: &mockCloser{closeErr: errors.New("close error")}}

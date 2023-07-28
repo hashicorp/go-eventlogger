@@ -5,7 +5,6 @@ package eventlogger
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -43,7 +42,8 @@ func TestReopen(t *testing.T) {
 	}
 
 	g := graph{}
-	g.roots.Store("id", root)
+	reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+	g.roots.Store("id", reg)
 	err = g.reopen(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +122,8 @@ func TestValidate(t *testing.T) {
 			}
 
 			g := graph{}
-			g.roots.Store("id", root)
+			reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+			g.roots.Store("id", reg)
 			err = g.validate()
 			valid := err == nil
 			if valid != tc.valid {
@@ -225,7 +226,8 @@ func TestSendResult(t *testing.T) {
 			}
 
 			g := graph{successThreshold: tc.threshold, successThresholdSinks: tc.thresholdSinks}
-			g.roots.Store("id", root)
+			reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+			g.roots.Store("id", reg)
 
 			err = g.validate()
 			if err != nil {
@@ -354,7 +356,8 @@ func TestSendBlocking(t *testing.T) {
 			}
 
 			g := graph{successThreshold: tc.threshold}
-			g.roots.Store("id", root)
+			reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+			g.roots.Store("id", reg)
 
 			err = g.validate()
 			if err != nil {
@@ -385,22 +388,4 @@ func TestSendBlocking(t *testing.T) {
 	// Sleep long enough that the 1s sleep in fileSinkDelayed completes, to
 	// satisfy the go leak detector in TestMain.
 	time.Sleep(700 * time.Millisecond)
-}
-
-// TestGraph_HasRegistrations ensures that hasRegistrations performs as expected.
-// If anything has been stored against the roots then we should expect true,
-// otherwise false.
-func TestGraph_HasRegistrations(t *testing.T) {
-	g := graph{}
-
-	// No registrations to begin with.
-	require.False(t, g.hasRegistrations())
-
-	// Store something and ensure we have registrations.
-	g.roots.Store("abc", nil)
-	require.True(t, g.hasRegistrations())
-
-	// Delete the stored entry and ensure we have no registrations.
-	g.roots.Delete("abc")
-	require.False(t, g.hasRegistrations())
 }
