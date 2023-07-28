@@ -14,7 +14,8 @@ import (
 // graph
 type graph struct {
 
-	// roots maps PipelineIDs to root Nodes
+	// roots maps PipelineIDs to pipelineRegistrations.
+	// A pipelineRegistration includes the root Node for a pipeline.
 	roots graphMap
 
 	// successThreshold specifies how many pipelines must successfully process
