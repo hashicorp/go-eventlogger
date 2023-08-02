@@ -42,7 +42,7 @@ func TestReopen(t *testing.T) {
 	}
 
 	g := graph{}
-	reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+	reg := &registeredPipeline{rootNode: root, registrationPolicy: AllowOverwrite}
 	g.roots.Store("id", reg)
 	err = g.reopen(context.Background())
 	if err != nil {
@@ -122,7 +122,7 @@ func TestValidate(t *testing.T) {
 			}
 
 			g := graph{}
-			reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+			reg := &registeredPipeline{rootNode: root, registrationPolicy: AllowOverwrite}
 			g.roots.Store("id", reg)
 			err = g.validate()
 			valid := err == nil
@@ -226,7 +226,7 @@ func TestSendResult(t *testing.T) {
 			}
 
 			g := graph{successThreshold: tc.threshold, successThresholdSinks: tc.thresholdSinks}
-			reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+			reg := &registeredPipeline{rootNode: root, registrationPolicy: AllowOverwrite}
 			g.roots.Store("id", reg)
 
 			err = g.validate()
@@ -356,7 +356,7 @@ func TestSendBlocking(t *testing.T) {
 			}
 
 			g := graph{successThreshold: tc.threshold}
-			reg := &pipelineRegistration{rootNode: root, registrationPolicy: AllowOverwrite}
+			reg := &registeredPipeline{rootNode: root, registrationPolicy: AllowOverwrite}
 			g.roots.Store("id", reg)
 
 			err = g.validate()

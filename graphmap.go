@@ -15,22 +15,22 @@ type graphMap struct {
 	m sync.Map
 }
 
-// pipelineRegistration represents both linked nodes and the registration policy
+// registeredPipeline represents both linked nodes and the registration policy
 // for the pipeline.
-type pipelineRegistration struct {
+type registeredPipeline struct {
 	rootNode           *linkedNode
 	registrationPolicy RegistrationPolicy
 }
 
 // Range calls sync.Map.Range
-func (g *graphMap) Range(f func(key PipelineID, value *pipelineRegistration) bool) {
+func (g *graphMap) Range(f func(key PipelineID, value *registeredPipeline) bool) {
 	g.m.Range(func(key, value interface{}) bool {
-		return f(key.(PipelineID), value.(*pipelineRegistration))
+		return f(key.(PipelineID), value.(*registeredPipeline))
 	})
 }
 
 // Store calls sync.Map.Store
-func (g *graphMap) Store(id PipelineID, root *pipelineRegistration) {
+func (g *graphMap) Store(id PipelineID, root *registeredPipeline) {
 	g.m.Store(id, root)
 }
 
@@ -46,7 +46,7 @@ func (g *graphMap) Nodes(id PipelineID) ([]NodeID, error) {
 		return nil, fmt.Errorf("unable to load root node from underlying data store")
 	}
 
-	pr, ok := v.(*pipelineRegistration)
+	pr, ok := v.(*registeredPipeline)
 	if !ok {
 		return nil, fmt.Errorf("unable to retrieve pipeline registration (linked nodes and policy) from underlying data store")
 	}

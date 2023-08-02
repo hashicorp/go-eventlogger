@@ -294,7 +294,7 @@ func (b *Broker) RegisterPipeline(def Pipeline, opt ...Option) error {
 
 	// Get the configured policy
 	pol := AllowOverwrite
-	g.roots.Range(func(key PipelineID, v *pipelineRegistration) bool {
+	g.roots.Range(func(key PipelineID, v *registeredPipeline) bool {
 		if key == def.PipelineID {
 			pol = v.registrationPolicy
 			return false
@@ -327,7 +327,7 @@ func (b *Broker) RegisterPipeline(def Pipeline, opt ...Option) error {
 	}
 
 	// Create the pipeline registration using the optional policy (or default).
-	pipelineReg := &pipelineRegistration{
+	pipelineReg := &registeredPipeline{
 		rootNode:           root,
 		registrationPolicy: opts.withPipelineRegistrationPolicy,
 	}
