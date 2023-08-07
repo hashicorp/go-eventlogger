@@ -32,7 +32,8 @@ func TestNodes_ListNodes_RegisteredPipeline(t *testing.T) {
 	linkedNodes, err := linkNodes(nodes, ids)
 	require.NoError(t, err)
 
-	g.Store(PipelineID("1"), linkedNodes)
+	reg := &registeredPipeline{rootNode: linkedNodes, registrationPolicy: AllowOverwrite}
+	g.Store(PipelineID("1"), reg)
 	nodeIDs, err := g.Nodes(PipelineID("1"))
 	require.NoError(t, err)
 	require.NotNil(t, nodeIDs)
