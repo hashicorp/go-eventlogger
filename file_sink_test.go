@@ -45,30 +45,22 @@ func TestFileSink_NewDir(t *testing.T) {
 
 func TestFileSink_Reopen(t *testing.T) {
 	tests := map[string]struct {
-		Path string
+		Path          string
+		IsPathSpecial bool
 	}{
 		"stdout": {
-
-			Path: stdout,
+			Path:          stdout,
+			IsPathSpecial: true,
 		},
 		"stderr": {
-
-			Path: stderr,
+			Path:          stderr,
+			IsPathSpecial: true,
 		},
 		"dev/null": {
-
-			Path: devnull,
+			Path:          devnull,
+			IsPathSpecial: true,
 		},
 		"default-file": {},
-	}
-
-	isSpecialPath := func(path string) bool {
-		switch path {
-		case stdout, stderr, devnull:
-			return true
-		default:
-			return false
-		}
 	}
 
 	for name, tc := range tests {
@@ -77,14 +69,13 @@ func TestFileSink_Reopen(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			isSpecial := isSpecialPath(tc.Path)
-
 			var path string
 			switch {
-			case isSpecial:
+			case tc.IsPathSpecial:
 				// Use the path 'as is' since it will be a special type
 				path = tc.Path
 			default:
+				// Create a temporary directory to store this file in.
 				path = t.TempDir()
 			}
 
@@ -101,8 +92,8 @@ func TestFileSink_Reopen(t *testing.T) {
 			_, err := fs.Process(context.Background(), event)
 			require.NoError(t, err)
 
-			if !isSpecial {
-				// delete file
+			if !tc.IsPathSpecial {
+				// manually delete the file if not a special path
 				err = os.Remove(filepath.Join(path, "audit.log"))
 				require.NoError(t, err)
 			}
@@ -119,7 +110,7 @@ func TestFileSink_Reopen(t *testing.T) {
 			_, err = fs.Process(context.Background(), event)
 			require.NoError(t, err)
 
-			if !isSpecial {
+			if !tc.IsPathSpecial {
 				// Ensure process re-created the file
 				dat, err := os.ReadFile(filepath.Join(path, "audit.log"))
 				require.NoError(t, err)
