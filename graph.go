@@ -14,7 +14,8 @@ import (
 // graph
 type graph struct {
 
-	// roots maps PipelineIDs to root Nodes
+	// roots maps PipelineIDs to pipelineRegistrations.
+	// A registeredPipeline includes the root Node for a pipeline.
 	roots graphMap
 
 	// successThreshold specifies how many pipelines must successfully process
@@ -34,9 +35,9 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 	statusChan := make(chan Status)
 	var wg sync.WaitGroup
 	go func() {
-		g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
+		g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
 			wg.Add(1)
-			g.doProcess(ctx, root, e, statusChan, &wg)
+			g.doProcess(ctx, pipeline.rootNode, e, statusChan, &wg)
 			return true
 		})
 		wg.Wait()
@@ -121,8 +122,8 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 func (g *graph) reopen(ctx context.Context) error {
 	var errors *multierror.Error
 
-	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
-		err := g.doReopen(ctx, root)
+	g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
+		err := g.doReopen(ctx, pipeline.rootNode)
 		if err != nil {
 			errors = multierror.Append(errors, err)
 		}
@@ -155,8 +156,8 @@ func (g *graph) doReopen(ctx context.Context, node *linkedNode) error {
 func (g *graph) validate() error {
 	var errors *multierror.Error
 
-	g.roots.Range(func(_ PipelineID, root *linkedNode) bool {
-		err := g.doValidate(nil, root)
+	g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
+		err := g.doValidate(nil, pipeline.rootNode)
 		if err != nil {
 			errors = multierror.Append(errors, err)
 		}

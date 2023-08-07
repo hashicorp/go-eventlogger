@@ -46,16 +46,14 @@ type Broker struct {
 	graphs map[EventType]*graph
 	lock   sync.RWMutex
 
-	pipelineRegistrationPolicy RegistrationPolicy
-	nodeRegistrationPolicy     RegistrationPolicy
-
 	*clock
 }
 
 // nodeUsage tracks how many times a Node is referenced by registered pipelines.
 type nodeUsage struct {
-	node           Node
-	referenceCount int
+	node               Node
+	referenceCount     int
+	registrationPolicy RegistrationPolicy
 }
 
 // Option allows options to be passed as arguments.
@@ -123,22 +121,12 @@ func WithNodeRegistrationPolicy(policy RegistrationPolicy) Option {
 	}
 }
 
-// NewBroker creates a new Broker applying any supplied options.
-func NewBroker(opt ...Option) (*Broker, error) {
-	opts, err := getOpts(opt...)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create broker: %w", err)
-	}
-
+// NewBroker creates a new Broker applying any relevant supplied options.
+// Options are currently accepted, but none are applied.
+func NewBroker(_ ...Option) (*Broker, error) {
 	b := &Broker{
 		nodes:  make(map[NodeID]*nodeUsage),
 		graphs: make(map[EventType]*graph),
-	}
-	if opts.withPipelineRegistrationPolicy != "" {
-		b.pipelineRegistrationPolicy = opts.withPipelineRegistrationPolicy
-	}
-	if opts.withNodeRegistrationPolicy != "" {
-		b.nodeRegistrationPolicy = opts.withNodeRegistrationPolicy
 	}
 
 	return b, nil
@@ -230,20 +218,30 @@ type NodeID string
 // RegisterNode assigns a node ID to a node.  Node IDs should be unique. A Node
 // may be a filter, formatter or sink (see NodeType). Nodes can be shared across
 // multiple pipelines.
-func (b *Broker) RegisterNode(id NodeID, node Node) error {
+// Accepted options: WithNodeRegistrationPolicy (default: AllowOverwrite).
+func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 	if id == "" {
 		return errors.New("unable to register node, node ID cannot be empty")
+	}
+
+	opts, err := getOpts(opt...)
+	if err != nil {
+		return fmt.Errorf("cannot register node: %w", err)
 	}
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	nr := &nodeUsage{node: node, referenceCount: 0}
+	nr := &nodeUsage{
+		node:               node,
+		referenceCount:     0,
+		registrationPolicy: opts.withNodeRegistrationPolicy,
+	}
 
 	// Check if this node is already registered, if so maintain reference count
 	r, exists := b.nodes[id]
 	if exists {
-		switch b.nodeRegistrationPolicy {
+		switch r.registrationPolicy {
 		case AllowOverwrite:
 			nr.referenceCount = r.referenceCount
 		case DenyOverwrite:
@@ -273,10 +271,16 @@ type Pipeline struct {
 }
 
 // RegisterPipeline adds a pipeline to the broker.
-func (b *Broker) RegisterPipeline(def Pipeline) error {
+// Accepted options: WithPipelineRegistrationPolicy (default: AllowOverwrite).
+func (b *Broker) RegisterPipeline(def Pipeline, opt ...Option) error {
 	err := def.validate()
 	if err != nil {
 		return err
+	}
+
+	opts, err := getOpts(opt...)
+	if err != nil {
+		return fmt.Errorf("cannot register pipeline: %w", err)
 	}
 
 	b.lock.Lock()
@@ -286,7 +290,19 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 	if !exists {
 		g = &graph{}
 		b.graphs[def.EventType] = g
-	} else if b.pipelineRegistrationPolicy == DenyOverwrite {
+	}
+
+	// Get the configured policy
+	pol := AllowOverwrite
+	g.roots.Range(func(key PipelineID, v *registeredPipeline) bool {
+		if key == def.PipelineID {
+			pol = v.registrationPolicy
+			return false
+		}
+		return true
+	})
+
+	if pol == DenyOverwrite {
 		return fmt.Errorf("pipeline ID %q is already registered, configured policy prevents overwriting", def.PipelineID)
 	}
 
@@ -310,8 +326,14 @@ func (b *Broker) RegisterPipeline(def Pipeline) error {
 		return err
 	}
 
+	// Create the pipeline registration using the optional policy (or default).
+	pipelineReg := &registeredPipeline{
+		rootNode:           root,
+		registrationPolicy: opts.withPipelineRegistrationPolicy,
+	}
+
 	// Store the pipeline and then update the reference count of the nodes in that pipeline.
-	g.roots.Store(def.PipelineID, root)
+	g.roots.Store(def.PipelineID, pipelineReg)
 	for _, id := range def.NodeIDs {
 		nodeUsage, ok := b.nodes[id]
 		// We can be optimistic about this as we would have already errored above.
