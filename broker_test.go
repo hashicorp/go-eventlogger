@@ -889,7 +889,7 @@ func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
 	assert.False(t, mc.n.closed)
 }
 
-func TestBroker_IsPipelineRegistered(t *testing.T) {
+func TestBroker_IsAnyPipelineRegistered(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
 
@@ -906,11 +906,11 @@ func TestBroker_IsPipelineRegistered(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.True(t, b.IsPipelineRegistered("t"))
-	require.False(t, b.IsPipelineRegistered("i-do-not-exist"))
+	require.True(t, b.IsAnyPipelineRegistered("t"))
+	require.False(t, b.IsAnyPipelineRegistered("i-do-not-exist"))
 }
 
-func TestBroker_IsPipelineRegistered_WithFailedRegistration(t *testing.T) {
+func TestBroker_IsAnyPipelineRegistered_WithFailedRegistration(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
 
@@ -921,5 +921,5 @@ func TestBroker_IsPipelineRegistered_WithFailedRegistration(t *testing.T) {
 	})
 	require.Error(t, err)
 
-	require.False(t, b.IsPipelineRegistered("t"))
+	require.False(t, b.IsAnyPipelineRegistered("t"))
 }
