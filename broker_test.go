@@ -888,3 +888,38 @@ func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
 	assert.Contains(t, err.Error(), "close error")
 	assert.False(t, mc.n.closed)
 }
+
+func TestBroker_IsPipelineRegistered(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{"f1", "s1"},
+	})
+	require.NoError(t, err)
+
+	require.True(t, b.IsPipelineRegistered("t"))
+	require.False(t, b.IsPipelineRegistered("i-do-not-exist"))
+}
+
+func TestBroker_IsPipelineRegistered_WithFailedRegistration(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+
+	err = b.RegisterPipeline(Pipeline{
+		PipelineID: "p1",
+		EventType:  "t",
+		NodeIDs:    []NodeID{},
+	})
+	require.Error(t, err)
+
+	require.False(t, b.IsPipelineRegistered("t"))
+}
