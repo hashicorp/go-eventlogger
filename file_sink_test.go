@@ -275,19 +275,46 @@ func TestFileSink_TimestampOnlyOnRotate_ByteRotate(t *testing.T) {
 }
 
 func TestFileSink_open(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	fs := FileSink{
-		Path:        tmpDir,
-		FileName:    "audit.log",
-		MaxDuration: 1 * time.Second,
+	tests := map[string]struct {
+		Path   string
+		IsFile bool
+	}{
+		"stdout": {
+			Path: "/dev/stdout",
+		},
+		"stderr": {
+			Path: "/dev/stderr",
+		},
+		"null": {
+			Path: "/dev/null",
+		},
+		"file": {
+			Path:   t.TempDir(),
+			IsFile: true,
+		},
 	}
-	err := fs.open()
-	require.NoError(t, err)
 
-	_, err = os.ReadFile(fs.f.Name())
-	require.NoError(t, err)
+	for name, tc := range tests {
+		name := name
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			fs := FileSink{
+				Path:        tc.Path,
+				FileName:    "audit.log",
+				MaxDuration: 1 * time.Second,
+			}
+			err := fs.open()
+			require.NoError(t, err)
+
+			// If this path should have been for a real file, attempt to open
+			// it from the operating system.
+			if tc.IsFile {
+				_, err = os.ReadFile(fs.f.Name())
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestFileSink_pruneFiles(t *testing.T) {
