@@ -231,6 +231,11 @@ func (fs *FileSink) open() error {
 }
 
 func (fs *FileSink) rotate() error {
+	switch fs.Path {
+	case stdout, stderr, devnull:
+		return nil
+	}
+
 	// Get the time from the last point of contact
 	elapsed := time.Since(fs.LastCreated)
 	if (fs.BytesWritten >= int64(fs.MaxBytes) && (fs.MaxBytes > 0)) ||
@@ -259,7 +264,10 @@ func (fs *FileSink) rotate() error {
 }
 
 func (fs *FileSink) pruneFiles() error {
-	if fs.MaxFiles == 0 {
+	switch {
+	case fs.Path == stdout, fs.Path == stderr, fs.Path == devnull:
+		return nil
+	case fs.MaxFiles == 0:
 		return nil
 	}
 
