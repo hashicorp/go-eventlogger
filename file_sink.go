@@ -132,10 +132,7 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 	// succeed, and we probably weren't attempting to write to a special path
 	// such as: /dev/null, /dev/stdout or /dev/stderr.
 	// Attempt a single 'retry' once per call.
-	_ = fs.f.Close()
-	fs.f = nil
-
-	if err := fs.open(); err != nil {
+	if err := fs.reopen(); err != nil {
 		return nil, err
 	}
 
@@ -144,15 +141,14 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 	return nil, err
 }
 
-// Reopen will close, rotate and reopen the Sink's file.
-func (fs *FileSink) Reopen() error {
+// reopen will close, rotate and reopen the Sink's file.
+// NOTE: this method is to be called by exported FileSink receivers which must
+// handle obtaining the relevant lock on the struct.
+func (fs *FileSink) reopen() error {
 	switch fs.Path {
 	case stdout, stderr, devnull:
 		return nil
 	}
-
-	fs.l.Lock()
-	defer fs.l.Unlock()
 
 	if fs.f != nil {
 		// Ensure file still exists
@@ -175,6 +171,19 @@ func (fs *FileSink) Reopen() error {
 	}
 
 	return fs.open()
+}
+
+// Reopen will close, rotate and reopen the Sink's file.
+func (fs *FileSink) Reopen() error {
+	switch fs.Path {
+	case stdout, stderr, devnull:
+		return nil
+	}
+
+	fs.l.Lock()
+	defer fs.l.Unlock()
+
+	return fs.reopen()
 }
 
 // Name returns a representation of the Sink's name
@@ -241,7 +250,12 @@ func (fs *FileSink) rotate() error {
 	if (fs.BytesWritten >= int64(fs.MaxBytes) && (fs.MaxBytes > 0)) ||
 		((elapsed > fs.MaxDuration) && (fs.MaxDuration > 0)) {
 
-		fs.f.Close()
+		// Clean up the existing file
+		err := fs.f.Close()
+		if err != nil {
+			return err
+		}
+		fs.f = nil
 
 		// Move current log file to a timestamped file.
 		if fs.TimestampOnlyOnRotate {

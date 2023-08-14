@@ -145,7 +145,7 @@ func TestFileSink_TimeRotate(t *testing.T) {
 	_, err := fs.Process(context.Background(), event)
 	require.NoError(t, err)
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	event = &Event{
 		Formatted: map[string][]byte{JSONFormat: []byte("first")},
