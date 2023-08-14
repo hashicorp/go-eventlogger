@@ -475,6 +475,21 @@ func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int
 	return nil
 }
 
+// IsAnyPipelineRegistered returns whether a pipeline for a given event type is already registered or not.
+func (b *Broker) IsAnyPipelineRegistered(e EventType) bool {
+	g, found := b.graphs[e]
+	if !found {
+		return false
+	}
+
+	found = false
+	g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
+		found = true
+		return false
+	})
+	return found
+}
+
 // validate ensures that the Pipeline has the required configuration to allow
 // registration, removal or usage, without issue.
 func (p Pipeline) validate() error {
