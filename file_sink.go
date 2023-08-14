@@ -102,10 +102,10 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 	defer fs.l.Unlock()
 
 	var writer io.Writer
-	switch {
-	case fs.Path == stdout:
+	switch fs.Path {
+	case stdout:
 		writer = os.Stdout
-	case fs.Path == stderr:
+	case stderr:
 		writer = os.Stderr
 	default:
 		if fs.f == nil {
