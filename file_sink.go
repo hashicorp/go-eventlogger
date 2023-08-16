@@ -18,6 +18,12 @@ import (
 	"time"
 )
 
+const (
+	stdout  = "/dev/stdout"
+	stderr  = "/dev/stderr"
+	devnull = "/dev/null"
+)
+
 // FileSink writes the []byte representation of an Event to a file
 // as a string.
 type FileSink struct {
@@ -69,13 +75,18 @@ const (
 )
 
 // Type describes the type of the node as a Sink.
-func (fs *FileSink) Type() NodeType {
+func (_ *FileSink) Type() NodeType {
 	return NodeTypeSink
 }
 
 // Process writes the []byte representation of an Event to a file
 // as a string.
-func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
+func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
+	// '/dev/null' should just return success
+	if fs.Path == devnull {
+		return nil, nil
+	}
+
 	format := fs.Format
 	if format == "" {
 		format = JSONFormat
@@ -84,35 +95,44 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	if !ok {
 		return nil, errors.New("event was not marshaled")
 	}
+
 	reader := bytes.NewReader(val)
 
 	fs.l.Lock()
 	defer fs.l.Unlock()
 
-	if fs.f == nil {
-		err := fs.open()
-		if err != nil {
+	var writer io.Writer
+	switch fs.Path {
+	case stdout:
+		writer = os.Stdout
+	case stderr:
+		writer = os.Stderr
+	default:
+		if fs.f == nil {
+			err := fs.open()
+			if err != nil {
+				return nil, err
+			}
+		}
+		// Check for last contact, rotate if necessary and able
+		if err := fs.rotate(); err != nil {
 			return nil, err
 		}
+		writer = fs.f
 	}
 
-	// Check for last contact, rotate if necessary and able
-	if err := fs.rotate(); err != nil {
-		return nil, err
-	}
-
-	if n, err := reader.WriteTo(fs.f); err == nil {
+	if n, err := reader.WriteTo(writer); err == nil {
 		// Sinks are leafs, so do not return the event, since nothing more can
 		// happen to it downstream.
-		fs.BytesWritten += int64(n)
+		fs.BytesWritten += n
 		return nil, nil
 	}
 
-	// Opportunistically try to re-open the FD, once per call.
-	_ = fs.f.Close()
-	fs.f = nil
-
-	if err := fs.open(); err != nil {
+	// Since we haven't returned yet, we assume that the attempt to write didn't
+	// succeed, and we probably weren't attempting to write to a special path
+	// such as: /dev/null, /dev/stdout or /dev/stderr.
+	// Attempt a single 'retry' once per call.
+	if err := fs.reopen(); err != nil {
 		return nil, err
 	}
 
@@ -121,10 +141,14 @@ func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
 	return nil, err
 }
 
-// Reopen will close, rotate and reopen the Sink's file.
-func (fs *FileSink) Reopen() error {
-	fs.l.Lock()
-	defer fs.l.Unlock()
+// reopen will close, rotate and reopen the Sink's file.
+// NOTE: this method is to be called by exported FileSink receivers which must
+// handle obtaining the relevant lock on the struct.
+func (fs *FileSink) reopen() error {
+	switch fs.Path {
+	case stdout, stderr, devnull:
+		return nil
+	}
 
 	if fs.f != nil {
 		// Ensure file still exists
@@ -149,12 +173,35 @@ func (fs *FileSink) Reopen() error {
 	return fs.open()
 }
 
+// Reopen will close, rotate and reopen the Sink's file.
+func (fs *FileSink) Reopen() error {
+	switch fs.Path {
+	case stdout, stderr, devnull:
+		return nil
+	}
+
+	fs.l.Lock()
+	defer fs.l.Unlock()
+
+	return fs.reopen()
+}
+
 // Name returns a representation of the Sink's name
 func (fs *FileSink) Name() string {
 	return fmt.Sprintf("sink:%s", fs.Path)
 }
 
 func (fs *FileSink) open() error {
+	// Return early if the file is open, or we're using a special path.
+	switch fs.Path {
+	case devnull, stdout, stderr:
+		return nil
+	default:
+		if fs.f != nil {
+			return nil
+		}
+	}
+
 	mode := fs.Mode
 	if mode == 0 {
 		mode = defaultMode
@@ -168,42 +215,47 @@ func (fs *FileSink) open() error {
 	// New file name as the format:
 	// file rotation enabled: filename-timestamp.extension
 	// file rotation disabled: filename.extension
-	newfileName := fs.newFileName(createTime)
-	newfilePath := filepath.Join(fs.Path, newfileName)
+	newFileName := fs.newFileName(createTime)
+	newFilePath := filepath.Join(fs.Path, newFileName)
 
 	var err error
-	fs.f, err = os.OpenFile(newfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, mode)
+	fs.f, err = os.OpenFile(newFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, mode)
 	if err != nil {
 		return err
 	}
 
-	// Change the file mode in case the log file already existed. We special
-	// case a few paths since we can't chmod them, and bypass if the mode is zero
-	switch newfilePath {
-	case "/dev/null":
-	case "/dev/stderr":
-	case "/dev/stdout":
-	default:
-		if fs.Mode != 0 {
-			err = os.Chmod(newfilePath, fs.Mode)
-			if err != nil {
-				return err
-			}
+	// Change the file mode (if not 0) in case the log file already existed.
+	if fs.Mode != 0 {
+		err = os.Chmod(newFilePath, fs.Mode)
+		if err != nil {
+			return err
 		}
 	}
 
+	// Reset file related statistics
 	fs.LastCreated = createTime
 	fs.BytesWritten = 0
+
 	return nil
 }
 
 func (fs *FileSink) rotate() error {
+	switch fs.Path {
+	case stdout, stderr, devnull:
+		return nil
+	}
+
 	// Get the time from the last point of contact
 	elapsed := time.Since(fs.LastCreated)
 	if (fs.BytesWritten >= int64(fs.MaxBytes) && (fs.MaxBytes > 0)) ||
 		((elapsed > fs.MaxDuration) && (fs.MaxDuration > 0)) {
 
-		fs.f.Close()
+		// Clean up the existing file
+		err := fs.f.Close()
+		if err != nil {
+			return err
+		}
+		fs.f = nil
 
 		// Move current log file to a timestamped file.
 		if fs.TimestampOnlyOnRotate {
@@ -226,7 +278,10 @@ func (fs *FileSink) rotate() error {
 }
 
 func (fs *FileSink) pruneFiles() error {
-	if fs.MaxFiles == 0 {
+	switch {
+	case fs.Path == stdout, fs.Path == stderr, fs.Path == devnull:
+		return nil
+	case fs.MaxFiles == 0:
 		return nil
 	}
 

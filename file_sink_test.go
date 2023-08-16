@@ -6,7 +6,7 @@ package eventlogger
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,12 +17,7 @@ import (
 func TestFileSink_NewDir(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	sinkDir := filepath.Join(tmpDir, "file_sink")
 
 	fs := FileSink{
@@ -34,13 +29,11 @@ func TestFileSink_NewDir(t *testing.T) {
 		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := fs.Process(context.Background(), event)
+	require.NoError(t, err)
 
 	want := []string{"audit.log"}
-	files, _ := ioutil.ReadDir(sinkDir)
+	files, _ := os.ReadDir(sinkDir)
 	got := []string{}
 	for _, f := range files {
 		got = append(got, f.Name())
@@ -51,75 +44,95 @@ func TestFileSink_NewDir(t *testing.T) {
 }
 
 func TestFileSink_Reopen(t *testing.T) {
-	t.Parallel()
-
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	fs := FileSink{
-		Path:     tmpDir,
-		FileName: "audit.log",
-	}
-	event := &Event{
-		Formatted: map[string][]byte{JSONFormat: []byte("first")},
-		Payload:   "First entry",
-	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
+	tests := map[string]struct {
+		Path   string
+		IsFile bool
+	}{
+		"stdout": {
+			Path: stdout,
+		},
+		"stderr": {
+			Path: stderr,
+		},
+		"dev/null": {
+			Path: devnull,
+		},
+		"default-file": {
+			IsFile: true,
+		},
 	}
 
-	// delete file
-	err = os.Remove(filepath.Join(tmpDir, "audit.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	for name, tc := range tests {
+		name := name
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	// reopen
-	err = fs.Reopen()
-	if err != nil {
-		t.Fatal(err)
-	}
+			var path string
+			switch {
+			case tc.IsFile:
+				// Create a temporary directory to store this file in.
+				path = t.TempDir()
+			default:
+				// Use the path 'as is' since it will be a special type
+				path = tc.Path
+			}
 
-	event = &Event{
-		Formatted: map[string][]byte{JSONFormat: []byte("second")},
-		Payload:   "Second entry",
-	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+			fs := FileSink{
+				Path:     path,
+				FileName: "audit.log",
+			}
 
-	// Ensure process re-created the file
-	dat, err := ioutil.ReadFile(filepath.Join(tmpDir, "audit.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
+			event := &Event{
+				Formatted: map[string][]byte{JSONFormat: []byte("first")},
+				Payload:   "First entry",
+			}
 
-	got := string(dat)
-	want := "second"
-	if got != "second" {
-		t.Errorf("Expected file content to be %s, got %s", want, got)
-	}
+			_, err := fs.Process(context.Background(), event)
+			require.NoError(t, err)
 
-	files := 1
-	if got, _ := ioutil.ReadDir(tmpDir); len(got) != files {
-		t.Errorf("Expected %d files, got %v file(s)", files, len(got))
+			if tc.IsFile {
+				// manually delete the file if not a special path
+				err = os.Remove(filepath.Join(path, "audit.log"))
+				require.NoError(t, err)
+			}
+
+			// reopen
+			err = fs.Reopen()
+			require.NoError(t, err)
+
+			event = &Event{
+				Formatted: map[string][]byte{JSONFormat: []byte("second")},
+				Payload:   "Second entry",
+			}
+
+			_, err = fs.Process(context.Background(), event)
+			require.NoError(t, err)
+
+			if tc.IsFile {
+				// Ensure process re-created the file
+				dat, err := os.ReadFile(filepath.Join(path, "audit.log"))
+				require.NoError(t, err)
+
+				got := string(dat)
+				want := "second"
+				if got != "second" {
+					t.Errorf("Expected file content to be %s, got %s", want, got)
+				}
+
+				files := 1
+				if got, _ := os.ReadDir(path); len(got) != files {
+					t.Errorf("Expected %d files, got %v file(s)", files, len(got))
+				}
+			}
+		})
 	}
 }
 
 func TestFileSink_TimeRotate(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	fs := FileSink{
 		Path:        tmpDir,
 		FileName:    "audit.log",
@@ -129,24 +142,20 @@ func TestFileSink_TimeRotate(t *testing.T) {
 		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := fs.Process(context.Background(), event)
+	require.NoError(t, err)
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	event = &Event{
 		Formatted: map[string][]byte{JSONFormat: []byte("first")},
 		Payload:   "First entry",
 	}
 	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	want := 2
-	if got, _ := ioutil.ReadDir(tmpDir); len(got) != want {
+	if got, _ := os.ReadDir(tmpDir); len(got) != want {
 		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
 	}
 }
@@ -154,12 +163,7 @@ func TestFileSink_TimeRotate(t *testing.T) {
 func TestFileSink_TimestampOnlyOnRotate_TimeRotate(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	fs := FileSink{
 		Path:                  tmpDir,
 		FileName:              "audit.log",
@@ -170,10 +174,8 @@ func TestFileSink_TimestampOnlyOnRotate_TimeRotate(t *testing.T) {
 		Formatted: map[string][]byte{JSONFormat: []byte("First entry")},
 		Payload:   "First entry",
 	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := fs.Process(context.Background(), event)
+	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
 
@@ -182,12 +184,10 @@ func TestFileSink_TimestampOnlyOnRotate_TimeRotate(t *testing.T) {
 		Payload:   "Last entry",
 	}
 	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	want := 2
-	got, _ := ioutil.ReadDir(tmpDir)
+	got, _ := os.ReadDir(tmpDir)
 	if len(got) != want {
 		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
 	}
@@ -203,12 +203,7 @@ func TestFileSink_TimestampOnlyOnRotate_TimeRotate(t *testing.T) {
 func TestFileSink_ByteRotate(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	fs := FileSink{
 		Path:        tmpDir,
 		FileName:    "audit.log",
@@ -219,10 +214,8 @@ func TestFileSink_ByteRotate(t *testing.T) {
 		Formatted: map[string][]byte{JSONFormat: []byte("entry")},
 		Payload:   "entry",
 	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := fs.Process(context.Background(), event)
+	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
 
@@ -231,12 +224,10 @@ func TestFileSink_ByteRotate(t *testing.T) {
 		Payload:   "entry",
 	}
 	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	want := 2
-	if got, _ := ioutil.ReadDir(tmpDir); len(got) != want {
+	if got, _ := os.ReadDir(tmpDir); len(got) != want {
 		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
 	}
 }
@@ -244,12 +235,7 @@ func TestFileSink_ByteRotate(t *testing.T) {
 func TestFileSink_TimestampOnlyOnRotate_ByteRotate(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	fs := FileSink{
 		Path:                  tmpDir,
 		FileName:              "audit.log",
@@ -261,10 +247,8 @@ func TestFileSink_TimestampOnlyOnRotate_ByteRotate(t *testing.T) {
 		Formatted: map[string][]byte{JSONFormat: []byte("first entry")},
 		Payload:   "first entry",
 	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := fs.Process(context.Background(), event)
+	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
 
@@ -273,12 +257,10 @@ func TestFileSink_TimestampOnlyOnRotate_ByteRotate(t *testing.T) {
 		Payload:   "last entry",
 	}
 	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	want := 2
-	got, _ := ioutil.ReadDir(tmpDir)
+	got, _ := os.ReadDir(tmpDir)
 	if len(got) != want {
 		t.Errorf("Expected %d files, got %v file(s)", want, len(got))
 	}
@@ -292,39 +274,52 @@ func TestFileSink_TimestampOnlyOnRotate_ByteRotate(t *testing.T) {
 }
 
 func TestFileSink_open(t *testing.T) {
-	t.Parallel()
-
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
+	tests := map[string]struct {
+		Path   string
+		IsFile bool
+	}{
+		"stdout": {
+			Path: "/dev/stdout",
+		},
+		"stderr": {
+			Path: "/dev/stderr",
+		},
+		"null": {
+			Path: "/dev/null",
+		},
+		"file": {
+			Path:   t.TempDir(),
+			IsFile: true,
+		},
 	}
-	defer os.RemoveAll(tmpDir)
 
-	fs := FileSink{
-		Path:        tmpDir,
-		FileName:    "audit.log",
-		MaxDuration: 1 * time.Second,
-	}
-	err = fs.open()
-	if err != nil {
-		t.Fatal(err)
-	}
+	for name, tc := range tests {
+		name := name
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			fs := FileSink{
+				Path:        tc.Path,
+				FileName:    "audit.log",
+				MaxDuration: 1 * time.Second,
+			}
+			err := fs.open()
+			require.NoError(t, err)
 
-	_, err = ioutil.ReadFile(fs.f.Name())
-	if err != nil {
-		t.Fatal(err)
+			// If this path should have been for a real file, attempt to open
+			// it from the operating system.
+			if tc.IsFile {
+				_, err = os.ReadFile(fs.f.Name())
+				require.NoError(t, err)
+			}
+		})
 	}
 }
 
 func TestFileSink_pruneFiles(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	fs := FileSink{
 		Path:        tmpDir,
 		FileName:    "audit.log",
@@ -336,29 +331,23 @@ func TestFileSink_pruneFiles(t *testing.T) {
 	event := &Event{
 		Formatted: map[string][]byte{JSONFormat: []byte("first entry")},
 	}
-	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := fs.Process(context.Background(), event)
+	require.NoError(t, err)
 
 	event = &Event{
 		Formatted: map[string][]byte{JSONFormat: []byte("second entry")},
 	}
 	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	event = &Event{
 		Formatted: map[string][]byte{JSONFormat: []byte("third entry")},
 	}
 	_, err = fs.Process(context.Background(), event)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	want := 2
-	tmpFiles, _ := ioutil.ReadDir(tmpDir)
+	tmpFiles, _ := os.ReadDir(tmpDir)
 	got := len(tmpFiles)
 	if want != got {
 		t.Errorf("Expected %d files, got %d", want, got)
@@ -367,27 +356,18 @@ func TestFileSink_pruneFiles(t *testing.T) {
 func TestFileSink_FileMode(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	configuredFileMode := os.FileMode(0640)
 	fs := FileSink{
 		Path:     tmpDir,
 		FileName: "audit.log",
 		Mode:     configuredFileMode,
 	}
-	err = fs.open()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err := fs.open()
+	require.NoError(t, err)
 
 	fileInfo, err := os.Stat(fs.f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Ensure the file mode matches the desired mode
 	actualMode := fileInfo.Mode()
@@ -399,30 +379,22 @@ func TestFileSink_FileMode(t *testing.T) {
 func TestFileSink_DirMode(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	parentDirMode := os.FileMode(0750)
 
 	// Change mode on parent directory
-	os.Chmod(tmpDir, parentDirMode)
+	err := os.Chmod(tmpDir, parentDirMode)
+	require.NoError(t, err)
 
 	fs := FileSink{
 		Path:     tmpDir,
 		FileName: "audit.log",
 	}
 	err = fs.open()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	dirInfo, err := os.Stat(tmpDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Ensure the parent directory's permissions remain unchanged
 	actualDirMode := dirInfo.Mode()
