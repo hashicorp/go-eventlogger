@@ -57,6 +57,7 @@ func TestProcess(t *testing.T) {
 	t.Parallel()
 
 	timeoutCtx, _ := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	
 	tests := []struct {
 		name            string
 		c               chan *eventlogger.Event
@@ -106,7 +107,6 @@ func TestProcess(t *testing.T) {
 				return
 			}
 			require.Nil(err)
-
 		})
 	}
 }
