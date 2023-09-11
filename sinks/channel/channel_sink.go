@@ -6,7 +6,8 @@ package channel
 import (
 	"context"
 	"errors"
-	"sync"
+	"fmt"
+	"time"
 
 	"github.com/hashicorp/eventlogger"
 )
@@ -14,31 +15,40 @@ import (
 // ChannelSink is a sink node which sends
 // the event to a channel
 type ChannelSink struct {
-	mu sync.Mutex
+	eventChan chan<- *eventlogger.Event
 
-	eventChan chan *eventlogger.Event
+	// The time to wait for a write before returning an error
+	timeoutDuration time.Duration
 }
 
 var _ eventlogger.Node = &ChannelSink{}
 
 // newChannelSink creates a ChannelSink
-func NewChannelSink(c chan *eventlogger.Event) (*ChannelSink, error) {
+func NewChannelSink(c chan<- *eventlogger.Event, t time.Duration) (*ChannelSink, error) {
 	if c == nil {
 		return nil, errors.New("missing event channel")
 	}
+	if t <= 0 {
+		return nil, errors.New("duration must be greater than 0")
+	}
 
 	return &ChannelSink{
-		eventChan: c,
+		eventChan:       c,
+		timeoutDuration: t,
 	}, nil
 }
 
 // Process sends the event on a channel
+// Process will wait for the ChannelSink timeoutDuration for a write before returning an error
 // Returns a nil event as this is a leaf node
 func (c *ChannelSink) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.eventChan <- e
+	select {
+	case c.eventChan <- e:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(c.timeoutDuration):
+		return nil, fmt.Errorf("%s: chan write timeout")
+	}
 
 	return nil, nil
 }
