@@ -47,7 +47,7 @@ func (c *ChannelSink) Process(ctx context.Context, e *eventlogger.Event) (*event
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(c.timeoutDuration):
-		return nil, fmt.Errorf("%s: chan write timeout")
+		return nil, fmt.Errorf("chan write timeout after %s", c.timeoutDuration)
 	}
 
 	return nil, nil

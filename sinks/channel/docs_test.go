@@ -25,7 +25,7 @@ func ExampleChannelSink() {
 
 	// Send the output to a channel
 	testChan := make(chan *eventlogger.Event, 1)
-	chanSink, err := channel.NewChannelSink(testChan)
+	chanSink, err := channel.NewChannelSink(testChan, time.Second)
 	if err != nil {
 		// handle error
 	}
