@@ -40,6 +40,7 @@ func NewChannelSink(c chan<- *eventlogger.Event, t time.Duration) (*ChannelSink,
 
 // Process sends the event on a channel
 // Process will wait for the ChannelSink timeoutDuration for a write before returning an error
+// This is to account for consumers having different timeouts than senders
 // Returns a nil event as this is a leaf node
 func (c *ChannelSink) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger.Event, error) {
 	select {
