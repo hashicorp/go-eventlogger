@@ -24,6 +24,8 @@ type ChannelSink struct {
 var _ eventlogger.Node = &ChannelSink{}
 
 // newChannelSink creates a ChannelSink
+// The time.Duration value is used to set a timeout on the consumer for sending events
+// This is to account for consumers having different timeouts than senders
 func NewChannelSink(c chan<- *eventlogger.Event, t time.Duration) (*ChannelSink, error) {
 	if c == nil {
 		return nil, errors.New("missing event channel")
