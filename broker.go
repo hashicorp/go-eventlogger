@@ -254,6 +254,36 @@ func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 	return nil
 }
 
+// DeregisterNode will remove a node from the broker, if it is not currently  in use
+// This is useful if RegisterNode was used succesfully prior to a failed RegisterPipeline call
+// referencing those nodes
+func (b *Broker) DeregisterNode(ctx context.Context, id NodeID) error {
+	if id == "" {
+		return errors.New("unable to deregister node, node ID cannot be empty")
+	}
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	var err error
+	nodeUsage, ok := b.nodes[id]
+	if !ok {
+		return fmt.Errorf("node not found: %q", id)
+	}
+
+	if nodeUsage.referenceCount > 0 {
+		return fmt.Errorf("cannot deregister node, as it is still in use by 1 or more pipelines: %q", id)
+	}
+
+	nc := NewNodeController(nodeUsage.node)
+	if err := nc.Close(ctx); err != nil {
+		err = fmt.Errorf("unable to close node ID %q: %w", id, err)
+	}
+	delete(b.nodes, id)
+
+	return err
+}
+
 // PipelineID is a string that uniquely identifies a Pipeline within a given EventType.
 type PipelineID string
 
