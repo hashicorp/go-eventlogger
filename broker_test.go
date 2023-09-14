@@ -641,7 +641,7 @@ func TestRegisterNode_NoID(t *testing.T) {
 	require.NoError(t, err)
 	err = b.RegisterNode("", &JSONFormatter{})
 	require.Error(t, err)
-	require.EqualError(t, err, "unable to register node, node ID cannot be empty")
+	require.EqualError(t, err, "unable to register node, node ID cannot be empty: invalid parameter")
 }
 
 // TestBroker_RegisterNode_AllowOverwrite_Implicit is used to prove that nodes can be
@@ -708,7 +708,7 @@ func TestDeregisterNode_NoID(t *testing.T) {
 	require.NoError(t, err)
 	err = b.DeregisterNode(context.Background(), "")
 	require.Error(t, err)
-	require.EqualError(t, err, "unable to deregister node, node ID cannot be empty")
+	require.EqualError(t, err, "unable to deregister node, node ID cannot be empty: invalid parameter")
 }
 
 // TestDeregisterNode_NotFound ensures we cannot deregister a Node that has not been registered
@@ -730,6 +730,19 @@ func TestDeregisterNode_StillReferenced(t *testing.T) {
 	err = b.DeregisterNode(context.Background(), "n1")
 	require.Error(t, err)
 	require.EqualError(t, err, "cannot deregister node, as it is still in use by 1 or more pipelines: \"n1\"")
+}
+
+// TestDeregisterNode_StillReferencedDecrement ensures we can decrement the reference to a Node that is still referenced
+// by a pipeline by using the option WithDecrementNodeReferenceIfStillUsed
+func TestDeregisterNode_StillReferencedDecrement(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	b.nodes["n1"].referenceCount = 2
+	err = b.DeregisterNode(context.Background(), "n1", WithDecrementNodeReferenceIfStillUsed(true))
+	require.NoError(t, err)
+	require.Equal(t, 1, b.nodes["n1"].referenceCount)
 }
 
 // TestBroker_RegisterPipeline_AllowOverwrite_Implicit is used to prove that pipelines can be

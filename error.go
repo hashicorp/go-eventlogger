@@ -7,4 +7,5 @@ import "errors"
 
 var (
 	ErrInvalidParameter = errors.New("invalid parameter")
+	ErrNodeNotFound     = errors.New("node not found")
 )

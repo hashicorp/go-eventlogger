@@ -61,15 +61,17 @@ type Option func(*options) error
 
 // options are used to represent configuration for the broker.
 type options struct {
-	withPipelineRegistrationPolicy RegistrationPolicy
-	withNodeRegistrationPolicy     RegistrationPolicy
+	withPipelineRegistrationPolicy        RegistrationPolicy
+	withNodeRegistrationPolicy            RegistrationPolicy
+	withDecrementNodeReferenceIfStillUsed bool
 }
 
 // getDefaultOptions returns a set of default options
 func getDefaultOptions() options {
 	return options{
-		withPipelineRegistrationPolicy: AllowOverwrite,
-		withNodeRegistrationPolicy:     AllowOverwrite,
+		withPipelineRegistrationPolicy:        AllowOverwrite,
+		withNodeRegistrationPolicy:            AllowOverwrite,
+		withDecrementNodeReferenceIfStillUsed: false,
 	}
 }
 
@@ -118,6 +120,15 @@ func WithNodeRegistrationPolicy(policy RegistrationPolicy) Option {
 		}
 
 		return err
+	}
+}
+
+// WithDecrementNodeReferenceIfStillUsed configures the option that determines whether deregistering
+// a node is used by more than one pipeline should result in decrementing its usage count
+func WithDecrementNodeReferenceIfStillUsed(b bool) Option {
+	return func(o *options) error {
+		o.withDecrementNodeReferenceIfStillUsed = b
+		return nil
 	}
 }
 
@@ -221,7 +232,7 @@ type NodeID string
 // Accepted options: WithNodeRegistrationPolicy (default: AllowOverwrite).
 func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 	if id == "" {
-		return errors.New("unable to register node, node ID cannot be empty")
+		return fmt.Errorf("unable to register node, node ID cannot be empty: %w", ErrInvalidParameter)
 	}
 
 	opts, err := getOpts(opt...)
@@ -257,29 +268,39 @@ func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 // DeregisterNode will remove a node from the broker, if it is not currently  in use
 // This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
 // referencing those nodes
-func (b *Broker) DeregisterNode(ctx context.Context, id NodeID) error {
+// Accepted options: WithDecrementNodeReferenceIfStillUsed.
+func (b *Broker) DeregisterNode(ctx context.Context, id NodeID, opt ...Option) error {
 	if id == "" {
-		return errors.New("unable to deregister node, node ID cannot be empty")
+		return fmt.Errorf("unable to deregister node, node ID cannot be empty: %w", ErrInvalidParameter)
+	}
+
+	opts, err := getOpts(opt...)
+	if err != nil {
+		return fmt.Errorf("cannot register node: %w", err)
 	}
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	var err error
 	nodeUsage, ok := b.nodes[id]
 	if !ok {
-		return fmt.Errorf("node not found: %q", id)
+		return fmt.Errorf("%w: %q", ErrNodeNotFound, id)
 	}
 
-	if nodeUsage.referenceCount > 0 {
+	if nodeUsage.referenceCount > 0 && !opts.withDecrementNodeReferenceIfStillUsed {
 		return fmt.Errorf("cannot deregister node, as it is still in use by 1 or more pipelines: %q", id)
 	}
 
-	nc := NewNodeController(nodeUsage.node)
-	if err := nc.Close(ctx); err != nil {
-		err = fmt.Errorf("unable to close node ID %q: %w", id, err)
+	switch nodeUsage.referenceCount {
+	case 0, 1:
+		nc := NewNodeController(nodeUsage.node)
+		if err = nc.Close(ctx); err != nil {
+			err = fmt.Errorf("unable to close node ID %q: %w", id, err)
+		}
+		delete(b.nodes, id)
+	default:
+		nodeUsage.referenceCount--
 	}
-	delete(b.nodes, id)
 
 	return err
 }
@@ -413,40 +434,28 @@ func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id Pip
 	}
 
 	b.lock.Lock()
-	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
+		b.lock.Unlock()
 		return false, fmt.Errorf("no graph for EventType %s", t)
 	}
 
 	nodes, err := g.roots.Nodes(id)
 	if err != nil {
+		b.lock.Unlock()
 		return false, fmt.Errorf("unable to retrieve all nodes referenced by pipeline ID %q: %w", id, err)
 	}
 
 	g.roots.Delete(id)
+	b.lock.Unlock()
 
 	var nodeErr error
 
 	for _, nodeID := range nodes {
-		nodeUsage, ok := b.nodes[nodeID]
-		if !ok {
-			// We might get multiple nodes which cannot be found
-			nodeErr = multierror.Append(nodeErr, fmt.Errorf("node not found: %q", nodeID))
-			continue
-		}
-
-		switch nodeUsage.referenceCount {
-		case 0, 1:
-			nc := NewNodeController(nodeUsage.node)
-			if err := nc.Close(ctx); err != nil {
-				nodeErr = multierror.Append(nodeErr, fmt.Errorf("unable to close node ID %q: %w", nodeID, err))
-			}
-			// Node is not currently in use, or was only being used by this pipeline
-			delete(b.nodes, nodeID)
-		default:
-			nodeUsage.referenceCount--
+		err = b.DeregisterNode(ctx, nodeID, WithDecrementNodeReferenceIfStillUsed(true))
+		if err != nil {
+			nodeErr = multierror.Append(nodeErr, err)
 		}
 	}
 
