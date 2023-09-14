@@ -733,14 +733,14 @@ func TestDeregisterNode_StillReferenced(t *testing.T) {
 }
 
 // TestDeregisterNode_StillReferencedDecrement ensures we can decrement the reference to a Node that is still referenced
-// by a pipeline by using the option WithDecrementNodeReferenceIfStillUsed
+// by a pipeline by using the option withDecrementNodeReferenceIfStillUsed
 func TestDeregisterNode_StillReferencedDecrement(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
 	require.NoError(t, err)
 	b.nodes["n1"].referenceCount = 2
-	err = b.DeregisterNode(context.Background(), "n1", WithDecrementNodeReferenceIfStillUsed(true))
+	err = b.DeregisterNode(context.Background(), "n1", withDecrementNodeReferenceIfStillUsed(true))
 	require.NoError(t, err)
 	require.Equal(t, 1, b.nodes["n1"].referenceCount)
 }

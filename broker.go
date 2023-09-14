@@ -123,9 +123,9 @@ func WithNodeRegistrationPolicy(policy RegistrationPolicy) Option {
 	}
 }
 
-// WithDecrementNodeReferenceIfStillUsed configures the option that determines whether deregistering
+// withDecrementNodeReferenceIfStillUsed configures the option that determines whether deregistering
 // a node is used by more than one pipeline should result in decrementing its usage count
-func WithDecrementNodeReferenceIfStillUsed(b bool) Option {
+func withDecrementNodeReferenceIfStillUsed(b bool) Option {
 	return func(o *options) error {
 		o.withDecrementNodeReferenceIfStillUsed = b
 		return nil
@@ -268,7 +268,7 @@ func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 // DeregisterNode will remove a node from the broker, if it is not currently  in use
 // This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
 // referencing those nodes
-// Accepted options: WithDecrementNodeReferenceIfStillUsed.
+// Accepted options: withDecrementNodeReferenceIfStillUsed.
 func (b *Broker) DeregisterNode(ctx context.Context, id NodeID, opt ...Option) error {
 	if id == "" {
 		return fmt.Errorf("unable to deregister node, node ID cannot be empty: %w", ErrInvalidParameter)
@@ -453,7 +453,7 @@ func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id Pip
 	var nodeErr error
 
 	for _, nodeID := range nodes {
-		err = b.DeregisterNode(ctx, nodeID, WithDecrementNodeReferenceIfStillUsed(true))
+		err = b.DeregisterNode(ctx, nodeID, withDecrementNodeReferenceIfStillUsed(true))
 		if err != nil {
 			nodeErr = multierror.Append(nodeErr, err)
 		}
