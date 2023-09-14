@@ -268,7 +268,6 @@ func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 // DeregisterNode will remove a node from the broker, if it is not currently  in use
 // This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
 // referencing those nodes
-// Accepted options: withDecrementNodeReferenceIfStillUsed.
 func (b *Broker) DeregisterNode(ctx context.Context, id NodeID, opt ...Option) error {
 	if id == "" {
 		return fmt.Errorf("unable to deregister node, node ID cannot be empty: %w", ErrInvalidParameter)
@@ -287,6 +286,8 @@ func (b *Broker) DeregisterNode(ctx context.Context, id NodeID, opt ...Option) e
 		return fmt.Errorf("%w: %q", ErrNodeNotFound, id)
 	}
 
+	// if withDecrementNodeReferenceIfStillUsed is passed, then it's fine to decrement the count for this node
+	// instead of failing
 	if nodeUsage.referenceCount > 0 && !opts.withDecrementNodeReferenceIfStillUsed {
 		return fmt.Errorf("cannot deregister node, as it is still in use by 1 or more pipelines: %q", id)
 	}
