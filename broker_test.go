@@ -692,6 +692,46 @@ func TestBroker_RegisterNode_AllowThenDenyOverwrite(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestDeregisterNode ensures we cannot deregister a Node with an empty ID.
+func TestDeregisterNode(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.DeregisterNode(context.Background(), "n1")
+	require.NoError(t, err)
+}
+
+// TestDeregisterNode_NoID ensures we cannot deregister a Node with an empty ID.
+func TestDeregisterNode_NoID(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.DeregisterNode(context.Background(), "")
+	require.Error(t, err)
+	require.EqualError(t, err, "unable to deregister node, node ID cannot be empty")
+}
+
+// TestDeregisterNode_NotFound ensures we cannot deregister a Node that has not been registered
+func TestDeregisterNode_NotFound(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.DeregisterNode(context.Background(), "n1")
+	require.Error(t, err)
+	require.EqualError(t, err, "node not found: \"n1\"")
+}
+
+// TestDeregisterNode_StillReferenced ensures we cannot deregister a Node that is still referenced by a pipeline
+func TestDeregisterNode_StillReferenced(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	b.nodes["n1"].referenceCount = 2
+	err = b.DeregisterNode(context.Background(), "n1")
+	require.Error(t, err)
+	require.EqualError(t, err, "cannot deregister node, as it is still in use by 1 or more pipelines: \"n1\"")
+}
+
 // TestBroker_RegisterPipeline_AllowOverwrite_Implicit is used to prove that pipelines can be
 // overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
 // This is the default in order to maintain pre-existing behavior.

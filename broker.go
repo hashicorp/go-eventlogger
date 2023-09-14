@@ -255,7 +255,7 @@ func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 }
 
 // DeregisterNode will remove a node from the broker, if it is not currently  in use
-// This is useful if RegisterNode was used succesfully prior to a failed RegisterPipeline call
+// This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
 // referencing those nodes
 func (b *Broker) DeregisterNode(ctx context.Context, id NodeID) error {
 	if id == "" {
