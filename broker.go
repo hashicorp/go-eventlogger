@@ -221,7 +221,7 @@ type NodeID string
 // Accepted options: WithNodeRegistrationPolicy (default: AllowOverwrite).
 func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 	if id == "" {
-		return errors.New("unable to register node, node ID cannot be empty")
+		return fmt.Errorf("unable to register node, node ID cannot be empty: %w", ErrInvalidParameter)
 	}
 
 	opts, err := getOpts(opt...)
@@ -252,6 +252,50 @@ func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 	b.nodes[id] = nr
 
 	return nil
+}
+
+// RemoveNode will remove a node from the broker, if it is not currently  in use
+// This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
+// referencing those nodes
+func (b *Broker) RemoveNode(ctx context.Context, id NodeID) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.removeNode(ctx, id, false)
+}
+
+// removeNode will remove a node from the broker, if it is not currently  in use.
+// This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
+// referencing those nodes
+// The force option can be used to decrement the count for the node if it's still in use by pipelines
+// This function assumes that the caller holds a lock
+func (b *Broker) removeNode(ctx context.Context, id NodeID, force bool) error {
+	if id == "" {
+		return fmt.Errorf("unable to remove node, node ID cannot be empty: %w", ErrInvalidParameter)
+	}
+
+	nodeUsage, ok := b.nodes[id]
+	if !ok {
+		return fmt.Errorf("%w: %q", ErrNodeNotFound, id)
+	}
+
+	// if force is passed, then decrement the count for this node instead of failing
+	if nodeUsage.referenceCount > 0 && !force {
+		return fmt.Errorf("cannot remove node, as it is still in use by 1 or more pipelines: %q", id)
+	}
+
+	var err error
+	switch nodeUsage.referenceCount {
+	case 0, 1:
+		nc := NewNodeController(nodeUsage.node)
+		if err = nc.Close(ctx); err != nil {
+			err = fmt.Errorf("unable to close node ID %q: %w", id, err)
+		}
+		delete(b.nodes, id)
+	default:
+		nodeUsage.referenceCount--
+	}
+
+	return err
 }
 
 // PipelineID is a string that uniquely identifies a Pipeline within a given EventType.
@@ -400,23 +444,9 @@ func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id Pip
 	var nodeErr error
 
 	for _, nodeID := range nodes {
-		nodeUsage, ok := b.nodes[nodeID]
-		if !ok {
-			// We might get multiple nodes which cannot be found
-			nodeErr = multierror.Append(nodeErr, fmt.Errorf("node not found: %q", nodeID))
-			continue
-		}
-
-		switch nodeUsage.referenceCount {
-		case 0, 1:
-			nc := NewNodeController(nodeUsage.node)
-			if err := nc.Close(ctx); err != nil {
-				nodeErr = multierror.Append(nodeErr, fmt.Errorf("unable to close node ID %q: %w", nodeID, err))
-			}
-			// Node is not currently in use, or was only being used by this pipeline
-			delete(b.nodes, nodeID)
-		default:
-			nodeUsage.referenceCount--
+		err = b.removeNode(ctx, nodeID, true)
+		if err != nil {
+			nodeErr = multierror.Append(nodeErr, err)
 		}
 	}
 

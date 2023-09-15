@@ -641,7 +641,7 @@ func TestRegisterNode_NoID(t *testing.T) {
 	require.NoError(t, err)
 	err = b.RegisterNode("", &JSONFormatter{})
 	require.Error(t, err)
-	require.EqualError(t, err, "unable to register node, node ID cannot be empty")
+	require.EqualError(t, err, "unable to register node, node ID cannot be empty: invalid parameter")
 }
 
 // TestBroker_RegisterNode_AllowOverwrite_Implicit is used to prove that nodes can be
@@ -690,6 +690,59 @@ func TestBroker_RegisterNode_AllowThenDenyOverwrite(t *testing.T) {
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &FileSink{})
 	require.Error(t, err)
+}
+
+// TestRemoveNode ensures we cannot remove a Node with an empty ID.
+func TestRemoveNode(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	err = b.RemoveNode(context.Background(), "n1")
+	require.NoError(t, err)
+}
+
+// TestRemoveNode_NoID ensures we cannot remove a Node with an empty ID.
+func TestRemoveNode_NoID(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RemoveNode(context.Background(), "")
+	require.Error(t, err)
+	require.EqualError(t, err, "unable to remove node, node ID cannot be empty: invalid parameter")
+}
+
+// TestRemoveNode_NotFound ensures we cannot remove a Node that has not been registered
+func TestRemoveNode_NotFound(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RemoveNode(context.Background(), "n1")
+	require.Error(t, err)
+	require.EqualError(t, err, "node not found: \"n1\"")
+}
+
+// TestRemoveNode_StillReferenced ensures we cannot remote a Node that is still referenced by a pipeline
+func TestRemoveNode_StillReferenced(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	b.nodes["n1"].referenceCount = 2
+	err = b.RemoveNode(context.Background(), "n1")
+	require.Error(t, err)
+	require.EqualError(t, err, "cannot remove node, as it is still in use by 1 or more pipelines: \"n1\"")
+}
+
+// TestDeregisterNode_Force ensures we can decrement the reference to a Node that is still referenced
+// by a pipeline by using the force option
+func TestRemoveNode_StillReferencedDecrement(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.RegisterNode("n1", &JSONFormatter{})
+	require.NoError(t, err)
+	b.nodes["n1"].referenceCount = 2
+	err = b.removeNode(context.Background(), "n1", true)
+	require.NoError(t, err)
+	require.Equal(t, 1, b.nodes["n1"].referenceCount)
 }
 
 // TestBroker_RegisterPipeline_AllowOverwrite_Implicit is used to prove that pipelines can be
