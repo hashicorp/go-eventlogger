@@ -692,55 +692,55 @@ func TestBroker_RegisterNode_AllowThenDenyOverwrite(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestDeregisterNode ensures we cannot deregister a Node with an empty ID.
-func TestDeregisterNode(t *testing.T) {
+// TestRemoveNode ensures we cannot remove a Node with an empty ID.
+func TestRemoveNode(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
 	require.NoError(t, err)
-	err = b.DeregisterNode(context.Background(), "n1")
+	err = b.RemoveNode(context.Background(), "n1")
 	require.NoError(t, err)
 }
 
-// TestDeregisterNode_NoID ensures we cannot deregister a Node with an empty ID.
-func TestDeregisterNode_NoID(t *testing.T) {
+// TestRemoveNode_NoID ensures we cannot remove a Node with an empty ID.
+func TestRemoveNode_NoID(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
-	err = b.DeregisterNode(context.Background(), "")
+	err = b.RemoveNode(context.Background(), "")
 	require.Error(t, err)
-	require.EqualError(t, err, "unable to deregister node, node ID cannot be empty: invalid parameter")
+	require.EqualError(t, err, "unable to remove node, node ID cannot be empty: invalid parameter")
 }
 
-// TestDeregisterNode_NotFound ensures we cannot deregister a Node that has not been registered
-func TestDeregisterNode_NotFound(t *testing.T) {
+// TestRemoveNode_NotFound ensures we cannot remove a Node that has not been registered
+func TestRemoveNode_NotFound(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
-	err = b.DeregisterNode(context.Background(), "n1")
+	err = b.RemoveNode(context.Background(), "n1")
 	require.Error(t, err)
 	require.EqualError(t, err, "node not found: \"n1\"")
 }
 
-// TestDeregisterNode_StillReferenced ensures we cannot deregister a Node that is still referenced by a pipeline
-func TestDeregisterNode_StillReferenced(t *testing.T) {
+// TestRemoveNode_StillReferenced ensures we cannot remote a Node that is still referenced by a pipeline
+func TestRemoveNode_StillReferenced(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
 	require.NoError(t, err)
 	b.nodes["n1"].referenceCount = 2
-	err = b.DeregisterNode(context.Background(), "n1")
+	err = b.RemoveNode(context.Background(), "n1")
 	require.Error(t, err)
-	require.EqualError(t, err, "cannot deregister node, as it is still in use by 1 or more pipelines: \"n1\"")
+	require.EqualError(t, err, "cannot remove node, as it is still in use by 1 or more pipelines: \"n1\"")
 }
 
-// TestDeregisterNode_StillReferencedDecrement ensures we can decrement the reference to a Node that is still referenced
-// by a pipeline by using the option withDecrementNodeReferenceIfStillUsed
-func TestDeregisterNode_StillReferencedDecrement(t *testing.T) {
+// TestDeregisterNode_Force ensures we can decrement the reference to a Node that is still referenced
+// by a pipeline by using the force option
+func TestRemoveNode_StillReferencedDecrement(t *testing.T) {
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
 	require.NoError(t, err)
 	b.nodes["n1"].referenceCount = 2
-	err = b.DeregisterNode(context.Background(), "n1", withDecrementNodeReferenceIfStillUsed(true))
+	err = b.removeNode(context.Background(), "n1", true)
 	require.NoError(t, err)
 	require.Equal(t, 1, b.nodes["n1"].referenceCount)
 }

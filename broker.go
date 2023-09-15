@@ -61,17 +61,15 @@ type Option func(*options) error
 
 // options are used to represent configuration for the broker.
 type options struct {
-	withPipelineRegistrationPolicy        RegistrationPolicy
-	withNodeRegistrationPolicy            RegistrationPolicy
-	withDecrementNodeReferenceIfStillUsed bool
+	withPipelineRegistrationPolicy RegistrationPolicy
+	withNodeRegistrationPolicy     RegistrationPolicy
 }
 
 // getDefaultOptions returns a set of default options
 func getDefaultOptions() options {
 	return options{
-		withPipelineRegistrationPolicy:        AllowOverwrite,
-		withNodeRegistrationPolicy:            AllowOverwrite,
-		withDecrementNodeReferenceIfStillUsed: false,
+		withPipelineRegistrationPolicy: AllowOverwrite,
+		withNodeRegistrationPolicy:     AllowOverwrite,
 	}
 }
 
@@ -120,15 +118,6 @@ func WithNodeRegistrationPolicy(policy RegistrationPolicy) Option {
 		}
 
 		return err
-	}
-}
-
-// withDecrementNodeReferenceIfStillUsed configures the option that determines whether deregistering
-// a node is used by more than one pipeline should result in decrementing its usage count
-func withDecrementNodeReferenceIfStillUsed(b bool) Option {
-	return func(o *options) error {
-		o.withDecrementNodeReferenceIfStillUsed = b
-		return nil
 	}
 }
 
@@ -265,33 +254,36 @@ func (b *Broker) RegisterNode(id NodeID, node Node, opt ...Option) error {
 	return nil
 }
 
-// DeregisterNode will remove a node from the broker, if it is not currently  in use
+// RemoveNode will remove a node from the broker, if it is not currently  in use
 // This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
 // referencing those nodes
-func (b *Broker) DeregisterNode(ctx context.Context, id NodeID, opt ...Option) error {
-	if id == "" {
-		return fmt.Errorf("unable to deregister node, node ID cannot be empty: %w", ErrInvalidParameter)
-	}
-
-	opts, err := getOpts(opt...)
-	if err != nil {
-		return fmt.Errorf("cannot register node: %w", err)
-	}
-
+func (b *Broker) RemoveNode(ctx context.Context, id NodeID) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
+	return b.removeNode(ctx, id, false)
+}
+
+// removeNode will remove a node from the broker, if it is not currently  in use.
+// This is useful if RegisterNode was used successfully prior to a failed RegisterPipeline call
+// referencing those nodes
+// The force option can be used to decrement the count for the node if it's still in use by pipelines
+// This function assumes that the caller holds a lock
+func (b *Broker) removeNode(ctx context.Context, id NodeID, force bool) error {
+	if id == "" {
+		return fmt.Errorf("unable to remove node, node ID cannot be empty: %w", ErrInvalidParameter)
+	}
 
 	nodeUsage, ok := b.nodes[id]
 	if !ok {
 		return fmt.Errorf("%w: %q", ErrNodeNotFound, id)
 	}
 
-	// if withDecrementNodeReferenceIfStillUsed is passed, then it's fine to decrement the count for this node
-	// instead of failing
-	if nodeUsage.referenceCount > 0 && !opts.withDecrementNodeReferenceIfStillUsed {
-		return fmt.Errorf("cannot deregister node, as it is still in use by 1 or more pipelines: %q", id)
+	// if force is passed, then decrement the count for this node instead of failing
+	if nodeUsage.referenceCount > 0 && !force {
+		return fmt.Errorf("cannot remove node, as it is still in use by 1 or more pipelines: %q", id)
 	}
 
+	var err error
 	switch nodeUsage.referenceCount {
 	case 0, 1:
 		nc := NewNodeController(nodeUsage.node)
@@ -435,26 +427,24 @@ func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id Pip
 	}
 
 	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	g, ok := b.graphs[t]
 	if !ok {
-		b.lock.Unlock()
 		return false, fmt.Errorf("no graph for EventType %s", t)
 	}
 
 	nodes, err := g.roots.Nodes(id)
 	if err != nil {
-		b.lock.Unlock()
 		return false, fmt.Errorf("unable to retrieve all nodes referenced by pipeline ID %q: %w", id, err)
 	}
 
 	g.roots.Delete(id)
-	b.lock.Unlock()
 
 	var nodeErr error
 
 	for _, nodeID := range nodes {
-		err = b.DeregisterNode(ctx, nodeID, withDecrementNodeReferenceIfStillUsed(true))
+		err = b.removeNode(ctx, nodeID, true)
 		if err != nil {
 			nodeErr = multierror.Append(nodeErr, err)
 		}
