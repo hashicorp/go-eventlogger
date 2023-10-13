@@ -164,9 +164,9 @@ type Status struct {
 func (s Status) getError(threshold, thresholdSinks int) error {
 	switch {
 	case len(s.complete) < threshold:
-		return fmt.Errorf("event not processed by enough 'filter' and 'sink' nodes")
+		return fmt.Errorf("event not processed by enough 'filter' and 'sink' nodes: %s", s.Warnings)
 	case len(s.completeSinks) < thresholdSinks:
-		return fmt.Errorf("event not processed by enough 'sink' nodes")
+		return fmt.Errorf("event not processed by enough 'sink' nodes: %s", s.Warnings)
 	default:
 		return nil
 	}
