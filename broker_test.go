@@ -7,15 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/hashicorp/go-multierror"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/go-test/deep"
 	"github.com/hashicorp/go-uuid"
@@ -148,6 +148,68 @@ func TestBroker(t *testing.T) {
 			}
 			if diff := deep.Equal(string(dat), expect); diff != nil {
 				t.Fatal(diff)
+			}
+		})
+	}
+}
+
+func TestBrokerWithDataThatCannotBeJSONEncoded(t *testing.T) {
+	// Marshal to JSON
+	formatter := &JSONFormatter{}
+
+	// Create a broker
+	broker, err := NewBroker()
+	require.NoError(t, err)
+	now := time.Now()
+	broker.clock = &clock{now}
+
+	tests := []struct {
+		name  string
+		nodes []Node
+	}{
+		{
+			name:  "with-formatter",
+			nodes: []Node{formatter},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			// Send to FileSink
+			sink := &FileSink{Path: tmpDir, FileName: "file.log"}
+			tt.nodes = append(tt.nodes, sink)
+
+			// Register the graph with the broker
+			et := EventType("Foo")
+			nodeIDs := nodesToNodeIDs(t, broker, tt.nodes...)
+			err := broker.RegisterPipeline(Pipeline{
+				EventType:  et,
+				PipelineID: "id",
+				NodeIDs:    nodeIDs,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Set success threshold to 1
+			err = broker.SetSuccessThreshold(et, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Process some Events
+			payloads := []interface{}{
+				map[string]interface{}{
+					"color": math.Inf(1),
+					"width": 1,
+				},
+			}
+			for _, p := range payloads {
+				_, err = broker.Send(context.Background(), et, p)
+				if err != nil {
+					require.EqualError(t, err, "event not processed by enough 'filter' and 'sink' nodes: [json: unsupported value: +Inf]")
+				}
 			}
 		})
 	}
