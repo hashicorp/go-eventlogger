@@ -976,3 +976,71 @@ func TestBroker_IsAnyPipelineRegistered_WithFailedRegistration(t *testing.T) {
 
 	require.False(t, b.IsAnyPipelineRegistered("t"))
 }
+
+func TestBroker_Status_Complete(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		statusSinks   []NodeID
+		expectedSinks []NodeID
+	}{
+		"none": {
+			statusSinks:   nil,
+			expectedSinks: nil,
+		},
+		"one": {
+			statusSinks:   []NodeID{NodeID("foo")},
+			expectedSinks: []NodeID{NodeID("foo")},
+		},
+		"many": {
+			statusSinks:   []NodeID{NodeID("foo"), NodeID("bar")},
+			expectedSinks: []NodeID{NodeID("foo"), NodeID("bar")},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			s := &Status{
+				complete: tc.statusSinks,
+			}
+
+			require.Len(t, s.Complete(), len(tc.expectedSinks))
+			require.Equal(t, tc.expectedSinks, s.Complete())
+		})
+	}
+}
+
+func TestBroker_Status_CompleteSinks(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		statusSinks   []NodeID
+		expectedSinks []NodeID
+	}{
+		"none": {
+			statusSinks:   nil,
+			expectedSinks: nil,
+		},
+		"one": {
+			statusSinks:   []NodeID{NodeID("foo")},
+			expectedSinks: []NodeID{NodeID("foo")},
+		},
+		"many": {
+			statusSinks:   []NodeID{NodeID("foo"), NodeID("bar")},
+			expectedSinks: []NodeID{NodeID("foo"), NodeID("bar")},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			s := &Status{
+				completeSinks: tc.statusSinks,
+			}
+
+			require.Len(t, s.CompleteSinks(), len(tc.expectedSinks))
+			require.Equal(t, tc.expectedSinks, s.CompleteSinks())
+		})
+	}
+}

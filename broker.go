@@ -161,6 +161,16 @@ type Status struct {
 	Warnings []error
 }
 
+// Complete returns the IDs of 'filter' and 'sink' type nodes that successfully processed the Event.
+func (s Status) Complete() []NodeID {
+	return s.complete
+}
+
+// CompleteSinks returns the IDs of 'sink' type nodes that successfully processed the Event.
+func (s Status) CompleteSinks() []NodeID {
+	return s.completeSinks
+}
+
 func (s Status) getError(threshold, thresholdSinks int) error {
 	switch {
 	case len(s.complete) < threshold:
