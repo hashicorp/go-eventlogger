@@ -977,6 +977,44 @@ func TestBroker_IsAnyPipelineRegistered_WithFailedRegistration(t *testing.T) {
 	require.False(t, b.IsAnyPipelineRegistered("t"))
 }
 
+func TestBroker_IsAnyPipelineRegisteredRaceCondition(t *testing.T) {
+	b, err := NewBroker()
+	require.NoError(t, err)
+
+	err = b.RegisterNode("f1", &JSONFormatter{})
+	require.NoError(t, err)
+
+	err = b.RegisterNode("s1", &FileSink{})
+	require.NoError(t, err)
+
+	n := 100
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		pipelineID, err := uuid.GenerateUUID()
+		require.NoError(t, err)
+		eventType, err := uuid.GenerateUUID()
+		require.NoError(t, err)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := b.RegisterPipeline(Pipeline{
+				PipelineID: PipelineID(pipelineID),
+				EventType:  EventType(eventType),
+				NodeIDs:    []NodeID{"f1", "s1"},
+			})
+			require.NoError(t, err)
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = b.IsAnyPipelineRegistered("t")
+		}()
+	}
+	wg.Wait()
+}
+
 func TestBroker_Status_Complete(t *testing.T) {
 	t.Parallel()
 
