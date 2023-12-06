@@ -154,23 +154,23 @@ func (b *Broker) StopTimeAt(now time.Time) {
 // Status describes the result of a Send.
 type Status struct {
 	// complete lists the IDs of 'filter' and 'sink' type nodes that successfully
-	// processed the Event, leading to completion of a particular Pipeline.
+	// processed the Event, resulting in immediate completion of a particular Pipeline.
 	complete []NodeID
 	// complete lists the IDs of 'sink' type nodes that successfully processed
-	// the Event, leading to completion of a particular Pipeline.
+	// the Event, resulting in immediate completion of a particular Pipeline.
 	completeSinks []NodeID
 	// Warnings lists any non-fatal errors that occurred while sending an Event.
 	Warnings []error
 }
 
 // Complete returns the IDs of 'filter' and 'sink' type nodes that successfully
-// processed the Event, leading to completion of a particular Pipeline.
+// processed the Event, resulting in immediate completion of a particular Pipeline.
 func (s Status) Complete() []NodeID {
 	return s.complete
 }
 
 // CompleteSinks returns the IDs of 'sink' type nodes that successfully processed
-// the Event, leading to completion of a particular Pipeline.
+// the Event, resulting in immediate completion of a particular Pipeline.
 func (s Status) CompleteSinks() []NodeID {
 	return s.completeSinks
 }
