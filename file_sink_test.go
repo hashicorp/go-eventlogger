@@ -44,6 +44,8 @@ func TestFileSink_NewDir(t *testing.T) {
 }
 
 func TestFileSink_Reopen(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		Path   string
 		IsFile bool
@@ -274,6 +276,8 @@ func TestFileSink_TimestampOnlyOnRotate_ByteRotate(t *testing.T) {
 }
 
 func TestFileSink_open(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		Path   string
 		IsFile bool
@@ -298,6 +302,7 @@ func TestFileSink_open(t *testing.T) {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+
 			fs := FileSink{
 				Path:        tc.Path,
 				FileName:    "audit.log",

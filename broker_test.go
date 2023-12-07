@@ -13,12 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-test/deep"
 	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/go-test/deep"
-	"github.com/hashicorp/go-uuid"
 )
 
 // nodesToNodeIDs takes the supplied nodes and registers them with a corresponding,
@@ -61,30 +60,22 @@ func TestBroker(t *testing.T) {
 	now := time.Now()
 	broker.clock = &clock{now}
 
-	tests := []struct {
-		name  string
-		nodes []Node
-	}{
-		{
-			name:  "with-formatter",
-			nodes: []Node{filter, formatter},
-		},
-		{
-			name:  "with-formatter-filter",
-			nodes: []Node{formatterFilter},
-		},
+	tests := map[string][]Node{
+		"with-formatter":        {filter, formatter},
+		"with-formatter-filter": {formatterFilter},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+
+	for name, nodes := range tests {
+		t.Run(name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 
 			// Send to FileSink
 			sink := &FileSink{Path: tmpDir, FileName: "file.log"}
-			tt.nodes = append(tt.nodes, sink)
+			nodes = append(nodes, sink)
 
 			// Register the graph with the broker
 			et := EventType("Foo")
-			nodeIDs := nodesToNodeIDs(t, broker, tt.nodes...)
+			nodeIDs := nodesToNodeIDs(t, broker, nodes...)
 			err := broker.RegisterPipeline(Pipeline{
 				EventType:  et,
 				PipelineID: "id",
@@ -233,7 +224,8 @@ func TestPipeline(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestPipelineRaceCondition can't fail, but it can check if there is a race condition in iterating through, adding, or removing pipelines.
+// TestPipelineRaceCondition can't fail, but it can check if there is a race condition
+// in iterating through, adding, or removing pipelines.
 func TestPipelineRaceCondition(t *testing.T) {
 	broker, err := NewBroker()
 	require.NoError(t, err)
@@ -318,9 +310,11 @@ func (ts *testSink) Name() string {
 	return "testSink"
 }
 
-// TestSuccessThreshold tests that we can set the required success threshold for
+// TestSetSuccessThreshold tests that we can set the required success threshold for
 // a specific event type in the graph.
-func TestSuccessThreshold(t *testing.T) {
+func TestSetSuccessThreshold(t *testing.T) {
+	t.Parallel()
+
 	threshold := 2
 	b, err := NewBroker()
 	require.NoError(t, err)
@@ -341,9 +335,11 @@ func TestSuccessThreshold(t *testing.T) {
 	require.EqualError(t, err, "successThreshold must be 0 or greater")
 }
 
-// TestSuccessThresholdSinks tests that we can set the required sink success
+// TestSetSuccessThresholdSinks tests that we can set the required sink success
 // threshold for a specific event type in the graph.
-func TestSuccessThresholdSinks(t *testing.T) {
+func TestSetSuccessThresholdSinks(t *testing.T) {
+	t.Parallel()
+
 	threshold := 2
 	b, err := NewBroker()
 	require.NoError(t, err)
@@ -364,11 +360,61 @@ func TestSuccessThresholdSinks(t *testing.T) {
 	require.EqualError(t, err, "successThresholdSinks must be 0 or greater")
 }
 
+func TestSuccessThreshold_NoEventType(t *testing.T) {
+	t.Parallel()
+
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.SetSuccessThreshold("t", 5)
+	require.NoError(t, err)
+	n, ok := b.SuccessThreshold("x")
+	require.False(t, ok)
+	require.Equal(t, 0, n)
+}
+
+func TestSuccessThreshold(t *testing.T) {
+	t.Parallel()
+
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.SetSuccessThreshold("t", 5)
+	require.NoError(t, err)
+	n, ok := b.SuccessThreshold("t")
+	require.True(t, ok)
+	require.Equal(t, 5, n)
+}
+
+func TestSuccessThresholdSinks_NoEventType(t *testing.T) {
+	t.Parallel()
+
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.SetSuccessThresholdSinks("t", 5)
+	require.NoError(t, err)
+	n, ok := b.SuccessThresholdSinks("x")
+	require.False(t, ok)
+	require.Equal(t, 0, n)
+}
+
+func TestSuccessThresholdSinks(t *testing.T) {
+	t.Parallel()
+
+	b, err := NewBroker()
+	require.NoError(t, err)
+	err = b.SetSuccessThresholdSinks("t", 5)
+	require.NoError(t, err)
+	n, ok := b.SuccessThresholdSinks("t")
+	require.True(t, ok)
+	require.Equal(t, 5, n)
+}
+
 // TestRemovePipelineAndNodes exercises the behavior that removes a pipeline and
 // any nodes associated with that pipeline, if they are not referenced by other pipelines.
 // The test is relatively long as it is focused on the state of the broker across
 // multiple operations.
 func TestRemovePipelineAndNodes(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	broker, err := NewBroker()
 	require.NoError(t, err)
@@ -437,6 +483,8 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 // TestRemovePipelineAndNodes_BadEventType tests attempting to remove a pipeline
 // with an event type we haven't previously registered.
 func TestRemovePipelineAndNodes_BadEventType(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	broker, err := NewBroker()
 	require.NoError(t, err)
@@ -449,6 +497,8 @@ func TestRemovePipelineAndNodes_BadEventType(t *testing.T) {
 // TestRegisterPipeline_BadParameters ensures that we perform sanity checking
 // on the parameters passed in when we attempt to register a pipeline.
 func TestRegisterPipeline_BadParameters(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		pipelineID string
 		eventType  string
@@ -488,7 +538,10 @@ func TestRegisterPipeline_BadParameters(t *testing.T) {
 	}
 
 	for name, tc := range tests {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			broker, err := NewBroker()
 			require.NoError(t, err)
 
@@ -519,6 +572,8 @@ func TestRegisterPipeline_BadParameters(t *testing.T) {
 // on the parameters passed in when we attempt to remove both individual pipelines
 // and also pipelines and nodes together.
 func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tests := map[string]struct {
 		pipelineID string
@@ -543,7 +598,11 @@ func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
 	}
 
 	for name, tc := range tests {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			broker, err := NewBroker()
 			require.NoError(t, err)
 
@@ -563,6 +622,8 @@ func TestRemovePipelineAndNodes_BadParameters(t *testing.T) {
 // TestPipelineValidate tests that given a Pipeline in various states we can assert
 // that the Pipeline is valid or invalid.
 func TestPipelineValidate(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		pipelineID       string
 		eventType        string
@@ -614,7 +675,11 @@ func TestPipelineValidate(t *testing.T) {
 	}
 
 	for name, tc := range tests {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			p := Pipeline{
 				PipelineID: PipelineID(tc.pipelineID),
 				EventType:  EventType(tc.eventType),
@@ -637,6 +702,8 @@ func TestPipelineValidate(t *testing.T) {
 
 // TestRegisterNode_NoID ensures we cannot register a Node with an empty ID.
 func TestRegisterNode_NoID(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("", &JSONFormatter{})
@@ -648,6 +715,8 @@ func TestRegisterNode_NoID(t *testing.T) {
 // overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
 // This is the default in order to maintain pre-existing behavior.
 func TestBroker_RegisterNode_AllowOverwrite_Implicit(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
@@ -659,6 +728,8 @@ func TestBroker_RegisterNode_AllowOverwrite_Implicit(t *testing.T) {
 // TestBroker_RegisterNode_AllowOverwrite_Explicit is used to prove that nodes can be
 // overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
 func TestBroker_RegisterNode_AllowOverwrite_Explicit(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{}, WithNodeRegistrationPolicy(AllowOverwrite))
@@ -670,6 +741,8 @@ func TestBroker_RegisterNode_AllowOverwrite_Explicit(t *testing.T) {
 // TestBroker_RegisterNode_DenyOverwrite is used to prove that nodes can't be
 // overwritten when a Broker has been configured with the DenyOverwrite policy.
 func TestBroker_RegisterNode_DenyOverwrite(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{}, WithNodeRegistrationPolicy(DenyOverwrite))
@@ -682,6 +755,8 @@ func TestBroker_RegisterNode_DenyOverwrite(t *testing.T) {
 // TestBroker_RegisterNode_AllowThenDenyOverwrite is used to prove that nodes can be
 // overwritten and then updated to prevent overwriting.
 func TestBroker_RegisterNode_AllowThenDenyOverwrite(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{}, WithNodeRegistrationPolicy(AllowOverwrite))
@@ -694,6 +769,8 @@ func TestBroker_RegisterNode_AllowThenDenyOverwrite(t *testing.T) {
 
 // TestRemoveNode ensures we cannot remove a Node with an empty ID.
 func TestRemoveNode(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
@@ -704,6 +781,8 @@ func TestRemoveNode(t *testing.T) {
 
 // TestRemoveNode_NoID ensures we cannot remove a Node with an empty ID.
 func TestRemoveNode_NoID(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RemoveNode(context.Background(), "")
@@ -713,6 +792,8 @@ func TestRemoveNode_NoID(t *testing.T) {
 
 // TestRemoveNode_NotFound ensures we cannot remove a Node that has not been registered
 func TestRemoveNode_NotFound(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RemoveNode(context.Background(), "n1")
@@ -722,6 +803,8 @@ func TestRemoveNode_NotFound(t *testing.T) {
 
 // TestRemoveNode_StillReferenced ensures we cannot remote a Node that is still referenced by a pipeline
 func TestRemoveNode_StillReferenced(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
@@ -735,6 +818,8 @@ func TestRemoveNode_StillReferenced(t *testing.T) {
 // TestDeregisterNode_Force ensures we can decrement the reference to a Node that is still referenced
 // by a pipeline by using the force option
 func TestRemoveNode_StillReferencedDecrement(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	err = b.RegisterNode("n1", &JSONFormatter{})
@@ -749,6 +834,8 @@ func TestRemoveNode_StillReferencedDecrement(t *testing.T) {
 // overwritten when a Broker has been implicitly configured with the AllowOverwrite policy.
 // This is the default in order to maintain pre-existing behavior.
 func TestBroker_RegisterPipeline_AllowOverwrite_Implicit(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 
@@ -779,6 +866,8 @@ func TestBroker_RegisterPipeline_AllowOverwrite_Implicit(t *testing.T) {
 // TestBroker_RegisterPipeline_AllowOverwrite_Explicit is used to prove that pipelines can be
 // overwritten when a Broker has been explicitly configured with the AllowOverwrite policy.
 func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 
@@ -809,6 +898,8 @@ func TestBroker_RegisterPipeline_AllowOverwrite_Explicit(t *testing.T) {
 // TestBroker_RegisterPipeline_DenyOverwrite is used to prove that pipelines can't
 // be overwritten when a Broker has been configured with the DenyOverwrite policy.
 func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	require.NotNil(t, b)
@@ -847,6 +938,8 @@ func TestBroker_RegisterPipeline_DenyOverwrite(t *testing.T) {
 // TestBroker_RegisterPipeline_DenyOverwrite is used to prove that pipelines can't
 // be overwritten when a Broker has been configured with the DenyOverwrite policy.
 func TestBroker_RegisterPipeline_AllowThenDenyOverwrite(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 	require.NotNil(t, b)
@@ -890,6 +983,8 @@ func TestBroker_RegisterPipeline_AllowThenDenyOverwrite(t *testing.T) {
 }
 
 func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	b, err := NewBroker()
 	require.NoError(t, err)
@@ -916,6 +1011,8 @@ func TestBroker_RegisterPipeline_WithCloser(t *testing.T) {
 }
 
 func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	b, err := NewBroker()
 	require.NoError(t, err)
@@ -943,6 +1040,8 @@ func TestBroker_RegisterPipeline_WithCloserError(t *testing.T) {
 }
 
 func TestBroker_IsAnyPipelineRegistered(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 
@@ -964,6 +1063,8 @@ func TestBroker_IsAnyPipelineRegistered(t *testing.T) {
 }
 
 func TestBroker_IsAnyPipelineRegistered_WithFailedRegistration(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 
@@ -978,6 +1079,8 @@ func TestBroker_IsAnyPipelineRegistered_WithFailedRegistration(t *testing.T) {
 }
 
 func TestBroker_IsAnyPipelineRegisteredRaceCondition(t *testing.T) {
+	t.Parallel()
+
 	b, err := NewBroker()
 	require.NoError(t, err)
 
@@ -1070,6 +1173,8 @@ func TestBroker_Status_CompleteSinks(t *testing.T) {
 		},
 	}
 	for name, tc := range tests {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
