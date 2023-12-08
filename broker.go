@@ -467,7 +467,7 @@ func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id Pip
 	return true, nodeErr
 }
 
-// SetSuccessThreshold sets the success threshold per eventType.  For the
+// SetSuccessThreshold sets the success threshold per EventType.  For the
 // overall processing of a given event to be considered a success, at least as
 // many pipelines as the threshold value must successfully process the event.
 // This means that a filter could of course filter an event before it reaches
@@ -495,7 +495,7 @@ func (b *Broker) SetSuccessThreshold(t EventType, successThreshold int) error {
 	return nil
 }
 
-// SetSuccessThresholdSinks sets the success threshold per eventType.  For the
+// SetSuccessThresholdSinks sets the success threshold per EventType.  For the
 // overall processing of a given event to be considered a success, at least as
 // many sinks as the threshold value must successfully process the event.
 func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int) error {
@@ -517,6 +517,43 @@ func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int
 
 	g.successThresholdSinks = successThresholdSinks
 	return nil
+}
+
+// SuccessThreshold returns the configured success threshold per EventType.
+// For the overall processing of a given event to be considered a success, at least
+// as many filter or sink nodes as the threshold value must successfully process
+// the event.
+// The threshold is returned (default: 0), along with a boolean indicating whether
+// the EventType was registered with the broker, if true, the threshold is accurate
+// for the specified EventType.
+func (b *Broker) SuccessThreshold(t EventType) (int, bool) {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	g, ok := b.graphs[t]
+	if ok {
+		return g.successThreshold, true
+	}
+
+	return 0, false
+}
+
+// SuccessThresholdSinks returns the configured success threshold per EventType.
+// For the overall processing of a given event to be considered a success, at least
+// as many sink nodes as the threshold value must successfully process the event.
+// The threshold is returned (default: 0), along with a boolean indicating whether
+// the EventType was registered with the broker, if true, the threshold is accurate
+// for the specified EventType.
+func (b *Broker) SuccessThresholdSinks(t EventType) (int, bool) {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	g, ok := b.graphs[t]
+	if ok {
+		return g.successThresholdSinks, true
+	}
+
+	return 0, false
 }
 
 // IsAnyPipelineRegistered returns whether a pipeline for a given event type is already registered or not.
