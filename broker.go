@@ -524,7 +524,7 @@ func (b *Broker) SetSuccessThresholdSinks(t EventType, successThresholdSinks int
 // as many filter or sink nodes as the threshold value must successfully process
 // the event.
 // The threshold is returned (default: 0), along with a boolean indicating whether
-// the EventType was registered with the broker, therefore the threshold is accurate
+// the EventType was registered with the broker, if true, the threshold is accurate
 // for the specified EventType.
 func (b *Broker) SuccessThreshold(t EventType) (int, bool) {
 	b.lock.RLock()
@@ -542,7 +542,7 @@ func (b *Broker) SuccessThreshold(t EventType) (int, bool) {
 // For the overall processing of a given event to be considered a success, at least
 // as many sink nodes as the threshold value must successfully process the event.
 // The threshold is returned (default: 0), along with a boolean indicating whether
-// the EventType was registered with the broker, therefore the threshold is accurate
+// the EventType was registered with the broker, if true, the threshold is accurate
 // for the specified EventType.
 func (b *Broker) SuccessThresholdSinks(t EventType) (int, bool) {
 	b.lock.RLock()
