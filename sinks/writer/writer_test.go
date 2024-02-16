@@ -8,8 +8,11 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/eventlogger"
 )
@@ -90,4 +93,39 @@ func TestWriterSink_Process(t *testing.T) {
 			t.Fatalf("unexpected error: %q", err)
 		}
 	})
+}
+
+// This test is a canary for the race detector
+func TestWriterSink_Process_Concurrent(t *testing.T) {
+	ctx := context.Background()
+
+	event := &eventlogger.Event{
+		Formatted: map[string][]byte{eventlogger.JSONFormat: []byte("first\n")},
+		Payload:   "First entry",
+	}
+
+	writer := new(bytes.Buffer)
+
+	s := Sink{
+		Writer: writer,
+	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			_, _ = s.Process(ctx, event)
+			time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			_, _ = s.Process(ctx, event)
+			time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+		}
+	}()
+
+	wg.Wait()
 }

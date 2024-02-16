@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 
 	"github.com/hashicorp/eventlogger"
 )
@@ -16,6 +17,8 @@ import (
 // string.  Sink allows you to define sinks for any io.Writer which
 // includes os.Stdout and os.Stderr
 type Sink struct {
+	l sync.RWMutex
+
 	// Format specifies the format the []byte representation is formatted in
 	// Defaults to JSONFormat
 	Format string
@@ -51,6 +54,8 @@ func (fs *Sink) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger
 	}
 	reader := bytes.NewReader(val)
 
+	fs.l.Lock()
+	defer fs.l.Unlock()
 	if _, err := reader.WriteTo(fs.Writer); err != nil {
 		return nil, err
 	}
