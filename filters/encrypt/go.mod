@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/pointerstructure v1.2.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.1.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
