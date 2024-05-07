@@ -3,14 +3,13 @@ package eventlogger
 import (
 	"context"
 	"fmt"
-	"log"
+	"testing"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/kafka"
 )
 
-func KafkaContainer() {
-	// runKafkaContainer {
+func TestKafkaSink_Process(t *testing.T) {
 	ctx := context.Background()
 
 	kafkaContainer, err := kafka.RunContainer(ctx,
@@ -18,20 +17,18 @@ func KafkaContainer() {
 		testcontainers.WithImage("confluentinc/confluent-local:7.5.0"),
 	)
 	if err != nil {
-		log.Fatalf("failed to start container: %s", err)
+		t.Fatalf("failed to start kafka container: %v", err)
 	}
 
-	// Clean up the container after
-	defer func() {
+	t.Cleanup(func() {
 		if err := kafkaContainer.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container: %s", err)
+			t.Fatalf("failed to terminate container: %v", err)
 		}
-	}()
-	// }
+	})
 
 	state, err := kafkaContainer.State(ctx)
 	if err != nil {
-		log.Fatalf("failed to get container state: %s", err) // nolint:gocritic
+		t.Fatalf("failed to get kafka container state: %v", err)
 	}
 
 	fmt.Println(kafkaContainer.ClusterID)
