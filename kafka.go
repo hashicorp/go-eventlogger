@@ -47,3 +47,7 @@ func (ks *KafkaSink) Process(_ context.Context, e *Event) (*Event, error) {
 
 	return nil, nil
 }
+
+func (ks *KafkaSink) Reopen() error {
+	return nil
+}
