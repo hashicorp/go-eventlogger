@@ -61,15 +61,6 @@ func (_ *KafkaSink) Type() NodeType {
 }
 
 func (ks *KafkaSink) Process(_ context.Context, e *Event) (*Event, error) {
-	format := ks.Format
-	if format == "" {
-		format = JSONFormat
-	}
-
-	val, ok := e.Format(format)
-	if !ok {
-		return nil, errors.New("event was not marshaled")
-	}
 
 	c := ks.parseConfig()
 	producer, err := sarama.NewSyncProducer(ks.Brokers, c)
@@ -78,15 +69,33 @@ func (ks *KafkaSink) Process(_ context.Context, e *Event) (*Event, error) {
 	}
 	defer producer.Close()
 
+	if err := ks.emit(producer, e); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+func (ks *KafkaSink) emit(p sarama.SyncProducer, e *Event) error {
+	format := ks.Format
+	if format == "" {
+		format = JSONFormat
+	}
+
+	val, ok := e.Format(format)
+	if !ok {
+		return errors.New("event was not marshaled")
+	}
+
 	msg := &sarama.ProducerMessage{
 		Topic: ks.Topic,
 		Value: sarama.ByteEncoder(val),
 	}
-	if _, _, err := producer.SendMessage(msg); err != nil {
-		return nil, fmt.Errorf("failed to send message: %w", err)
-	}
 
-	return nil, nil
+	if _, _, err := p.SendMessage(msg); err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+	return nil
 }
 
 func (ks *KafkaSink) Reopen() error {
