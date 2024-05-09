@@ -21,7 +21,6 @@ func TestKafkaSink_Process(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to start kafka container: %v", err)
 	}
-
 	t.Cleanup(func() {
 		if err := kafkaContainer.Terminate(ctx); err != nil {
 			t.Fatalf("failed to terminate container: %v", err)
@@ -58,16 +57,15 @@ func TestKafkaSink_Process(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create kafka client: %v", err)
 	}
-	t.Cleanup(func() {
-		if err = client.Close(); err != nil {
-			t.Fatalf("failed to close client: %v", err)
-		}
-	})
-
 	admin, err := sarama.NewClusterAdminFromClient(client)
 	if err != nil {
 		t.Fatalf("failed to create kafka admin client: %v", err)
 	}
+	t.Cleanup(func() {
+		if err := admin.Close(); err != nil {
+			t.Fatalf("failed to close admin client: %v", err)
+		}
+	})
 
 	if err = admin.CreateTopic("test-topic", &sarama.TopicDetail{
 		NumPartitions:     1,

@@ -71,17 +71,17 @@ func (ks *KafkaSink) Process(_ context.Context, e *Event) (*Event, error) {
 		return nil, errors.New("event was not marshaled")
 	}
 
-	msg := &sarama.ProducerMessage{
-		Topic: ks.Topic,
-		Value: sarama.ByteEncoder(val),
-	}
-
 	c := ks.parseConfig()
 	producer, err := sarama.NewSyncProducer(ks.Brokers, c)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create producer: %w", err)
 	}
+	defer producer.Close()
 
+	msg := &sarama.ProducerMessage{
+		Topic: ks.Topic,
+		Value: sarama.ByteEncoder(val),
+	}
 	if _, _, err := producer.SendMessage(msg); err != nil {
 		return nil, fmt.Errorf("failed to send message: %w", err)
 	}
