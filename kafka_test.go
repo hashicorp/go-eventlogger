@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestKafkaSink_Process(t *testing.T) {
+func TestKafkaSink_emit(t *testing.T) {
 	sink := KafkaSink{
 		Format: JSONFormat,
 		Topic:  "test-topic",

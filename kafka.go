@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -53,6 +54,12 @@ type KafkaSink struct {
 		// JVM producer.
 		Backoff time.Duration
 	}
+
+	producerOnce sync.Once
+
+	producer sarama.SyncProducer
+
+	lock sync.Mutex
 }
 
 // Type describes the type of the node as a Sink.
@@ -62,17 +69,21 @@ func (_ *KafkaSink) Type() NodeType {
 
 func (ks *KafkaSink) Process(_ context.Context, e *Event) (*Event, error) {
 
-	c := ks.parseConfig()
-	producer, err := sarama.NewSyncProducer(ks.Brokers, c)
+	var err error
+	ks.producerOnce.Do(func() {
+		err = ks.initProducer()
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create producer: %w", err)
 	}
-	defer producer.Close()
 
-	if err := ks.emit(producer, e); err != nil {
+	defer ks.producer.Close()
+
+	if err := ks.emit(ks.producer, e); err != nil {
 		return nil, err
 	}
 
+	// sink nodes are the end of the pipeline, no need to return the event
 	return nil, nil
 }
 
@@ -99,6 +110,21 @@ func (ks *KafkaSink) emit(p sarama.SyncProducer, e *Event) error {
 }
 
 func (ks *KafkaSink) Reopen() error {
+
+	ks.lock.Lock()
+	defer ks.lock.Unlock()
+
+	ks.producer.Close()
+
+	var err error
+	ks.producerOnce = sync.Once{}
+	ks.producerOnce.Do(func() {
+		err = ks.initProducer()
+	})
+	if err != nil {
+		return fmt.Errorf("failed to recreate producer: %w", err)
+	}
+
 	return nil
 }
 
@@ -137,4 +163,13 @@ func (ks *KafkaSink) parseConfig() *sarama.Config {
 	config.Producer.Return.Errors = true
 
 	return config
+}
+
+func (ks *KafkaSink) initProducer() error {
+	var err error
+
+	c := ks.parseConfig()
+	ks.producer, err = sarama.NewSyncProducer(ks.Brokers, c)
+
+	return err
 }
