@@ -77,8 +77,6 @@ func (ks *KafkaSink) Process(_ context.Context, e *Event) (*Event, error) {
 		return nil, fmt.Errorf("failed to create producer: %w", err)
 	}
 
-	defer ks.producer.Close()
-
 	if err := ks.emit(ks.producer, e); err != nil {
 		return nil, err
 	}
