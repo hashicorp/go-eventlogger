@@ -33,6 +33,21 @@ func TestKafkaSink_Process(t *testing.T) {
 		t.Fatalf("failed to query brokers: %v", err)
 	}
 
+	sink := KafkaSink{
+		Format:  JSONFormat,
+		Topic:   "test-topic",
+		Brokers: []string{brokers[0]},
+	}
+
+	evt := &Event{
+		Type:      "test",
+		CreatedAt: time.Now(),
+		Formatted: map[string][]byte{
+			JSONFormat: []byte(`"hello world"`),
+		},
+		Payload: []byte("hello world"),
+	}
+
 	config := sarama.NewConfig()
 	config.Version = sarama.DefaultVersion
 	config.Producer.Return.Errors = true
@@ -60,31 +75,11 @@ func TestKafkaSink_Process(t *testing.T) {
 	}, false); err != nil {
 		t.Fatalf("failed to create topic: %v", err)
 	}
-
-	producer, err := sarama.NewSyncProducerFromClient(client)
-	if err != nil {
-		t.Fatalf("failed to create kafka producer: %v", err)
-	}
 	t.Cleanup(func() {
-		if err = producer.Close(); err != nil {
-			t.Fatalf("failed to close producer: %v", err)
+		if err = admin.DeleteTopic("test-topic"); err != nil {
+			t.Fatalf("failed to delete topic: %v", err)
 		}
 	})
-
-	sink := KafkaSink{
-		Format:   JSONFormat,
-		Topic:    "test-topic",
-		Producer: producer,
-	}
-
-	evt := &Event{
-		Type:      "test",
-		CreatedAt: time.Now(),
-		Formatted: map[string][]byte{
-			JSONFormat: []byte(`"hello world"`),
-		},
-		Payload: []byte("hello world"),
-	}
 
 	_, err = sink.Process(ctx, evt)
 	if err != nil {
