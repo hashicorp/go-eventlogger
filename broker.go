@@ -599,3 +599,22 @@ func (p Pipeline) validate() error {
 
 	return err
 }
+
+// SetRequireAllPipelinesComplete is used to set a 'per EventType' setting which
+// specifies whether every pipeline invoked for this EventType should complete
+// before we will allow execution to return to the caller.
+// Configuring an EventType's Pipelines to all require completion means that even
+// cancelling the context alone will not immediately return from a Broker.Send
+// in the return to calling code.
+func (b *Broker) SetRequireAllPipelinesComplete(eventType EventType, requireAll bool) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	g, exists := b.graphs[eventType]
+	if !exists {
+		g = &graph{}
+		b.graphs[eventType] = g
+	}
+
+	g.requireAllPipelinesComplete = requireAll
+}

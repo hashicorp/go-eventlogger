@@ -27,25 +27,56 @@ type graph struct {
 	// successThresholdSinks specifies how many sinks must successfully process
 	// an event for Process to not return an error.
 	successThresholdSinks int
+
+	// requireAllPipelinesComplete specifies whether every pipeline triggered for
+	// a specific EventType should complete/return before determining Status and
+	// success based on thresholds.
+	// The default setting is false, meaning when all Pipelines complete or the
+	// context is 'done' then the Status and error will be returned.
+	// Enabling this setting allows the Status for each Pipeline to be considered
+	// in the return to calling code (Broker.Send).
+	requireAllPipelinesComplete bool
 }
 
 // Process the Event by routing it through all of the graph's nodes,
 // starting with the root node.
 func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
-	statusChan := make(chan Status)
+	// Pre-emptively create a channel that can safely hold as many statuses as
+	// we have pipelines, with the expectation that we'd have a usually have 3 nodes
+	// per pipeline (filter, formatter, sink). We do this so that we don't end up
+	// blocked when trying to return the status from processing of a node, but we
+	// may have already decided to gather Status and error to return to the caller.
+	statusChan := make(chan Status, g.roots.numRoots*3)
+
+	// Initialize so that by default, we aren't required to wait for all invoked
+	// pipelines to complete.
+	allPipelinesCompleted := !g.requireAllPipelinesComplete
+	var done bool
 	var wg sync.WaitGroup
+
 	go func() {
 		g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
+			select {
+			// Don't continue to start root nodes if our context is already done.
+			case <-ctx.Done():
+				done = true
+				return false
+			default:
+			}
+
 			wg.Add(1)
 			g.doProcess(ctx, pipeline.rootNode, e, statusChan, &wg)
 			return true
 		})
 		wg.Wait()
 		close(statusChan)
+		allPipelinesCompleted = true
 	}()
 	var status Status
-	var done bool
-	for !done {
+
+	// We will continue to aggregate our Status from nodes while we are not 'done'
+	// or waiting for pipelines to complete (when required to do so).
+	for !done || !allPipelinesCompleted {
 		select {
 		case <-ctx.Done():
 			done = true
@@ -59,6 +90,7 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 			}
 		}
 	}
+
 	return status, status.getError(g.successThreshold, g.successThresholdSinks)
 }
 
@@ -72,7 +104,7 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 //     filter node's ID
 //   - the final node in a pipeline (a sink) finishes, and Status.complete contains
 //     the sink node's ID
-func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statusChan chan Status, wg *sync.WaitGroup) {
+func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statusChan chan<- Status, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Process the current Node
@@ -99,7 +131,7 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 		return
 	}
 
-	// Process any child nodes.  This is depth-first.
+	// Process any child nodes. This is depth-first.
 	if len(node.next) != 0 {
 		// If the new Event is nil, it has been filtered out and we are done.
 		if e == nil {

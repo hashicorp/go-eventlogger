@@ -1187,3 +1187,23 @@ func TestBroker_Status_CompleteSinks(t *testing.T) {
 		})
 	}
 }
+
+func TestBroker_SetRequireAllPipelinesComplete(t *testing.T) {
+	t.Parallel()
+
+	// Create a broker
+	broker, err := NewBroker()
+	require.NoError(t, err)
+
+	// Turn 'on'
+	broker.SetRequireAllPipelinesComplete("foo", true)
+
+	// Get the pointer to the graph for further inspection.
+	g := broker.graphs["foo"]
+	require.NotNil(t, g)
+	require.True(t, g.requireAllPipelinesComplete)
+
+	// Turn 'off' and check setting.
+	broker.SetRequireAllPipelinesComplete("foo", false)
+	require.False(t, g.requireAllPipelinesComplete)
+}
