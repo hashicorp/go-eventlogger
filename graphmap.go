@@ -38,22 +38,29 @@ func (g *graphMap) Range(f func(key PipelineID, value *registeredPipeline) bool)
 
 // Store calls sync.Map.Store
 func (g *graphMap) Store(id PipelineID, root *registeredPipeline) {
-	// Store the root node and increment how many we have.
+	// Store the root node and increment how many we have (if this is a new pipeline).
 	// NOTE: These two actions might not be atomic, so potentially something could
 	// start to range over the map before we've made the change to the total number
 	// of roots.
+	if !g.Exists(id) {
+		g.numRoots++
+	}
 	g.m.Store(id, root)
-	g.numRoots++
 }
 
 // Delete calls sync.Map.Delete
 func (g *graphMap) Delete(id PipelineID) {
-	// Delete the nodes for the pipeline, and decrement how many root nodes we have.
+	if !g.Exists(id) {
+		return
+	}
+
+	// Delete the root node for the pipeline if it was already stored, and decrement
+	// how many we have.
 	// NOTE: These two actions might not be atomic, so potentially something could
 	// start to range over the map before we've made the change to the total number
 	// of roots.
-	g.m.Delete(id)
 	g.numRoots--
+	g.m.Delete(id)
 }
 
 // Nodes returns all the nodes referenced by the specified Pipeline
@@ -77,4 +84,19 @@ func (g *graphMap) Nodes(id PipelineID) ([]NodeID, error) {
 	}
 
 	return result, nil
+}
+
+// Exists determines whether a PipelineID is already stored within the graphMap.
+func (g *graphMap) Exists(id PipelineID) bool {
+	var found bool
+
+	g.Range(func(key PipelineID, v *registeredPipeline) bool {
+		if key == id {
+			found = true
+			return false
+		}
+		return true
+	})
+
+	return found
 }
