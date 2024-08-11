@@ -72,7 +72,7 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 //     filter node's ID
 //   - the final node in a pipeline (a sink) finishes, and Status.complete contains
 //     the sink node's ID
-func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statusChan chan Status, wg *sync.WaitGroup) {
+func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statusChan chan<- Status, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Process the current Node
