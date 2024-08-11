@@ -398,6 +398,8 @@ func TestSendBlocking(t *testing.T) {
 }
 
 func TestGraph_process_StopRootRangeOnContextCancelled(t *testing.T) {
+	t.Parallel()
+
 	seen := atomic.Bool{}
 	ctx, cancel := context.WithCancel(context.Background())
 	l := &sync.RWMutex{}
