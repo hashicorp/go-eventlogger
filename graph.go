@@ -68,7 +68,7 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 			}
 		}
 	}
-	return status, status.getError(g.successThreshold, g.successThresholdSinks)
+	return status, status.getError(ctx.Err(), g.successThreshold, g.successThresholdSinks)
 }
 
 // Recursively process every node in the graph.
