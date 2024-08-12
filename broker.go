@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 // RegistrationPolicy is used to specify what kind of policy should apply when
@@ -434,7 +432,7 @@ func (b *Broker) RemovePipeline(t EventType, id PipelineID) error {
 // neither the pipeline nor nodes will be deleted.
 //
 // Once we start deleting the pipeline and nodes, we will continue until completion,
-// but we'll return true along with any errors encountered (as multierror.Error).
+// but we'll return true along with any errors encountered.
 func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id PipelineID) (bool, error) {
 	switch {
 	case t == "":
@@ -458,16 +456,16 @@ func (b *Broker) RemovePipelineAndNodes(ctx context.Context, t EventType, id Pip
 
 	g.roots.Delete(id)
 
-	var nodeErr error
+	var nodeErrs []error
 
 	for _, nodeID := range nodes {
 		err = b.removeNode(ctx, nodeID, true)
 		if err != nil {
-			nodeErr = multierror.Append(nodeErr, err)
+			nodeErrs = append(nodeErrs, err)
 		}
 	}
 
-	return true, nodeErr
+	return true, errors.Join(nodeErrs...)
 }
 
 // SetSuccessThreshold sets the success threshold per EventType.  For the
@@ -579,26 +577,26 @@ func (b *Broker) IsAnyPipelineRegistered(e EventType) bool {
 // validate ensures that the Pipeline has the required configuration to allow
 // registration, removal or usage, without issue.
 func (p Pipeline) validate() error {
-	var err error
+	var errs []error
 
 	if p.PipelineID == "" {
-		err = multierror.Append(err, errors.New("pipeline ID is required"))
+		errs = append(errs, fmt.Errorf("pipeline ID is required"))
 	}
 
 	if p.EventType == "" {
-		err = multierror.Append(err, errors.New("event type is required"))
+		errs = append(errs, fmt.Errorf("event type is required"))
 	}
 
 	if len(p.NodeIDs) == 0 {
-		err = multierror.Append(err, errors.New("node IDs are required"))
+		errs = append(errs, fmt.Errorf("node IDs are required"))
 	}
 
 	for _, n := range p.NodeIDs {
 		if n == "" {
-			err = multierror.Append(err, errors.New("node ID cannot be empty"))
+			errs = append(errs, fmt.Errorf("node ID cannot be empty"))
 			break
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
