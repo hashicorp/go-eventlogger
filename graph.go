@@ -36,6 +36,15 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 	var wg sync.WaitGroup
 	go func() {
 		g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
+			select {
+			// Don't continue to start root nodes if our context is already done.
+			// We would just process the node and then drop the status, and no
+			// other linked nodes would be processed.
+			case <-ctx.Done():
+				return false
+			default:
+			}
+
 			wg.Add(1)
 			g.doProcess(ctx, pipeline.rootNode, e, statusChan, &wg)
 			return true
@@ -59,7 +68,7 @@ func (g *graph) process(ctx context.Context, e *Event) (Status, error) {
 			}
 		}
 	}
-	return status, status.getError(g.successThreshold, g.successThresholdSinks)
+	return status, status.getError(ctx.Err(), g.successThreshold, g.successThresholdSinks)
 }
 
 // Recursively process every node in the graph.
