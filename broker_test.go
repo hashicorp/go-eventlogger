@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/go-test/deep"
-	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -475,9 +474,10 @@ func TestRemovePipelineAndNodes(t *testing.T) {
 	ok, err = broker.RemovePipelineAndNodes(ctx, EventType("t"), "p2")
 	require.Error(t, err)
 	require.True(t, ok)
-	me, ok := err.(*multierror.Error)
+	unwrapped, ok := err.(interface{ Unwrap() []error })
 	require.True(t, ok)
-	require.Equal(t, 2, me.Len())
+	errs := unwrapped.Unwrap()
+	require.Len(t, errs, 2)
 }
 
 // TestRemovePipelineAndNodes_BadEventType tests attempting to remove a pipeline
@@ -561,9 +561,11 @@ func TestRegisterPipeline_BadParameters(t *testing.T) {
 			})
 
 			require.Error(t, err)
-			me, ok := err.(*multierror.Error)
+			unwrapped, ok := err.(interface{ Unwrap() []error })
 			require.True(t, ok)
-			require.EqualError(t, me.Unwrap(), tc.error)
+			errs := unwrapped.Unwrap()
+			require.Len(t, errs, 1)
+			require.EqualError(t, errs[0], tc.error)
 		})
 	}
 }
@@ -692,9 +694,10 @@ func TestPipelineValidate(t *testing.T) {
 				require.NoError(t, err)
 			default:
 				require.Error(t, err)
-				me, ok := err.(*multierror.Error)
+				unwrapped, ok := err.(interface{ Unwrap() []error })
 				require.True(t, ok)
-				require.Equal(t, tc.expectErrorCount, me.Len())
+				errs := unwrapped.Unwrap()
+				require.Len(t, errs, tc.expectErrorCount)
 			}
 		})
 	}
