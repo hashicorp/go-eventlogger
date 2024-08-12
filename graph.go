@@ -5,10 +5,9 @@ package eventlogger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 // graph
@@ -129,17 +128,17 @@ func (g *graph) doProcess(ctx context.Context, node *linkedNode, e *Event, statu
 }
 
 func (g *graph) reopen(ctx context.Context) error {
-	var errors *multierror.Error
+	var errs []error
 
 	g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
 		err := g.doReopen(ctx, pipeline.rootNode)
 		if err != nil {
-			errors = multierror.Append(errors, err)
+			errs = append(errs, err)
 		}
 		return true
 	})
 
-	return errors.ErrorOrNil()
+	return errors.Join(errs...)
 }
 
 // Recursively reopen every node in the graph.
@@ -163,17 +162,17 @@ func (g *graph) doReopen(ctx context.Context, node *linkedNode) error {
 }
 
 func (g *graph) validate() error {
-	var errors *multierror.Error
+	var errs []error
 
 	g.roots.Range(func(_ PipelineID, pipeline *registeredPipeline) bool {
 		err := g.doValidate(nil, pipeline.rootNode)
 		if err != nil {
-			errors = multierror.Append(errors, err)
+			errs = append(errs, err)
 		}
 		return true
 	})
 
-	return errors.ErrorOrNil()
+	return errors.Join(errs...)
 }
 
 func (g *graph) doValidate(parent, node *linkedNode) error {
