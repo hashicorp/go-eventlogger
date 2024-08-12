@@ -175,15 +175,18 @@ func (s Status) CompleteSinks() []NodeID {
 	return s.completeSinks
 }
 
-func (s Status) getError(threshold, thresholdSinks int) error {
+func (s Status) getError(ctxErr error, threshold, thresholdSinks int) error {
+	var err error
 	switch {
 	case len(s.complete) < threshold:
-		return fmt.Errorf("event not processed by enough 'filter' and 'sink' nodes")
+		err = fmt.Errorf("event not processed by enough 'filter' and 'sink' nodes")
 	case len(s.completeSinks) < thresholdSinks:
-		return fmt.Errorf("event not processed by enough 'sink' nodes")
+		err = fmt.Errorf("event not processed by enough 'sink' nodes")
 	default:
 		return nil
 	}
+
+	return errors.Join(err, ctxErr)
 }
 
 // Send writes an event of type t to all registered pipelines concurrently and
