@@ -2,7 +2,9 @@ name: Go
 
 on:
   push:
-    branches: [ coverage ]
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
 
