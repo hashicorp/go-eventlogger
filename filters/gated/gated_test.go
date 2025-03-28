@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -272,13 +271,13 @@ func TestGatedFilter_Process(t *testing.T) {
 		assert.Equal(wantEvent, got)
 
 		// Check the contents of the log
-		files, err := ioutil.ReadDir(tmpDir)
+		files, err := os.ReadDir(tmpDir)
 		require.NoError(err)
 		if len(files) > 1 {
 			t.Errorf("Expected 1 log file, got %d", len(files))
 		}
 
-		dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+		dat, err := os.ReadFile(filepath.Join(tmpDir, files[0].Name()))
 		require.NoError(err)
 
 		type loggedEvent struct {
@@ -389,7 +388,7 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 				return
 			}
 			// Check the contents of the log
-			files, err := ioutil.ReadDir(tmpDir)
+			files, err := os.ReadDir(tmpDir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -401,7 +400,7 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 				assert.Len(files, 0)
 			default:
 				require.Len(files, 1)
-				dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+				dat, err := os.ReadFile(filepath.Join(tmpDir, files[0].Name()))
 				require.NoError(err)
 
 				gotEvent := &loggedEvent{}
@@ -440,7 +439,7 @@ func TestGatedFilter_FlushAll(t *testing.T) {
 		err = gf.FlushAll(ctx)
 		require.NoError(err)
 
-		files, err := ioutil.ReadDir(tmpDir)
+		files, err := os.ReadDir(tmpDir)
 		require.NoError(err)
 		assert.Len(files, 0)
 	})
@@ -477,7 +476,7 @@ func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) 
 	t.Helper()
 	require := require.New(t)
 	require.NotEmpty(eventType)
-	tmpDir, err := ioutil.TempDir("", testName)
+	tmpDir, err := os.MkdirTemp("", testName)
 	require.NoError(err)
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
@@ -573,7 +572,7 @@ func TestGatedFilter_Close(t *testing.T) {
 	require.NoError(err)
 
 	// Check the contents of the log
-	files, err := ioutil.ReadDir(tmpDir)
+	files, err := os.ReadDir(tmpDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -582,7 +581,7 @@ func TestGatedFilter_Close(t *testing.T) {
 	}
 
 	require.Len(files, 1)
-	dat, err := ioutil.ReadFile(filepath.Join(tmpDir, files[0].Name()))
+	dat, err := os.ReadFile(filepath.Join(tmpDir, files[0].Name()))
 	require.NoError(err)
 
 	gotEvent := &loggedEvent{}

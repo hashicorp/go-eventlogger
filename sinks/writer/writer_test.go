@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"sync"
@@ -66,7 +65,7 @@ func TestWriterSink_Process(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, err := ioutil.ReadAll(tt.writer)
+			got, err := io.ReadAll(tt.writer)
 			if err != nil {
 				t.Fatal(err)
 			}
