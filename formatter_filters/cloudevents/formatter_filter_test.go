@@ -344,7 +344,9 @@ func TestFormatterFilter_Process(t *testing.T) {
 				tt.wantCloudEvent.SerializedHmac = ""
 				buf := &bytes.Buffer{}
 				enc := json.NewEncoder(buf)
-				enc.Encode(tt.wantCloudEvent)
+				if err := enc.Encode(tt.wantCloudEvent); err != nil {
+					t.Fatal(err)
+				}
 				require.NoError(err)
 				tt.wantCloudEvent.Serialized = base64.RawURLEncoding.EncodeToString(buf.Bytes())
 				tt.wantCloudEvent.SerializedHmac = hmac
@@ -420,5 +422,5 @@ func (t *testOptionalInterfaces) ID() string {
 }
 
 func (t *testOptionalInterfaces) Data() interface{} {
-	return t.payload["data"].(interface{})
+	return t.payload["data"]
 }

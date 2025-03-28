@@ -146,9 +146,7 @@ func (l *linkedNode) flatten() map[NodeID]struct{} {
 
 		flattened[node.nodeID] = struct{}{}
 
-		for _, child := range node.next {
-			stack = append(stack, child)
-		}
+		stack = append(stack, node.next...)
 	}
 
 	return flattened
