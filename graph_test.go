@@ -5,7 +5,6 @@ package eventlogger
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -278,7 +277,7 @@ func (fsd *fileSinkDelayed) Process(ctx context.Context, e *Event) (*Event, erro
 }
 
 func TestSendBlocking(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", t.Name())
+	tmpDir, err := os.MkdirTemp("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

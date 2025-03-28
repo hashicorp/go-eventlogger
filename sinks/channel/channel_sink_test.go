@@ -56,8 +56,9 @@ func TestNewChannelSink(t *testing.T) {
 func TestProcess(t *testing.T) {
 	t.Parallel()
 
-	timeoutCtx, _ := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-	
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+	defer cancel()
+
 	tests := []struct {
 		name            string
 		c               chan *eventlogger.Event
@@ -73,14 +74,14 @@ func TestProcess(t *testing.T) {
 		},
 		{
 			name:            "write timeout",
-			c:               make(chan *eventlogger.Event, 0),
+			c:               make(chan *eventlogger.Event),
 			d:               time.Second,
 			ctx:             context.Background(),
 			wantErrContains: "chan write timeout",
 		},
 		{
 			name:            "context timeout",
-			c:               make(chan *eventlogger.Event, 0),
+			c:               make(chan *eventlogger.Event),
 			d:               time.Second,
 			ctx:             timeoutCtx,
 			wantErrContains: "context deadline exceeded",

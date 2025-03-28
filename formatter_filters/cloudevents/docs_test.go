@@ -109,5 +109,5 @@ func (t *testPayload) ID() string {
 }
 
 func (t *testPayload) Data() interface{} {
-	return t.payload["data"].(interface{})
+	return t.payload["data"]
 }
