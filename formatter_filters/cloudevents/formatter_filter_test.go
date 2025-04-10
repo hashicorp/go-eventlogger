@@ -344,9 +344,7 @@ func TestFormatterFilter_Process(t *testing.T) {
 				tt.wantCloudEvent.SerializedHmac = ""
 				buf := &bytes.Buffer{}
 				enc := json.NewEncoder(buf)
-				if err := enc.Encode(tt.wantCloudEvent); err != nil {
-					t.Fatal(err)
-				}
+				err := enc.Encode(tt.wantCloudEvent)
 				require.NoError(err)
 				tt.wantCloudEvent.Serialized = base64.RawURLEncoding.EncodeToString(buf.Bytes())
 				tt.wantCloudEvent.SerializedHmac = hmac
