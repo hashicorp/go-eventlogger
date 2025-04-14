@@ -46,7 +46,7 @@ func (fs *Sink) Process(ctx context.Context, e *eventlogger.Event) (*eventlogger
 
 	format := fs.Format
 	if fs.Format == "" {
-		format = jsonfmt.JSONFormat
+		format = eventlogger.JSONFormat
 	}
 	val, ok := e.Format(format)
 	if !ok {

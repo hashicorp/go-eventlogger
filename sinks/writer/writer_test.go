@@ -21,7 +21,7 @@ func TestWriterSink_Process(t *testing.T) {
 	ctx := context.Background()
 
 	event := &eventlogger.Event{
-		Formatted: map[string][]byte{jsonfmt.JSONFormat: []byte("first\n")},
+		Formatted: map[string][]byte{eventlogger.JSONFormat: []byte("first\n")},
 		Payload:   "First entry",
 	}
 
@@ -100,7 +100,7 @@ func TestWriterSink_Process_Concurrent(t *testing.T) {
 	ctx := context.Background()
 
 	event := &eventlogger.Event{
-		Formatted: map[string][]byte{jsonfmt.JSONFormat: []byte("first\n")},
+		Formatted: map[string][]byte{eventlogger.JSONFormat: []byte("first\n")},
 		Payload:   "First entry",
 	}
 

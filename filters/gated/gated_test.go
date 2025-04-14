@@ -15,7 +15,6 @@ import (
 
 	"github.com/hashicorp/eventlogger"
 	"github.com/hashicorp/eventlogger/filters/gated"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -493,7 +492,7 @@ func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) 
 	}
 
 	// Marshal to JSON
-	n1 := &jsonfmt.JSONFormatter{}
+	n1 := &eventlogger.JSONFormatter{}
 	// Send to FileSink
 	n2 := &eventlogger.FileSink{Path: tmpDir, FileName: "file.log"}
 

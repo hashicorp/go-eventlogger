@@ -21,7 +21,7 @@ func ExampleChannelSink() {
 	b.StopTimeAt(then) // setting this so the output timestamps are predictable for testing.
 
 	// Marshal to JSON
-	jsonFmt := &jsonfmt.JSONFormatter{}
+	jsonFmt := &eventlogger.JSONFormatter{}
 
 	// Send the output to a channel
 	testChan := make(chan *eventlogger.Event, 1)
