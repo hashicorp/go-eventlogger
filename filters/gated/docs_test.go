@@ -28,7 +28,7 @@ func ExampleFilter() {
 		NowFunc: func() time.Time { return then }, // setting this so the output timestamps are predictable for testing.
 	}
 	// Marshal to JSON
-	jsonFmt := &eventlogger.JSONFormatter{}
+	jsonFmt := &jsonfmt.JSONFormatter{}
 
 	// Send the output to stdout
 	stdoutSink := &writer.Sink{

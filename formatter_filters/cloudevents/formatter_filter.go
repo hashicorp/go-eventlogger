@@ -12,8 +12,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/hashicorp/eventlogger"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
+
+	"github.com/hashicorp/eventlogger"
 )
 
 const (
@@ -228,12 +229,12 @@ func (f *FormatterFilter) Reopen() error {
 	return nil
 }
 
-// Type describes the type of the node as a Formatter.
+// Type describes the type of the node as a JSONFormatter.
 func (f *FormatterFilter) Type() eventlogger.NodeType {
 	return eventlogger.NodeTypeFormatterFilter
 }
 
-// Name returns a representation of the Formatter's name
+// Name returns a representation of the JSONFormatter's name
 func (f *FormatterFilter) Name() string {
 	return NodeName
 }

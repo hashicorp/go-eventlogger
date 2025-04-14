@@ -10,6 +10,7 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/goleak v1.3.0
+	google.golang.org/protobuf v1.36.6
 	mvdan.cc/gofumpt v0.6.0
 )
 

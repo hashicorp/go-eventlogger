@@ -15,7 +15,7 @@ const (
 )
 
 // Format defines a type for the supported encoding formats used by
-// Formatter.Format and used when when calling eventlogger Event.Format(...)
+// JSONFormatter.Format and used when when calling eventlogger Event.Format(...)
 // from other nodes
 type Format string
 
