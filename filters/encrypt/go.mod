@@ -2,8 +2,6 @@ module github.com/hashicorp/eventlogger/filters/encrypt
 
 go 1.23.0
 
-toolchain go1.24.2
-
 require (
 	github.com/hashicorp/eventlogger v0.2.10
 	github.com/hashicorp/go-kms-wrapping/v2 v2.0.18
