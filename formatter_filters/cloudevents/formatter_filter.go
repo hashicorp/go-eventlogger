@@ -190,7 +190,9 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as JSON: %w", op, err)
 		}
-		f.sign(ctx, &ce, enc, buf)
+		if err := f.sign(ctx, &ce, enc, buf); err != nil {
+			return nil, fmt.Errorf("failed to sign: %w", err)
+		}
 		e.FormattedAs(string(FormatJSON), buf.Bytes())
 	case FormatText:
 		ce.DataContentType = DataContentTypeText
@@ -200,7 +202,9 @@ func (f *FormatterFilter) Process(ctx context.Context, e *eventlogger.Event) (*e
 		if err := enc.Encode(ce); err != nil {
 			return nil, fmt.Errorf("%s: error formatting as text: %w", op, err)
 		}
-		f.sign(ctx, &ce, enc, buf)
+		if err := f.sign(ctx, &ce, enc, buf); err != nil {
+			return nil, fmt.Errorf("failed to sign: %w", err)
+		}
 		e.FormattedAs(string(FormatText), buf.Bytes())
 	default:
 		// this should be unreachable since f.validate() should catch this error
