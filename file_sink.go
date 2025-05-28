@@ -75,7 +75,7 @@ const (
 )
 
 // Type describes the type of the node as a Sink.
-func (_ *FileSink) Type() NodeType {
+func (*FileSink) Type() NodeType {
 	return NodeTypeSink
 }
 
