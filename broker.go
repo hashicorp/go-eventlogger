@@ -203,7 +203,7 @@ func (b *Broker) Send(ctx context.Context, t EventType, payload interface{}) (St
 
 	e := &Event{
 		Type:      t,
-		CreatedAt: b.clock.Now(),
+		CreatedAt: b.Now(),
 		Formatted: make(map[string][]byte),
 		Payload:   payload,
 	}

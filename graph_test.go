@@ -281,7 +281,7 @@ func TestSendBlocking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 	fs := &FileSink{Path: tmpDir, FileName: "sink"}
 	goodsink := NodeID("good")
 	slowsink := NodeID("bad")

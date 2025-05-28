@@ -207,6 +207,7 @@ func (w *Filter) processExpiredEvents(ctx context.Context) error {
 	}
 
 	// Iterate through list, starting with the oldest gated event at the front.
+LOOP:
 	for e := w.orderedGated.Front(); e != nil; e = e.Next() {
 		ge := e.Value.(*gatedEvent)
 		switch {
@@ -217,7 +218,7 @@ func (w *Filter) processExpiredEvents(ctx context.Context) error {
 		default:
 			// since the event are ordered by when they arrived, once we hit one
 			// that's not expired we're done.
-			break
+			break LOOP
 		}
 	}
 	return nil
@@ -290,12 +291,11 @@ func (w *Filter) openGate(ctx context.Context, ge *gatedEvent) error {
 		// a Gateable payload would create infinite loop.
 		return fmt.Errorf("%s: %T.ComposeFrom returned a Gateable payload", op, p)
 	}
-	switch {
-	case w.Broker == nil:
+	if w.Broker == nil {
 		// no op... perhaps we should log this somehow in the future if
 		// the Filter adds a logger.  For now, we'll just drop the
 		// event into the bit bucket to nowhere.
-	default:
+	} else {
 		if _, err := w.Broker.Send(ctx, t, p); err != nil {
 			return err
 		}
