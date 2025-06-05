@@ -479,7 +479,7 @@ func testBrokerWithGatedFilter(t *testing.T, testName string, eventType string) 
 	tmpDir, err := os.MkdirTemp("", testName)
 	require.NoError(err)
 	t.Cleanup(func() {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 	})
 
 	// Create a broker
