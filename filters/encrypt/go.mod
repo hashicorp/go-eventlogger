@@ -1,6 +1,6 @@
 module github.com/hashicorp/eventlogger/filters/encrypt
 
-go 1.23.0
+go 1.24.0
 
 require (
 	github.com/hashicorp/eventlogger v0.2.10
@@ -8,7 +8,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/mitchellh/pointerstructure v1.2.1
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/crypto v0.38.0
+	golang.org/x/crypto v0.45.0
 	google.golang.org/protobuf v1.36.4
 )
 
