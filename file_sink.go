@@ -18,10 +18,16 @@ import (
 	"time"
 )
 
+// Special file paths that receive special handling by FileSink.
 const (
-	stdout  = "/dev/stdout"
-	stderr  = "/dev/stderr"
-	devnull = "/dev/null"
+	// FileStdout represents the standard output stream path for FileSink.
+	FileStdout = "/dev/stdout"
+
+	// FileStderr represents the standard error stream path for FileSink.
+	FileStderr = "/dev/stderr"
+
+	// FileDevNull represents the null device path where FileSink discards data.
+	FileDevNull = "/dev/null"
 )
 
 // FileSink writes the []byte representation of an Event to a file
@@ -81,9 +87,15 @@ func (*FileSink) Type() NodeType {
 
 // Process writes the []byte representation of an Event to a file
 // as a string.
-func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
+func (fs *FileSink) Process(ctx context.Context, e *Event) (*Event, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	// '/dev/null' should just return success
-	if fs.Path == devnull {
+	if fs.Path == FileDevNull {
 		return nil, nil
 	}
 
@@ -101,11 +113,18 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 	fs.l.Lock()
 	defer fs.l.Unlock()
 
+	// Check context again after acquiring the lock.
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	var writer io.Writer
 	switch fs.Path {
-	case stdout:
+	case FileStdout:
 		writer = os.Stdout
-	case stderr:
+	case FileStderr:
 		writer = os.Stderr
 	default:
 		if fs.f == nil {
@@ -146,7 +165,7 @@ func (fs *FileSink) Process(_ context.Context, e *Event) (*Event, error) {
 // handle obtaining the relevant lock on the struct.
 func (fs *FileSink) reopen() error {
 	switch fs.Path {
-	case stdout, stderr, devnull:
+	case FileStdout, FileStderr, FileDevNull:
 		return nil
 	}
 
@@ -176,7 +195,7 @@ func (fs *FileSink) reopen() error {
 // Reopen will close, rotate and reopen the Sink's file.
 func (fs *FileSink) Reopen() error {
 	switch fs.Path {
-	case stdout, stderr, devnull:
+	case FileStdout, FileStderr, FileDevNull:
 		return nil
 	}
 
@@ -194,7 +213,7 @@ func (fs *FileSink) Name() string {
 func (fs *FileSink) open() error {
 	// Return early if the file is open, or we're using a special path.
 	switch fs.Path {
-	case devnull, stdout, stderr:
+	case FileDevNull, FileStdout, FileStderr:
 		return nil
 	default:
 		if fs.f != nil {
@@ -241,7 +260,7 @@ func (fs *FileSink) open() error {
 
 func (fs *FileSink) rotate() error {
 	switch fs.Path {
-	case stdout, stderr, devnull:
+	case FileStdout, FileStderr, FileDevNull:
 		return nil
 	}
 
@@ -279,7 +298,7 @@ func (fs *FileSink) rotate() error {
 
 func (fs *FileSink) pruneFiles() error {
 	switch {
-	case fs.Path == stdout, fs.Path == stderr, fs.Path == devnull:
+	case fs.Path == FileStdout, fs.Path == FileStderr, fs.Path == FileDevNull:
 		return nil
 	case fs.MaxFiles == 0:
 		return nil

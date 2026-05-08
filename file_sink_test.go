@@ -6,12 +6,13 @@ package eventlogger
 import (
 	"bytes"
 	"context"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFileSink_NewDir(t *testing.T) {
@@ -51,13 +52,13 @@ func TestFileSink_Reopen(t *testing.T) {
 		IsFile bool
 	}{
 		"stdout": {
-			Path: stdout,
+			Path: FileStdout,
 		},
 		"stderr": {
-			Path: stderr,
+			Path: FileStderr,
 		},
 		"dev/null": {
-			Path: devnull,
+			Path: FileDevNull,
 		},
 		"default-file": {
 			IsFile: true,
@@ -358,6 +359,7 @@ func TestFileSink_pruneFiles(t *testing.T) {
 		t.Errorf("Expected %d files, got %d", want, got)
 	}
 }
+
 func TestFileSink_FileMode(t *testing.T) {
 	t.Parallel()
 
@@ -406,4 +408,94 @@ func TestFileSink_DirMode(t *testing.T) {
 	if actualDirMode.Perm() != parentDirMode.Perm() {
 		t.Errorf("Expected file mode %q, got %q", parentDirMode.Perm(), actualDirMode.Perm())
 	}
+}
+
+func TestFileSink_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		path string
+	}{
+		"regular-file-path": {
+			path: t.TempDir(),
+		},
+		"stdout": {
+			path: FileStdout,
+		},
+		"stderr": {
+			path: FileStderr,
+		},
+		"devnull": {
+			path: FileDevNull,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			fs := &FileSink{
+				Path:     tc.path,
+				FileName: "sink.log",
+			}
+
+			// Create and immediately cancel the context.
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			event := &Event{
+				Formatted: map[string][]byte{JSONFormat: []byte(`{"msg":"test data"}`)},
+				Payload:   "test",
+			}
+
+			// Process should return context error immediately.
+			_, err := fs.Process(ctx, event)
+			require.Error(t, err)
+			require.Equal(t, context.Canceled, err)
+		})
+	}
+}
+
+func TestFileSink_ContextCancellationBetweenWrites(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	fs := &FileSink{
+		Path:     tmpDir,
+		FileName: "sink.log",
+	}
+
+	// Create a context that we'll cancel between writes.
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Process one event successfully.
+	event := &Event{
+		Formatted: map[string][]byte{JSONFormat: []byte(`{"msg":"first event"}`)},
+		Payload:   "first event",
+	}
+	_, err := fs.Process(ctx, event)
+	require.NoError(t, err)
+
+	// Verify the first event was processed and written to the sink.
+	filePath := filepath.Join(tmpDir, "sink.log")
+	content, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, `{"msg":"first event"}`, string(content))
+
+	// Cancel the context and next time we process an event,
+	// it should fail with context error.
+	cancel()
+
+	event2 := &Event{
+		Formatted: map[string][]byte{JSONFormat: []byte(`{"msg":"second event"}`)},
+		Payload:   "second event",
+	}
+	_, err = fs.Process(ctx, event2)
+	require.Error(t, err)
+	require.Equal(t, context.Canceled, err)
+
+	// Verify the file still only contains the first event (second write didn't happen).
+	contentAfter, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, `{"msg":"first event"}`, string(contentAfter))
 }
